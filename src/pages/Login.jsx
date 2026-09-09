@@ -19,8 +19,19 @@ export default function Login() {
   const [adminCode, setAdminCode] = useState("");
   const [adminError, setAdminError] = useState("");
   const [adminLoading, setAdminLoading] = useState(false);
+  const [adminDenied, setAdminDenied] = useState(() => sessionStorage.getItem("bear_admin_denied") === "true");
   const navigate = useNavigate();
   const returnTo = safeReturnTo();
+
+  React.useEffect(() => {
+    if (adminDenied) {
+      const t = setTimeout(() => {
+        sessionStorage.removeItem("bear_admin_denied");
+        setAdminDenied(false);
+      }, 5000);
+      return () => clearTimeout(t);
+    }
+  }, [adminDenied]);
 
   const handleLongPress = () => {
     setAdminModal(true);
@@ -79,6 +90,11 @@ export default function Login() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-10 bg-gradient-to-b from-background to-secondary/40">
       <div className="w-full max-w-sm">
+        {adminDenied && (
+          <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm text-center">
+            No pudimos validar el acceso.
+          </div>
+        )}
         <div className="flex flex-col items-center mb-8">
           <Logo size="xl" onLongPress={handleLongPress} />
           <p className="mt-4 text-sm text-muted-foreground text-center">
