@@ -1,19 +1,41 @@
-// Geo helpers using free OpenStreetMap Nominatim (no API key needed).
-const NOMINATIM = "https://nominatim.openstreetmap.org";
+import { onMapsSDKReady } from "./mapsConfig";
+
+export const FORMOSA_CENTER = { lat: -26.1849, lng: -58.1731 };
 
 export async function searchPlaces(query) {
   if (!query || query.trim().length < 3) return [];
   try {
-    const res = await fetch(
-      `${NOMINATIM}/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=ar&accept-language=es`,
-      { headers: { "Accept": "application/json" } }
+    const g = await onMapsSDKReady();
+    const autoService = new g.maps.places.AutocompleteService();
+    const predictions = await new Promise((resolve) => {
+      autoService.getPlacePredictions(
+        { input: query, componentRestrictions: { country: "ar" }, language: "es" },
+        (res, status) => {
+          if (status === g.maps.places.PlacesServiceStatus.OK && res) resolve(res);
+          else resolve([]);
+        }
+      );
+    });
+    if (!predictions.length) return [];
+    const geocoder = new g.maps.Geocoder();
+    const results = await Promise.all(
+      predictions.slice(0, 5).map((p) =>
+        new Promise((resolve) => {
+          geocoder.geocode({ placeId: p.place_id }, (res, status) => {
+            if (status === g.maps.GeocoderStatus.OK && res && res[0]) {
+              resolve({
+                label: p.description,
+                lat: res[0].geometry.location.lat(),
+                lng: res[0].geometry.location.lng(),
+              });
+            } else {
+              resolve(null);
+            }
+          });
+        })
+      )
     );
-    const data = await res.json();
-    return data.map((r) => ({
-      label: r.display_name,
-      lat: parseFloat(r.lat),
-      lng: parseFloat(r.lon),
-    }));
+    return results.filter(Boolean);
   } catch {
     return [];
   }
@@ -21,11 +43,15 @@ export async function searchPlaces(query) {
 
 export async function reverseGeocode(lat, lng) {
   try {
-    const res = await fetch(
-      `${NOMINATIM}/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=es`
-    );
-    const data = await res.json();
-    return data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    const g = await onMapsSDKReady();
+    const geocoder = new g.maps.Geocoder();
+    const result = await new Promise((resolve) => {
+      geocoder.geocode({ location: { lat, lng } }, (res, status) => {
+        if (status === g.maps.GeocoderStatus.OK && res && res[0]) resolve(res[0].formatted_address);
+        else resolve(null);
+      });
+    });
+    return result || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
   } catch {
     return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
   }
@@ -44,5 +70,3 @@ export function getCurrentPosition() {
     );
   });
 }
-
-export const FORMOSA_CENTER = { lat: -26.1849, lng: -58.1731 };
