@@ -1,0 +1,32 @@
+{
+  "name": "BearPointsLedger",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "points": {
+      "type": "number",
+      "description": "Positive for awards, negative for redemptions"
+    },
+    "reason": {
+      "type": "string",
+      "description": "ride_completed, promo, redemption, adjustment"
+    },
+    "ride_id": {
+      "type": "string"
+    },
+    "balance_after": {
+      "type": "number"
+    },
+    "admin_by": {
+      "type": "string",
+      "description": "Admin user id if manual adjustment"
+    }
+  },
+  "required": [
+    "user_id",
+    "points",
+    "reason"
+  ]
+}

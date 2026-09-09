@@ -1,0 +1,39 @@
+{
+  "name": "DailyChargeConfig",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "amount": {
+      "type": "number",
+      "default": 1500
+    },
+    "currency": {
+      "type": "string",
+      "default": "ARS"
+    },
+    "late_fee_coefficient": {
+      "type": "number",
+      "default": 0.1,
+      "description": "Daily late fee as fraction of amount"
+    },
+    "grace_days": {
+      "type": "number",
+      "default": 3
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    },
+    "effective_from": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "name",
+    "amount",
+    "active"
+  ]
+}

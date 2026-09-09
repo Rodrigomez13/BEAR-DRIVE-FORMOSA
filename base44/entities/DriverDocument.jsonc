@@ -1,0 +1,78 @@
+{
+  "name": "DriverDocument",
+  "type": "object",
+  "properties": {
+    "driver_id": {
+      "type": "string"
+    },
+    "application_id": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string",
+      "enum": [
+        "personal",
+        "vehicle"
+      ],
+      "description": "Personal or vehicle document"
+    },
+    "code": {
+      "type": "string",
+      "description": "Document requirement code, e.g. dni, license, insurance"
+    },
+    "label": {
+      "type": "string"
+    },
+    "file_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "file_uri": {
+      "type": "string",
+      "description": "Private file URI for signed access"
+    },
+    "document_number": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PENDING",
+        "APPROVED",
+        "REJECTED",
+        "EXPIRED",
+        "MORE_INFO_REQUIRED",
+        "GRACE_PERIOD"
+      ],
+      "default": "PENDING"
+    },
+    "review_comment": {
+      "type": "string"
+    },
+    "rejection_reason": {
+      "type": "string"
+    },
+    "reviewed_by": {
+      "type": "string"
+    },
+    "review_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "driver_id",
+    "subject",
+    "code",
+    "label",
+    "status"
+  ]
+}

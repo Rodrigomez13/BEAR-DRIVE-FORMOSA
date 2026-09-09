@@ -1,0 +1,138 @@
+{
+  "name": "Ride",
+  "type": "object",
+  "properties": {
+    "passenger_id": {
+      "type": "string"
+    },
+    "passenger_name": {
+      "type": "string"
+    },
+    "driver_id": {
+      "type": "string"
+    },
+    "driver_name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PLANNING",
+        "QUOTED",
+        "SEARCHING",
+        "NO_DRIVERS",
+        "ASSIGNED",
+        "DRIVER_APPROACHING",
+        "DRIVER_ARRIVED",
+        "WAITING",
+        "PIN_VALIDATION",
+        "IN_PROGRESS",
+        "ARRIVED",
+        "PAYMENT_PENDING",
+        "COMPLETED",
+        "RATED",
+        "CANCELLED",
+        "NO_SHOW"
+      ],
+      "default": "PLANNING"
+    },
+    "origin_address": {
+      "type": "string"
+    },
+    "origin_lat": {
+      "type": "number"
+    },
+    "origin_lng": {
+      "type": "number"
+    },
+    "destination_address": {
+      "type": "string"
+    },
+    "destination_lat": {
+      "type": "number"
+    },
+    "destination_lng": {
+      "type": "number"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "basic",
+        "flash",
+        "premium"
+      ],
+      "default": "basic"
+    },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "cash",
+        "qr"
+      ],
+      "default": "cash"
+    },
+    "quoted_fare": {
+      "type": "number"
+    },
+    "final_fare": {
+      "type": "number"
+    },
+    "fare_adjustments": {
+      "type": "string",
+      "description": "JSON breakdown of fare adjustments"
+    },
+    "distance_km": {
+      "type": "number"
+    },
+    "duration_min": {
+      "type": "number"
+    },
+    "start_pin": {
+      "type": "string",
+      "description": "Hashed PIN - set by backend"
+    },
+    "vehicle_id": {
+      "type": "string"
+    },
+    "vehicle_plate": {
+      "type": "string"
+    },
+    "vehicle_model": {
+      "type": "string"
+    },
+    "vehicle_color": {
+      "type": "string"
+    },
+    "driver_rating": {
+      "type": "number"
+    },
+    "passenger_rating": {
+      "type": "number"
+    },
+    "rating_comment": {
+      "type": "string"
+    },
+    "quote_data": {
+      "type": "string",
+      "description": "JSON snapshot of quote context"
+    },
+    "completed_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cancelled_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cancel_reason": {
+      "type": "string"
+    },
+    "idempotency_key": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "passenger_id",
+    "status"
+  ]
+}

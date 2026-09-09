@@ -1,0 +1,73 @@
+{
+  "name": "Vehicle",
+  "type": "object",
+  "properties": {
+    "driver_id": {
+      "type": "string",
+      "description": "Owner driver user id"
+    },
+    "make": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "year": {
+      "type": "number"
+    },
+    "plate": {
+      "type": "string"
+    },
+    "color": {
+      "type": "string"
+    },
+    "nickname": {
+      "type": "string"
+    },
+    "segment": {
+      "type": "string",
+      "description": "sedan, suv, hatchback, etc"
+    },
+    "has_ac": {
+      "type": "boolean",
+      "default": true
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "basic",
+        "flash",
+        "premium"
+      ],
+      "default": "basic"
+    },
+    "premium_eligible": {
+      "type": "boolean",
+      "default": false
+    },
+    "premium_approved_by": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected",
+        "inactive"
+      ],
+      "default": "pending"
+    },
+    "photo_url": {
+      "type": "string",
+      "format": "uri"
+    }
+  },
+  "required": [
+    "driver_id",
+    "make",
+    "model",
+    "plate",
+    "status"
+  ]
+}

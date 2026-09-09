@@ -1,0 +1,78 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "description": "The role of the user in the app",
+      "enum": [
+        "admin",
+        "user"
+      ]
+    },
+    "phone": {
+      "type": "string",
+      "description": "Phone number"
+    },
+    "city": {
+      "type": "string",
+      "description": "City of residence"
+    },
+    "profile_photo_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Profile photo"
+    },
+    "driver_status": {
+      "type": "string",
+      "enum": [
+        "NOT_APPLIED",
+        "APPLICATION_DRAFT",
+        "PENDING_REVIEW",
+        "MORE_INFO_REQUIRED",
+        "APPROVED",
+        "REJECTED",
+        "SUSPENDED",
+        "EXPIRED"
+      ],
+      "default": "NOT_APPLIED",
+      "description": "Driver application status"
+    },
+    "driver_capability": {
+      "type": "string",
+      "enum": [
+        "NO_DRIVER",
+        "ONBOARDING",
+        "PENDING_REVIEW",
+        "APPROVED_BLOCKED",
+        "APPROVED_ELIGIBLE",
+        "SUSPENDED"
+      ],
+      "default": "NO_DRIVER",
+      "description": "Operational driver capability"
+    },
+    "last_active_mode": {
+      "type": "string",
+      "enum": [
+        "passenger",
+        "driver"
+      ],
+      "default": "passenger"
+    },
+    "rating_avg": {
+      "type": "number",
+      "default": 0
+    },
+    "total_rides": {
+      "type": "number",
+      "default": 0
+    },
+    "bearpoints_balance": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "role"
+  ]
+}

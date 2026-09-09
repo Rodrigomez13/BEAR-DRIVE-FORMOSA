@@ -1,0 +1,48 @@
+{
+  "name": "Benefit",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "audience": {
+      "type": "string",
+      "enum": [
+        "passenger",
+        "driver",
+        "all"
+      ],
+      "default": "all"
+    },
+    "partner": {
+      "type": "string"
+    },
+    "points_cost": {
+      "type": "number",
+      "default": 0
+    },
+    "discount_text": {
+      "type": "string"
+    },
+    "image_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "title",
+    "audience",
+    "enabled"
+  ]
+}

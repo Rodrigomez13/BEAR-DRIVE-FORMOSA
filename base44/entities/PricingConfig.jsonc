@@ -1,0 +1,57 @@
+{
+  "name": "PricingConfig",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "base_fare": {
+      "type": "number",
+      "default": 300
+    },
+    "per_km": {
+      "type": "number",
+      "default": 120
+    },
+    "per_min": {
+      "type": "number",
+      "default": 40
+    },
+    "min_fare": {
+      "type": "number",
+      "default": 500
+    },
+    "flash_supplement": {
+      "type": "number",
+      "default": 200,
+      "description": "Flat supplement for Flash priority"
+    },
+    "premium_multiplier": {
+      "type": "number",
+      "default": 1.5
+    },
+    "currency": {
+      "type": "string",
+      "default": "ARS"
+    },
+    "effective_from": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "effective_to": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "name",
+    "base_fare",
+    "per_km",
+    "per_min",
+    "active"
+  ]
+}

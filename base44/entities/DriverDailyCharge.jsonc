@@ -1,0 +1,61 @@
+{
+  "name": "DriverDailyCharge",
+  "type": "object",
+  "properties": {
+    "driver_id": {
+      "type": "string"
+    },
+    "driver_name": {
+      "type": "string"
+    },
+    "business_day": {
+      "type": "string",
+      "description": "YYYY-MM-DD business day"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Snapshot of charge amount applied that day"
+    },
+    "currency": {
+      "type": "string",
+      "default": "ARS"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "paid",
+        "waived"
+      ],
+      "default": "pending"
+    },
+    "late_fee": {
+      "type": "number",
+      "default": 0
+    },
+    "total_due": {
+      "type": "number",
+      "default": 0
+    },
+    "trigger_ride_id": {
+      "type": "string",
+      "description": "First completed ride that triggered the charge"
+    },
+    "paid_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "waived_by": {
+      "type": "string"
+    },
+    "waive_reason": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "driver_id",
+    "business_day",
+    "amount",
+    "status"
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "name": "SupportCase",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "user_name": {
+      "type": "string"
+    },
+    "ride_id": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "ride",
+        "payment",
+        "driver",
+        "passenger",
+        "safety",
+        "documentation",
+        "account"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "in_progress",
+        "resolved",
+        "closed"
+      ],
+      "default": "open"
+    },
+    "description": {
+      "type": "string"
+    },
+    "resolution": {
+      "type": "string"
+    },
+    "assigned_to": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "user_id",
+    "category",
+    "status",
+    "description"
+  ]
+}

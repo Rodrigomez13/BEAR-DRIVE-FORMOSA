@@ -1,0 +1,35 @@
+{
+  "name": "Zone",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string",
+      "default": "Formosa"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "priority": {
+      "type": "number",
+      "default": 1
+    },
+    "center_lat": {
+      "type": "number"
+    },
+    "center_lng": {
+      "type": "number"
+    },
+    "radius_km": {
+      "type": "number",
+      "default": 15
+    }
+  },
+  "required": [
+    "name",
+    "enabled"
+  ]
+}

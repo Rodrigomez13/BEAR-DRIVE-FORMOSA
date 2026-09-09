@@ -1,0 +1,42 @@
+{
+  "name": "Rating",
+  "type": "object",
+  "properties": {
+    "ride_id": {
+      "type": "string"
+    },
+    "rater_id": {
+      "type": "string",
+      "description": "User giving the rating"
+    },
+    "ratee_id": {
+      "type": "string",
+      "description": "User being rated"
+    },
+    "ratee_role": {
+      "type": "string",
+      "enum": [
+        "driver",
+        "passenger"
+      ]
+    },
+    "score": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "tags": {
+      "type": "string",
+      "description": "Comma-separated tags"
+    },
+    "comment": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "ride_id",
+    "rater_id",
+    "ratee_id",
+    "score"
+  ]
+}
