@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { APILoader, Map, useMap } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, useMap } from "@vis.gl/react-google-maps";
 import { getMapsApiKey } from "@/lib/mapsConfig";
 
 const DARK_MAP_STYLES = [
@@ -147,7 +147,7 @@ export default function MapView({
 
   return (
     <div className={`relative w-full h-full ${className}`}>
-      <APILoader apiKey={apiKey} libraries={["places"]} language="es" region="AR">
+      <APIProvider apiKey={apiKey} libraries={["places"]} language="es" region="AR">
         <Map
           defaultCenter={center}
           defaultZoom={zoom}
@@ -167,7 +167,7 @@ export default function MapView({
             interactive={interactive}
           />
         </Map>
-      </APILoader>
+      </APIProvider>
     </div>
   );
 }
