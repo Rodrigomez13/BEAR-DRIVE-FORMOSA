@@ -1,0 +1,118 @@
+import React, { useState, useEffect } from "react";
+import { useAuth } from "@/lib/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { base44 } from "@/api/base44Client";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import StarRating from "@/components/bear/StarRating";
+import { Car, LogOut, User, FileText, ChevronRight, Shield, HelpCircle, CheckCircle2, AlertTriangle } from "lucide-react";
+
+export default function DriverProfile() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [vehicles, setVehicles] = useState([]);
+  const [docs, setDocs] = useState([]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const v = await base44.entities.Vehicle.filter({ driver_id: user.id });
+        setVehicles(v);
+        const d = await base44.entities.DriverDocument.filter({ driver_id: user.id });
+        setDocs(d);
+      } catch (err) {}
+    };
+    load();
+  }, [user]);
+
+  const cap = user?.driver_capability || "NO_DRIVER";
+  const capLabel = {
+    APPROVED_ELIGIBLE: "Aprobado y habilitado",
+    APPROVED_BLOCKED: "Aprobado con bloqueo",
+    PENDING_REVIEW: "En revisión",
+    ONBOARDING: "En preparación",
+    NO_DRIVER: "No conductor",
+    SUSPENDED: "Suspendido",
+  }[cap] || cap;
+
+  return (
+    <div className="max-w-md mx-auto px-5 pt-10 pb-10">
+      <h1 className="text-2xl font-bold mb-6">Perfil</h1>
+
+      <Card className="p-5 mb-4 bear-gradient text-white">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-2xl font-bold text-accent">
+            {(user?.full_name || user?.email || "C").charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-lg truncate">{user?.full_name || "Conductor"}</p>
+            <p className="text-sm text-white/60 truncate">{user?.email}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <StarRating value={user?.rating_avg || 0} readOnly size={14} />
+              <span className="text-xs text-white/60">{user?.total_rides || 0} viajes</span>
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-white/10">
+          <span className={`text-xs font-semibold px-2 py-1 rounded-full ${cap === "APPROVED_ELIGIBLE" ? "bg-green-500/20 text-green-300" : "bg-accent/20 text-accent"}`}>
+            {capLabel}
+          </span>
+        </div>
+      </Card>
+
+      <Card className="p-2 mb-4">
+        <div className="p-3">
+          <p className="font-semibold text-sm mb-2">Vehículos</p>
+          {vehicles.length === 0 ? <p className="text-sm text-muted-foreground">Sin vehículos registrados</p> : (
+            <div className="space-y-2">
+              {vehicles.map(v => (
+                <div key={v.id} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2"><Car className="w-4 h-4 text-muted-foreground" /><span>{v.make} {v.model} · {v.plate}</span></div>
+                  <span className={`text-xs ${v.status === "approved" ? "text-green-600" : "text-muted-foreground"}`}>{v.status === "approved" ? "Aprobado" : "Pendiente"}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="h-px bg-border mx-3" />
+        <div className="p-3">
+          <p className="font-semibold text-sm mb-2">Documentación</p>
+          <div className="space-y-2">
+            {docs.length === 0 ? <p className="text-sm text-muted-foreground">Sin documentos</p> : docs.map(d => (
+              <div key={d.id} className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2"><FileText className="w-4 h-4 text-muted-foreground" />{d.label}</span>
+                <span className={`text-xs ${d.status === "APPROVED" ? "text-green-600" : d.status === "REJECTED" ? "text-destructive" : "text-muted-foreground"}`}>
+                  {d.status === "APPROVED" ? <CheckCircle2 className="w-3.5 h-3.5 inline" /> : d.status === "REJECTED" ? <AlertTriangle className="w-3.5 h-3.5 inline" /> : null} {d.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-2 mb-4">
+        <button onClick={() => navigate("/passenger")} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-secondary/50">
+          <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center"><User className="w-5 h-5 text-accent" /></div>
+          <div className="flex-1 text-left"><p className="font-medium text-sm">Cambiar a modo Pasajero</p></div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </button>
+        <div className="h-px bg-border mx-3" />
+        <button className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-secondary/50">
+          <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center"><Shield className="w-5 h-5 text-muted-foreground" /></div>
+          <div className="flex-1 text-left"><p className="font-medium text-sm">Seguridad</p></div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </button>
+        <div className="h-px bg-border mx-3" />
+        <button className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-secondary/50">
+          <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center"><HelpCircle className="w-5 h-5 text-muted-foreground" /></div>
+          <div className="flex-1 text-left"><p className="font-medium text-sm">Ayuda y soporte</p></div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </button>
+      </Card>
+
+      <Button variant="outline" onClick={() => logout()} className="w-full text-destructive border-destructive/30 hover:bg-destructive/5">
+        <LogOut className="w-4 h-4 mr-2" />Cerrar sesión
+      </Button>
+    </div>
+  );
+}
