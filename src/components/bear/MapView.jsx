@@ -188,7 +188,7 @@ export default function MapView({
 
   if (status === "loading") {
     return (
-      <div className={`relative w-full h-full bg-[#0e1320] flex flex-col items-center justify-center gap-3 ${className}`}>
+      <div className={`${className} bg-[#0e1320] flex flex-col items-center justify-center gap-3`}>
         <div className="w-8 h-8 border-4 border-secondary border-t-accent rounded-full animate-spin" />
         <p className="text-xs text-white/50">{debugInfo}</p>
         <button
@@ -217,7 +217,7 @@ export default function MapView({
 
   if (status === "error") {
     return (
-      <div className={`relative w-full h-full bg-[#0e1320] flex flex-col items-center justify-center gap-3 p-6 text-center ${className}`}>
+      <div className={`${className} bg-[#0e1320] flex flex-col items-center justify-center gap-3 p-6 text-center`}>
         <AlertTriangle className="w-10 h-10 text-red-400/70" />
         <p className="text-sm text-white/70 font-medium">No pudimos cargar el mapa</p>
         {errorMsg && (
@@ -251,7 +251,8 @@ export default function MapView({
     <div className={className} style={{ background: "#0e1320" }}>
       <div
         ref={containerRef}
-        style={{ width: "100%", height: "100%", position: "relative", background: "#0e1320" }}
+        className="absolute inset-0"
+        style={{ background: "#0e1320" }}
       />
       {status === "ready" && (
         <div className="absolute top-2 right-2 z-10 px-2 py-0.5 rounded-full bg-green-500/20 border border-green-400/40 text-[9px] text-green-300 font-mono pointer-events-none">

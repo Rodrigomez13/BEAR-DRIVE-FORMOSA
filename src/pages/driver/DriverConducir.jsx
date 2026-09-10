@@ -275,7 +275,7 @@ export default function DriverConducir() {
   if (!eligible) {
     const cap = user?.driver_capability || "NO_DRIVER";
     return (
-      <div className="max-w-md mx-auto px-4 pt-10 pb-8 text-center">
+      <div className="max-w-md mx-auto px-4 pt-10 pb-8 text-center h-full overflow-y-auto scrollbar-hide">
         <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
           <AlertTriangle className="w-8 h-8 text-accent" />
         </div>
@@ -448,7 +448,7 @@ export default function DriverConducir() {
 
   // Offline home
   return (
-    <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in h-full overflow-y-auto scrollbar-hide">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Conducir</h1>
         <div className="px-3 py-1 rounded-full text-xs font-semibold bg-secondary text-muted-foreground">

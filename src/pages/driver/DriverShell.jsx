@@ -12,7 +12,7 @@ export default function DriverShell() {
   ];
   return (
     <div className="h-[100dvh] overflow-hidden flex flex-col bg-background">
-      <main className="flex-1 overflow-y-auto scrollbar-hide relative">
+      <main className="flex-1 overflow-hidden relative">
         <Outlet />
       </main>
       <BottomNav items={items} basePath="/driver" />

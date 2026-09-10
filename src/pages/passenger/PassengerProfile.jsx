@@ -59,7 +59,7 @@ export default function PassengerProfile() {
   const isDriver = driverCap === "APPROVED_ELIGIBLE";
 
   return (
-    <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in h-full overflow-y-auto scrollbar-hide">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Perfil</h1>
         <ThemeToggle />

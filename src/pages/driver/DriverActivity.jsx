@@ -32,7 +32,7 @@ export default function DriverActivity() {
   const formatDate = (d) => d ? new Date(d).toLocaleDateString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
 
   return (
-    <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in h-full overflow-y-auto scrollbar-hide">
       <h1 className="text-2xl font-bold mb-6">Actividad</h1>
       {loading ? <SkeletonList count={4} /> :
        rides.length === 0 ? (
