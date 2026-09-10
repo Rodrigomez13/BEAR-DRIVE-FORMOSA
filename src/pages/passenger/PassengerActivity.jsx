@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import StarRating from "@/components/bear/StarRating";
 import { MapPin, Clock, DollarSign, Receipt } from "lucide-react";
+import { displayAddress } from "@/lib/geo";
 
 const STATUS_LABELS = {
   SEARCHING: "Buscando conductor",
@@ -74,11 +75,11 @@ export default function PassengerActivity() {
               <div className="space-y-2 text-sm">
                 <div className="flex items-start gap-2">
                   <div className="w-2 h-2 rounded-full bg-foreground mt-1.5 shrink-0" />
-                  <p className="text-muted-foreground truncate">{ride.origin_address || "Origen"}</p>
+                  <p className="text-muted-foreground truncate">{displayAddress(ride.origin_address, "Origen")}</p>
                 </div>
                 <div className="flex items-start gap-2">
                   <div className="w-2 h-2 rounded-full bg-accent mt-1.5 shrink-0" />
-                  <p className="text-muted-foreground truncate">{ride.destination_address || "Destino"}</p>
+                  <p className="text-muted-foreground truncate">{displayAddress(ride.destination_address, "Destino")}</p>
                 </div>
               </div>
               <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border text-xs text-muted-foreground">

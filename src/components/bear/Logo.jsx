@@ -42,7 +42,7 @@ export default function Logo({ size = "md", onLongPress, className = "" }) {
       onContextMenu={(e) => e.preventDefault()}
     >
       <div className="flex flex-col items-center gap-3">
-        <div className={`${s.box} rounded-2xl overflow-hidden bg-black shadow-lg shadow-black/30`}>
+        <div className={`${s.box} rounded-2xl overflow-hidden`}>
           <Image src={BEAR_LOGO_MARK} fittingType="fit" className="block w-full h-full" />
         </div>
         <div className="text-center leading-none">

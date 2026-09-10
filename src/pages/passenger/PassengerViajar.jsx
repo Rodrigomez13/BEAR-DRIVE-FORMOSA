@@ -22,7 +22,7 @@ const CATEGORIES = [
   { code: "premium", name: "BearPremium", desc: "Gama superior" },
 ];
 
-const ACTIVE_STATUSES = ["SEARCHING", "ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING", "PIN_VALIDATION", "IN_PROGRESS", "ARRIVED", "PAYMENT_PENDING", "COMPLETED"];
+const ACTIVE_STATUSES = ["SEARCHING", "ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING", "PIN_VALIDATION", "IN_PROGRESS", "ARRIVED", "PAYMENT_PENDING"];
 
 export default function PassengerViajar() {
   const { user } = useAuth();

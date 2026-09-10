@@ -89,7 +89,7 @@ export default function Login() {
   };
 
   return (
-    <div className="relative h-[100dvh] overflow-y-auto flex flex-col items-center justify-center px-6 py-10 bg-gradient-to-b from-background to-secondary/40">
+    <div className="relative h-[100dvh] overflow-y-auto scrollbar-hide flex flex-col items-center justify-center px-6 py-10 bg-gradient-to-b from-background to-secondary/40">
       <div className="absolute top-4 right-4 z-10"><ThemeToggle /></div>
       <div className="w-full max-w-sm">
         {adminDenied && (

@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import StarRating from "@/components/bear/StarRating";
 import { MapPin, Clock, DollarSign, Star } from "lucide-react";
+import { displayAddress } from "@/lib/geo";
 
 const STATUS_LABELS = {
   COMPLETED: "Completado", RATED: "Completado", CANCELLED: "Cancelado",
@@ -51,8 +52,8 @@ export default function DriverActivity() {
                 <p className="font-bold text-lg text-accent">{formatPrice(ride.final_fare || ride.quoted_fare)}</p>
               </div>
               <div className="space-y-1.5 text-sm">
-                <p className="text-muted-foreground truncate"><MapPin className="w-3.5 h-3.5 inline mr-1" />{ride.origin_address?.split(",")[0]}</p>
-                <p className="text-muted-foreground truncate"><MapPin className="w-3.5 h-3.5 inline mr-1" />{ride.destination_address?.split(",")[0]}</p>
+                <p className="text-muted-foreground truncate"><MapPin className="w-3.5 h-3.5 inline mr-1" />{displayAddress(ride.origin_address, "Origen")}</p>
+                <p className="text-muted-foreground truncate"><MapPin className="w-3.5 h-3.5 inline mr-1" />{displayAddress(ride.destination_address, "Destino")}</p>
               </div>
               <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
                 {ride.distance_km && <span>{ride.distance_km} km</span>}
