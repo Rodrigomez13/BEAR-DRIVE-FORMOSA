@@ -11,6 +11,9 @@ import { Car, Power, Loader2, MapPin, Clock, DollarSign, Navigation, CheckCircle
 import { getCurrentPosition, FORMOSA_CENTER, displayAddress } from "@/lib/geo";
 import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
+import BearAvatar from "@/components/bear/BearAvatar";
+import { BEAR_MASCOT_WAVE } from "@/lib/brandAssets";
+import { Image } from "@/components/ui/image";
 
 export default function DriverConducir() {
   const { user } = useAuth();
@@ -248,6 +251,13 @@ export default function DriverConducir() {
               <span className="text-xs font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent capitalize">{status.replace(/_/g, " ")}</span>
               <span className="font-bold text-lg text-accent">{formatPrice(activeRide.quoted_fare)}</span>
             </div>
+            <div className="flex items-center gap-3 mb-3 pb-3 border-b border-border">
+              <BearAvatar size={40} />
+              <div>
+                <p className="font-medium text-sm">{activeRide.passenger_name || "Pasajero"}</p>
+                <p className="text-xs text-muted-foreground">Pasajero</p>
+              </div>
+            </div>
             <div className="space-y-2 text-sm mb-4">
               <p className="text-muted-foreground truncate"><MapPin className="w-3.5 h-3.5 inline mr-1 shrink-0" />{displayAddress(activeRide.origin_address)}</p>
               <p className="text-muted-foreground truncate"><Navigation className="w-3.5 h-3.5 inline mr-1 shrink-0" />{displayAddress(activeRide.destination_address)}</p>
@@ -340,10 +350,11 @@ export default function DriverConducir() {
         </Card>
       ) : (
         <div>
-          <Card className="p-5 mb-4 bear-gradient text-white">
+          <Card className="p-5 mb-4 bear-gradient text-white text-center">
+            <Image src={BEAR_MASCOT_WAVE} fittingType="fit" className="w-24 h-24 mx-auto mb-2" />
             <p className="text-sm text-white/60 mb-1">Disponible para viajes</p>
             <p className="text-2xl font-bold">Esperando solicitudes...</p>
-            <Loader2 className="w-5 h-5 animate-spin text-accent mt-2" />
+            <Loader2 className="w-5 h-5 animate-spin text-accent mt-2 mx-auto" />
           </Card>
           <Button onClick={handleGoOffline} variant="outline" className="w-full">Desconectarme</Button>
 
