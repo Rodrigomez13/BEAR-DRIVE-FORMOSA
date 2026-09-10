@@ -67,7 +67,8 @@
       "type": "string",
       "enum": [
         "cash",
-        "qr"
+        "qr",
+        "card"
       ],
       "default": "cash"
     },
@@ -126,6 +127,10 @@
     },
     "cancel_reason": {
       "type": "string"
+    },
+    "stripe_session_id": {
+      "type": "string",
+      "description": "Stripe Checkout session ID for card payments"
     },
     "idempotency_key": {
       "type": "string"

@@ -14,7 +14,7 @@ import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
 import { sanitizeString } from "@/lib/sanitize";
 import BearAvatar from "@/components/bear/BearAvatar";
-import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote } from "lucide-react";
+import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard } from "lucide-react";
 
 const CATEGORIES = [
   { code: "basic", name: "BearDrive", desc: "Servicio estándar" },
@@ -45,7 +45,25 @@ export default function PassengerViajar() {
   const [ratingComment, setRatingComment] = useState("");
   const [showFavoriteModal, setShowFavoriteModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [paying, setPaying] = useState(false);
   const pollRef = useRef(null);
+
+  // Handle Stripe redirect return
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get("payment");
+    if (paymentStatus === "success") {
+      toast({ title: "Pago procesado", description: "Confirmando con el conductor..." });
+    } else if (paymentStatus === "cancelled") {
+      toast({ title: "Pago cancelado", description: "Podés reintentar el pago", variant: "destructive" });
+    }
+    if (paymentStatus) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("payment");
+      url.searchParams.delete("ride");
+      window.history.replaceState({}, "", url);
+    }
+  }, []);
 
   // Recover active ride on mount
   useEffect(() => {
@@ -241,6 +259,29 @@ export default function PassengerViajar() {
     setRatingComment("");
   };
 
+  // Pay with card via Stripe Checkout
+  const handleCardPayment = async () => {
+    if (!activeRide) return;
+    // Block checkout inside iframe (preview)
+    if (window.self !== window.top) {
+      toast({ title: "Pago no disponible en vista previa", description: "Publicá la app para pagar con tarjeta", variant: "destructive" });
+      return;
+    }
+    setPaying(true);
+    try {
+      const res = await base44.functions.invoke("createRidePayment", { ride_id: activeRide.id });
+      if (res.data?.checkout_url) {
+        window.location.href = res.data.checkout_url;
+      } else {
+        toast({ title: "No se pudo iniciar el pago", variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "Error al iniciar el pago", description: err.message, variant: "destructive" });
+    } finally {
+      setPaying(false);
+    }
+  };
+
   const formatPrice = (v) => `$${(v || 0).toLocaleString("es-AR")}`;
 
   // ---- RENDER STATES ----
@@ -355,7 +396,20 @@ export default function PassengerViajar() {
               <div className="text-center py-2">
                 {status === "IN_PROGRESS" && <><Car className="w-10 h-10 text-accent mx-auto mb-2" /><p className="font-semibold">En viaje</p><p className="text-sm text-muted-foreground">Llegando a destino...</p></>}
                 {status === "ARRIVED" && <><CheckCircle2 className="w-10 h-10 text-accent mx-auto mb-2" /><p className="font-semibold">Llegaste a destino</p></>}
-                {status === "PAYMENT_PENDING" && <><Wallet className="w-10 h-10 text-accent mx-auto mb-2" /><p className="font-semibold">Pago pendiente</p><p className="text-sm text-muted-foreground capitalize">{activeRide.payment_method === "cash" ? "Pagá en efectivo al conductor" : "Escaneá el QR del conductor"}</p></>}
+                {status === "PAYMENT_PENDING" && <>
+                  <Wallet className="w-10 h-10 text-accent mx-auto mb-2" />
+                  <p className="font-semibold">Pago pendiente</p>
+                  {activeRide.payment_method === "card" ? (
+                    <>
+                      <p className="text-sm text-muted-foreground mb-3">Pagá con tarjeta para completar el viaje</p>
+                      <Button onClick={handleCardPayment} disabled={paying} className="w-full bear-gold-gradient text-foreground border-0 font-semibold">
+                        {paying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Procesando...</> : <><CreditCard className="w-4 h-4 mr-2" />Pagar con tarjeta</>}
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground capitalize">{activeRide.payment_method === "cash" ? "Pagá en efectivo al conductor" : "Escaneá el QR del conductor"}</p>
+                  )}
+                </>}
                 {status === "PIN_VALIDATION" && <><Loader2 className="w-10 h-10 animate-spin text-accent mx-auto mb-2" /><p className="font-semibold">Validando PIN...</p></>}
                 <div className="mt-3 pt-3 border-t border-border text-left">
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total</span><span className="font-bold text-accent">{formatPrice(activeRide.quoted_fare)}</span></div>
@@ -464,11 +518,14 @@ export default function PassengerViajar() {
                 ))}
               </div>
               <div className="flex gap-2 mb-4">
-                <button onClick={() => setPaymentMethod("cash")} className={`flex-1 p-2.5 rounded-xl flex items-center justify-center gap-2 text-sm font-medium transition-colors ${paymentMethod === "cash" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+                <button onClick={() => setPaymentMethod("cash")} className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${paymentMethod === "cash" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
                   <Banknote className="w-4 h-4" />Efectivo
                 </button>
-                <button onClick={() => setPaymentMethod("qr")} className={`flex-1 p-2.5 rounded-xl flex items-center justify-center gap-2 text-sm font-medium transition-colors ${paymentMethod === "qr" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+                <button onClick={() => setPaymentMethod("qr")} className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${paymentMethod === "qr" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
                   <QrCode className="w-4 h-4" />QR
+                </button>
+                <button onClick={() => setPaymentMethod("card")} className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${paymentMethod === "card" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+                  <CreditCard className="w-4 h-4" />Tarjeta
                 </button>
               </div>
               <Button onClick={handleRequestRide} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold">

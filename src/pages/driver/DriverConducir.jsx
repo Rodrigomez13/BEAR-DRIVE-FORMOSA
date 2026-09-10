@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import MapView from "@/components/bear/MapView";
-import { Car, Power, Loader2, MapPin, Clock, DollarSign, Navigation, CheckCircle2, KeyRound, X, AlertTriangle, Wallet } from "lucide-react";
+import { Car, Power, Loader2, MapPin, Clock, DollarSign, Navigation, CheckCircle2, KeyRound, X, AlertTriangle, Wallet, CreditCard, Banknote, QrCode } from "lucide-react";
 import { getCurrentPosition, FORMOSA_CENTER, displayAddress } from "@/lib/geo";
 import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
@@ -264,7 +264,12 @@ export default function DriverConducir() {
               <div className="flex gap-3 text-xs text-muted-foreground pt-1">
                 <span><Clock className="w-3 h-3 inline mr-1" />{activeRide.duration_min} min</span>
                 <span><MapPin className="w-3 h-3 inline mr-1" />{activeRide.distance_km} km</span>
-                <span className="capitalize">{activeRide.payment_method}</span>
+                <span className="capitalize flex items-center gap-1">
+                  {activeRide.payment_method === "card" && <CreditCard className="w-3 h-3" />}
+                  {activeRide.payment_method === "cash" && <Banknote className="w-3 h-3" />}
+                  {activeRide.payment_method === "qr" && <QrCode className="w-3 h-3" />}
+                  {activeRide.payment_method === "card" ? "Tarjeta" : activeRide.payment_method === "cash" ? "Efectivo" : "QR"}
+                </span>
               </div>
             </div>
 
@@ -291,9 +296,19 @@ export default function DriverConducir() {
             )}
             {status === "PAYMENT_PENDING" && (
               <div className="text-center">
-                <Wallet className="w-8 h-8 text-accent mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground mb-3 capitalize">{activeRide.payment_method === "cash" ? "Cobrá en efectivo" : "Generá el QR de pago"}</p>
-                <Button onClick={handleComplete} disabled={completing} className="w-full bear-gold-gradient text-foreground border-0">Confirmar pago</Button>
+                {activeRide.payment_method === "card" ? (
+                  <>
+                    <Loader2 className="w-8 h-8 text-accent mx-auto mb-2 animate-spin" />
+                    <p className="text-sm text-muted-foreground mb-1">Esperando pago con tarjeta</p>
+                    <p className="text-xs text-muted-foreground mb-3">El pasajero está pagando. El viaje se completará automáticamente.</p>
+                  </>
+                ) : (
+                  <>
+                    <Wallet className="w-8 h-8 text-accent mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground mb-3 capitalize">{activeRide.payment_method === "cash" ? "Cobrá en efectivo" : "Generá el QR de pago"}</p>
+                    <Button onClick={handleComplete} disabled={completing} className="w-full bear-gold-gradient text-foreground border-0">Confirmar pago</Button>
+                  </>
+                )}
               </div>
             )}
           </Card>
@@ -375,6 +390,12 @@ export default function DriverConducir() {
                       <span><Clock className="w-3 h-3 inline mr-1" />{ride.duration_min} min</span>
                       <span>{ride.distance_km} km</span>
                       <span className="capitalize">{ride.category}</span>
+                      <span className="flex items-center gap-0.5">
+                        {ride.payment_method === "card" && <CreditCard className="w-3 h-3" />}
+                        {ride.payment_method === "cash" && <Banknote className="w-3 h-3" />}
+                        {ride.payment_method === "qr" && <QrCode className="w-3 h-3" />}
+                        {ride.payment_method === "card" ? "Tarjeta" : ride.payment_method === "cash" ? "Efectivo" : "QR"}
+                      </span>
                     </div>
                     <Button onClick={() => handleAcceptRide(ride)} className="w-full bear-gold-gradient text-foreground border-0">Aceptar viaje</Button>
                   </Card>
