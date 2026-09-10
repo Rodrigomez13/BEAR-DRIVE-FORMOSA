@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Mail, Lock, Loader2, User, Car, ShieldCheck, X } from "lucide-react";
+import { Mail, Lock, Loader2, User, Car, ShieldCheck, X, MapPin } from "lucide-react";
 import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
 import Logo from "@/components/bear/Logo";
@@ -21,6 +21,9 @@ export default function Login() {
   const [adminError, setAdminError] = useState("");
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminDenied, setAdminDenied] = useState(() => sessionStorage.getItem("bear_admin_denied") === "true");
+  const [permissionsGranted, setPermissionsGranted] = useState(false);
+  const [permissionError, setPermissionError] = useState("");
+  const [requestingPermission, setRequestingPermission] = useState(false);
   const navigate = useNavigate();
   const returnTo = safeReturnTo();
 
@@ -50,6 +53,7 @@ export default function Login() {
         sessionStorage.setItem("bear_admin_attempt", "true");
         setAdminModal(false);
         setMode("passenger");
+        setPermissionsGranted(true);
       } else {
         setAdminError("No pudimos validar el acceso.");
       }
@@ -86,6 +90,32 @@ export default function Login() {
     }
     sessionStorage.setItem("bear_requested_mode", mode);
     base44.auth.loginWithProvider("google", returnTo);
+  };
+
+  const handleRequestPermissions = async () => {
+    setPermissionError("");
+    setRequestingPermission(true);
+    try {
+      await new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("Geolocalización no disponible"));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          () => resolve(),
+          (err) => reject(err),
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      });
+      if ("Notification" in window) {
+        await Notification.requestPermission();
+      }
+      setPermissionsGranted(true);
+    } catch (err) {
+      setPermissionError("No pudimos obtener tu ubicación. Podés habilitarla más tarde desde la configuración de tu navegador.");
+    } finally {
+      setRequestingPermission(false);
+    }
   };
 
   return (
@@ -138,10 +168,45 @@ export default function Login() {
               </Link>
             </p>
           </div>
+        ) : !permissionsGranted ? (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <button onClick={() => { setMode(null); setPermissionsGranted(false); }} className="text-sm text-muted-foreground hover:text-foreground">
+                ← Volver
+              </button>
+              <span className="text-sm font-medium capitalize flex items-center gap-1.5">
+                {mode === "passenger" ? <User className="w-4 h-4" /> : <Car className="w-4 h-4" />}
+                {mode === "passenger" ? "Pasajero" : "Conductor"}
+              </span>
+            </div>
+            <div className="text-center py-8">
+              <div className="w-20 h-20 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-6">
+                <MapPin className="w-10 h-10 text-accent" />
+              </div>
+              <h2 className="text-xl font-bold mb-3">Necesitamos tu ubicación</h2>
+              <p className="text-sm text-muted-foreground mb-2">
+                BearDrive usa tu ubicación para {mode === "passenger" ? "conectar con conductores cercanos y mostrar tu viaje en tiempo real" : "recibir solicitudes de pasajeros cercanos y navegar a sus puntos de encuentro"}.
+              </p>
+              <p className="text-xs text-muted-foreground mb-6">
+                También necesitamos permiso para enviarte notificaciones sobre el estado de tus viajes.
+              </p>
+              {permissionError && (
+                <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm text-center mb-4">
+                  {permissionError}
+                </div>
+              )}
+              <Button onClick={handleRequestPermissions} disabled={requestingPermission} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold mb-2">
+                {requestingPermission ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Solicitando...</> : <><MapPin className="w-4 h-4 mr-2" />Permitir ubicación</>}
+              </Button>
+              <Button variant="ghost" onClick={() => setPermissionsGranted(true)} className="w-full text-sm">
+                Continuar de todos modos
+              </Button>
+            </div>
+          </div>
         ) : (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <button onClick={() => setMode(null)} className="text-sm text-muted-foreground hover:text-foreground">
+              <button onClick={() => { setMode(null); setPermissionsGranted(false); }} className="text-sm text-muted-foreground hover:text-foreground">
                 ← Volver
               </button>
               <span className="text-sm font-medium capitalize flex items-center gap-1.5">

@@ -87,6 +87,40 @@ export default function DriverConducir() {
   // Guard against closing app during active ride
   useActiveRideGuard(!!activeRide);
 
+  // Auto-arrived and auto-complete based on GPS proximity
+  useEffect(() => {
+    if (!activeRide || !online) return;
+    const status = activeRide.status;
+    if (!["ASSIGNED", "DRIVER_APPROACHING", "IN_PROGRESS"].includes(status)) return;
+
+    const checkProximity = async () => {
+      try {
+        const pos = await getCurrentPosition();
+        setDriverPos(pos);
+
+        if (["ASSIGNED", "DRIVER_APPROACHING"].includes(activeRide.status)) {
+          const distToOrigin = haversineKm(pos.lat, pos.lng, activeRide.origin_lat, activeRide.origin_lng);
+          if (distToOrigin <= 0.1) {
+            await base44.entities.Ride.update(activeRide.id, { status: "DRIVER_ARRIVED" });
+            setActiveRide(prev => ({ ...prev, status: "DRIVER_ARRIVED" }));
+            toast({ title: "Llegaste al punto de encuentro" });
+          }
+        } else if (activeRide.status === "IN_PROGRESS") {
+          const distToDest = haversineKm(pos.lat, pos.lng, activeRide.destination_lat, activeRide.destination_lng);
+          if (distToDest <= 0.1) {
+            await base44.functions.invoke("completeRide", { ride_id: activeRide.id, final_fare: activeRide.quoted_fare, payment_method: activeRide.payment_method });
+            toast({ title: "Viaje completado", description: `Ganaste $${activeRide.quoted_fare.toLocaleString("es-AR")}` });
+            setActiveRide(null);
+          }
+        }
+      } catch (err) { /* ignore */ }
+    };
+
+    checkProximity();
+    const interval = setInterval(checkProximity, 5000);
+    return () => clearInterval(interval);
+  }, [activeRide?.id, activeRide?.status, online]);
+
   // Update driver position when online
   useEffect(() => {
     if (!online) return;
@@ -204,6 +238,15 @@ export default function DriverConducir() {
   };
 
   const formatPrice = (v) => `$${(v || 0).toLocaleString("es-AR")}`;
+
+  const haversineKm = (lat1, lng1, lat2, lng2) => {
+    const R = 6371;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.asin(Math.sqrt(a));
+  };
 
   if (loading) return <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
 

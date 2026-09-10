@@ -31,10 +31,10 @@ const DARK_MAP_STYLES = [
 ];
 
 function originIcon(g) {
-  return { path: g.SymbolPath.CIRCLE, scale: 11, fillColor: "#181E2F", fillOpacity: 1, strokeColor: "#E9B74E", strokeWeight: 3 };
+  return { path: g.SymbolPath.CIRCLE, scale: 11, fillColor: "#181E2F", fillOpacity: 1, strokeColor: "#E9B74E", strokeWeight: 3, labelOrigin: new g.Point(0, -16) };
 }
 function destinationIcon(g) {
-  return { path: g.SymbolPath.CIRCLE, scale: 11, fillColor: "#E9B74E", fillOpacity: 1, strokeColor: "#181E2F", strokeWeight: 3 };
+  return { path: g.SymbolPath.CIRCLE, scale: 11, fillColor: "#E9B74E", fillOpacity: 1, strokeColor: "#181E2F", strokeWeight: 3, labelOrigin: new g.Point(0, -16) };
 }
 function carIcon(g) {
   return {
@@ -55,8 +55,8 @@ function MapContent({ origin, destination, driverPos, path, onMapClick, recenter
     if (!map) return;
     const g = window.google.maps;
     map.setOptions({ styles: DARK_MAP_STYLES, backgroundColor: "#0e1320" });
-    markersRef.current.origin = new g.Marker({ map, icon: originIcon(g), visible: false });
-    markersRef.current.destination = new g.Marker({ map, icon: destinationIcon(g), visible: false });
+    markersRef.current.origin = new g.Marker({ map, icon: originIcon(g), label: { text: "Origen", color: "#E9B74E", fontSize: "11px", fontWeight: "bold" }, visible: false });
+    markersRef.current.destination = new g.Marker({ map, icon: destinationIcon(g), label: { text: "Destino", color: "#E9B74E", fontSize: "11px", fontWeight: "bold" }, visible: false });
     markersRef.current.driver = new g.Marker({ map, icon: carIcon(g), visible: false });
     polylineRef.current = new g.Polyline({ map, path: [], strokeColor: "#E9B74E", strokeWeight: 4, strokeOpacity: 0.85, visible: false });
     dirRendererRef.current = new g.DirectionsRenderer({ suppressMarkers: true, polylineOptions: { strokeColor: "#E9B74E", strokeWeight: 4, strokeOpacity: 0.9 } });
