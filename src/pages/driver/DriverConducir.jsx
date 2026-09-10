@@ -184,7 +184,7 @@ export default function DriverConducir() {
 
   const formatPrice = (v) => `$${(v || 0).toLocaleString("es-AR")}`;
 
-  if (loading) return <div className="flex items-center justify-center h-screen"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
+  if (loading) return <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
 
   // Not eligible
   if (!eligible) {
@@ -215,7 +215,7 @@ export default function DriverConducir() {
   if (activeRide) {
     const status = activeRide.status;
     return (
-      <div className="relative h-screen">
+      <div className="relative h-full">
         <MapView
           origin={{ lat: activeRide.origin_lat, lng: activeRide.origin_lng }}
           destination={{ lat: activeRide.destination_lat, lng: activeRide.destination_lng }}
@@ -224,7 +224,7 @@ export default function DriverConducir() {
           interactive={false}
           className="absolute inset-0"
         />
-        <div className="absolute inset-x-0 bottom-0 z-10 p-3 pb-24">
+        <div className="absolute inset-x-0 bottom-0 z-10 p-3">
           <Card className="rounded-2xl p-5 max-w-md mx-auto">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent capitalize">{status.replace(/_/g, " ")}</span>

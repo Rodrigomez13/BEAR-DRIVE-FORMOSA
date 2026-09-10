@@ -20,9 +20,9 @@ export default function AdminShell() {
   ];
 
   return (
-    <div className="min-h-screen flex bg-secondary/30">
+    <div className="h-[100dvh] overflow-hidden flex bg-secondary/30">
       {/* Sidebar */}
-      <aside className="w-60 bear-gradient text-white flex flex-col fixed h-screen">
+      <aside className="w-60 bear-gradient text-white flex flex-col shrink-0">
         <div className="p-5 border-b border-white/10">
           <Logo size="sm" className="[&_span]:text-white" />
           <p className="text-xs text-white/50 mt-2">Panel Operations</p>
@@ -50,7 +50,7 @@ export default function AdminShell() {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 ml-60 p-6">
+      <main className="flex-1 p-6 overflow-y-auto">
         <Outlet />
       </main>
     </div>

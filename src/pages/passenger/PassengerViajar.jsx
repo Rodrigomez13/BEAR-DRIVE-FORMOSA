@@ -237,7 +237,7 @@ export default function PassengerViajar() {
   // ---- RENDER STATES ----
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
+    return <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
   }
 
   // Active ride view
@@ -292,8 +292,8 @@ export default function PassengerViajar() {
           interactive={false}
           className="absolute inset-0"
         />
-        <div className="absolute inset-x-0 bottom-0 z-10">
-          <Card className="mx-3 mb-3 rounded-2xl p-5 max-w-md mx-auto">
+        <div className="absolute inset-x-0 bottom-0 z-10 p-3">
+          <Card className="rounded-2xl p-5 max-w-md mx-auto">
             {status === "SEARCHING" && (
               <div className="text-center py-2">
                 <Loader2 className="w-10 h-10 animate-spin text-accent mx-auto mb-3" />
@@ -363,7 +363,7 @@ export default function PassengerViajar() {
 
   // Planning / quoting view
   return (
-    <div className="relative h-screen">
+    <div className="relative h-full">
       <MapView
         origin={origin}
         destination={destination}
@@ -429,7 +429,7 @@ export default function PassengerViajar() {
       </button>
 
       {/* Bottom panel */}
-      <div className="absolute inset-x-0 bottom-0 z-10 p-3 pb-24">
+      <div className="absolute inset-x-0 bottom-0 z-10 p-3">
         <Card className="rounded-2xl p-4 max-w-md mx-auto">
           {quote ? (
             <div>

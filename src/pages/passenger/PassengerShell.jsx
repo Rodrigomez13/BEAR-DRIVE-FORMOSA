@@ -11,8 +11,10 @@ export default function PassengerShell() {
     { path: "profile", label: "Perfil", icon: User },
   ];
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <Outlet />
+    <div className="h-[100dvh] overflow-hidden flex flex-col bg-background">
+      <main className="flex-1 overflow-y-auto">
+        <Outlet />
+      </main>
       <BottomNav items={items} basePath="/passenger" />
     </div>
   );

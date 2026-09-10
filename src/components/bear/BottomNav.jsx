@@ -6,7 +6,7 @@ export default function BottomNav({ items, basePath }) {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 glass-navy border-t border-white/10">
+    <nav className="shrink-0 z-40 glass-navy border-t border-white/10">
       <div className="max-w-md mx-auto flex items-center justify-around px-2 py-2 safe-bottom">
         {items.map((item) => {
           const active = location.pathname === `${basePath}/${item.path}` || (item.path === "" && location.pathname === basePath);
