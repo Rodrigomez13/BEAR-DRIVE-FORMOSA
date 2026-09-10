@@ -9,7 +9,7 @@ import MapView from "@/components/bear/MapView";
 import StarRating from "@/components/bear/StarRating";
 import FavoriteModal from "@/components/bear/FavoriteModal";
 import FavoritesBar from "@/components/bear/FavoritesBar";
-import { searchPlaces, geocodePlace, reverseGeocode, getCurrentPosition, FORMOSA_CENTER, displayAddress, isCoordinateLike } from "@/lib/geo";
+import { searchPlaces, geocodePlace, reverseGeocode, getCurrentPosition, FORMOSA_CENTER, displayAddress } from "@/lib/geo";
 import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
 import { sanitizeString } from "@/lib/sanitize";
@@ -56,17 +56,8 @@ export default function PassengerViajar() {
           setActiveRide(rides[0]);
           if (rides[0].origin_lat) setOrigin({ lat: rides[0].origin_lat, lng: rides[0].origin_lng });
           if (rides[0].destination_lat) setDestination({ lat: rides[0].destination_lat, lng: rides[0].destination_lng });
-          // Reverse geocode if address is missing or coordinate-like
-          if (rides[0].origin_address && !isCoordinateLike(rides[0].origin_address)) {
-            setOriginAddress(rides[0].origin_address);
-          } else if (rides[0].origin_lat) {
-            setOriginAddress(await reverseGeocode(rides[0].origin_lat, rides[0].origin_lng));
-          }
-          if (rides[0].destination_address && !isCoordinateLike(rides[0].destination_address)) {
-            setDestinationAddress(rides[0].destination_address);
-          } else if (rides[0].destination_lat) {
-            setDestinationAddress(await reverseGeocode(rides[0].destination_lat, rides[0].destination_lng));
-          }
+          setOriginAddress(rides[0].origin_address || "");
+          setDestinationAddress(rides[0].destination_address || "");
         }
       } catch (err) {
         // ignore
