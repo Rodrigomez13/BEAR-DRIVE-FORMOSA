@@ -72,7 +72,10 @@ export default function PassengerViajar() {
     }
   }, []);
 
-  // Recover active ride on mount
+  // Recover active ride on mount.
+  // NOTE: setLoading(false) runs BEFORE reverseGeocode so the MapView can render
+  // and load the Google Maps SDK. reverseGeocode depends on that SDK, so calling
+  // it while loading=true would deadlock (map never renders, SDK never loads).
   useEffect(() => {
     const recover = async () => {
       try {
@@ -83,21 +86,29 @@ export default function PassengerViajar() {
           if (rides[0].destination_lat) setDestination({ lat: rides[0].destination_lat, lng: rides[0].destination_lng });
           setOriginAddress(rides[0].origin_address || "");
           setDestinationAddress(rides[0].destination_address || "");
+          setLoading(false);
         } else {
+          // Get GPS position (doesn't need the Maps SDK), then let the map render
+          // before resolving the address via reverseGeocode (which needs the SDK).
+          let pos = null;
           try {
-            const pos = await getCurrentPosition();
+            pos = await getCurrentPosition();
             setOrigin(pos);
-            const addr = await reverseGeocode(pos.lat, pos.lng);
-            setOriginAddress(addr);
-          } catch (err) { /* ignore */ }
+          } catch (err) { /* ignore — user can pick origin manually */ }
+          setLoading(false);
+          // Resolve address now that the MapView is rendering and the SDK is loading.
+          if (pos) {
+            reverseGeocode(pos.lat, pos.lng)
+              .then(setOriginAddress)
+              .catch(() => {});
+          }
         }
       } catch (err) {
-        // ignore
-      } finally {
         setLoading(false);
       }
     };
     recover();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // Poll active ride
