@@ -9,7 +9,7 @@ import MapView from "@/components/bear/MapView";
 import StarRating from "@/components/bear/StarRating";
 import FavoriteModal from "@/components/bear/FavoriteModal";
 import FavoritesBar from "@/components/bear/FavoritesBar";
-import { searchPlaces, geocodePlace, reverseGeocode, getCurrentPosition, FORMOSA_CENTER } from "@/lib/geo";
+import { searchPlaces, geocodePlace, reverseGeocode, getCurrentPosition, FORMOSA_CENTER, displayAddress, isCoordinateLike } from "@/lib/geo";
 import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
 import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote } from "lucide-react";
@@ -54,8 +54,17 @@ export default function PassengerViajar() {
           setActiveRide(rides[0]);
           if (rides[0].origin_lat) setOrigin({ lat: rides[0].origin_lat, lng: rides[0].origin_lng });
           if (rides[0].destination_lat) setDestination({ lat: rides[0].destination_lat, lng: rides[0].destination_lng });
-          setOriginAddress(rides[0].origin_address || "");
-          setDestinationAddress(rides[0].destination_address || "");
+          // Reverse geocode if address is missing or coordinate-like
+          if (rides[0].origin_address && !isCoordinateLike(rides[0].origin_address)) {
+            setOriginAddress(rides[0].origin_address);
+          } else if (rides[0].origin_lat) {
+            setOriginAddress(await reverseGeocode(rides[0].origin_lat, rides[0].origin_lng));
+          }
+          if (rides[0].destination_address && !isCoordinateLike(rides[0].destination_address)) {
+            setDestinationAddress(rides[0].destination_address);
+          } else if (rides[0].destination_lat) {
+            setDestinationAddress(await reverseGeocode(rides[0].destination_lat, rides[0].destination_lng));
+          }
         }
       } catch (err) {
         // ignore
@@ -262,8 +271,8 @@ export default function PassengerViajar() {
               <h1 className="text-2xl font-bold">¡Viaje completado!</h1>
             </div>
             <Card className="p-5 mb-4 space-y-3">
-              <div className="flex justify-between"><span className="text-sm text-muted-foreground">Origen</span><span className="text-sm font-medium text-right truncate ml-3">{activeRide.origin_address}</span></div>
-              <div className="flex justify-between"><span className="text-sm text-muted-foreground">Destino</span><span className="text-sm font-medium text-right truncate ml-3">{activeRide.destination_address}</span></div>
+              <div className="flex justify-between"><span className="text-sm text-muted-foreground">Origen</span><span className="text-sm font-medium text-right truncate ml-3">{displayAddress(activeRide.origin_address)}</span></div>
+              <div className="flex justify-between"><span className="text-sm text-muted-foreground">Destino</span><span className="text-sm font-medium text-right truncate ml-3">{displayAddress(activeRide.destination_address)}</span></div>
               <div className="flex justify-between"><span className="text-sm text-muted-foreground">Distancia</span><span className="text-sm font-medium">{activeRide.distance_km} km</span></div>
               <div className="flex justify-between"><span className="text-sm text-muted-foreground">Duración</span><span className="text-sm font-medium">{activeRide.duration_min} min</span></div>
               <div className="flex justify-between"><span className="text-sm text-muted-foreground">Pago</span><span className="text-sm font-medium capitalize">{activeRide.payment_method}</span></div>
@@ -429,8 +438,8 @@ export default function PassengerViajar() {
           )}
           {(originAddress || destinationAddress) && (
             <div className="mt-2 space-y-1.5 text-xs">
-              {originAddress && <p className="flex items-center gap-1.5 text-muted-foreground"><span className="w-2 h-2 rounded-full bg-foreground shrink-0" />{originAddress}</p>}
-              {destinationAddress && <p className="flex items-center gap-1.5 text-muted-foreground"><span className="w-2 h-2 rounded-full bg-accent shrink-0" />{destinationAddress}</p>}
+              {originAddress && <p className="flex items-center gap-1.5 text-muted-foreground"><span className="w-2 h-2 rounded-full bg-foreground shrink-0" />{displayAddress(originAddress)}</p>}
+              {destinationAddress && <p className="flex items-center gap-1.5 text-muted-foreground"><span className="w-2 h-2 rounded-full bg-accent shrink-0" />{displayAddress(destinationAddress)}</p>}
             </div>
           )}
         </Card>

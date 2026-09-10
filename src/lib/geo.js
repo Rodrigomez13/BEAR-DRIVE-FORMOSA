@@ -5,7 +5,7 @@ export const FORMOSA_CENTER = { lat: -26.1849, lng: -58.1731 };
 // Parses Google address components into "Calle altura, Ciudad" format
 function formatAddressFromResult(result) {
   const comps = result.address_components || [];
-  let street = "", number = "", city = "";
+  let street = "", number = "", city = "", neighborhood = "";
   for (const c of comps) {
     if (c.types.includes("route")) street = c.short_name || c.long_name;
     if (c.types.includes("street_number")) number = c.long_name;
@@ -13,8 +13,9 @@ function formatAddressFromResult(result) {
     if (!city && c.types.includes("administrative_area_level_2")) city = c.long_name;
     if (!city && c.types.includes("administrative_area_level_3")) city = c.long_name;
     if (!city && c.types.includes("sublocality")) city = c.long_name;
+    if (c.types.includes("neighborhood")) neighborhood = c.long_name;
   }
-  const streetPart = street ? (number ? `${street} ${number}` : street) : "";
+  const streetPart = street ? (number ? `${street} ${number}` : street) : (neighborhood || "");
   if (streetPart && city) return `${streetPart}, ${city}`;
   if (streetPart) return streetPart;
   if (city) return city;
@@ -88,10 +89,22 @@ export async function reverseGeocode(lat, lng) {
         } else resolve(null);
       });
     });
-    return result || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    return result || "Ubicación seleccionada";
   } catch {
-    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    return "Ubicación seleccionada";
   }
+}
+
+// Check if a string looks like raw coordinates (e.g. "-26.1849, -58.1731")
+export function isCoordinateLike(str) {
+  if (!str) return false;
+  return /^-?\d+\.?\d*,\s*-?\d+\.?\d*$/.test(str.trim());
+}
+
+// Format an address for display, with a fallback if it's empty or coordinate-like
+export function displayAddress(address, fallback = "Ubicación seleccionada") {
+  if (!address || address.trim() === "" || isCoordinateLike(address)) return fallback;
+  return address;
 }
 
 export function getCurrentPosition() {
