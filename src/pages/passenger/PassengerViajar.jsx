@@ -10,6 +10,8 @@ import StarRating from "@/components/bear/StarRating";
 import FavoriteModal from "@/components/bear/FavoriteModal";
 import FavoritesBar from "@/components/bear/FavoritesBar";
 import { searchPlaces, geocodePlace, reverseGeocode, getCurrentPosition, FORMOSA_CENTER } from "@/lib/geo";
+import CancelRideDialog from "@/components/bear/CancelRideDialog";
+import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
 import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote } from "lucide-react";
 
 const CATEGORIES = [
@@ -40,6 +42,7 @@ export default function PassengerViajar() {
   const [rating, setRating] = useState(0);
   const [ratingComment, setRatingComment] = useState("");
   const [showFavoriteModal, setShowFavoriteModal] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const pollRef = useRef(null);
 
   // Recover active ride on mount
@@ -77,6 +80,9 @@ export default function PassengerViajar() {
     pollRef.current = setInterval(poll, 3000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [activeRide?.id]);
+
+  // Guard against closing app during active ride
+  useActiveRideGuard(!!activeRide);
 
   // GPS
   const handleGPS = async () => {
@@ -202,6 +208,7 @@ export default function PassengerViajar() {
     try {
       await base44.entities.Ride.update(activeRide.id, { status: "CANCELLED", cancelled_date: new Date().toISOString(), cancel_reason: "passenger_cancelled" });
       setActiveRide(null);
+      setShowCancelDialog(false);
       toast({ title: "Viaje cancelado" });
     } catch (err) {
       toast({ title: "No se pudo cancelar", variant: "destructive" });
@@ -299,7 +306,7 @@ export default function PassengerViajar() {
                 <Loader2 className="w-10 h-10 animate-spin text-accent mx-auto mb-3" />
                 <p className="font-semibold">Conductores cercanos están verificando disponibilidad para aceptar tu viaje.</p>
                 <p className="text-sm text-muted-foreground mt-1">Buscando conductor...</p>
-                <Button variant="outline" onClick={handleCancel} className="w-full mt-4 text-destructive">Cancelar viaje</Button>
+                <Button variant="outline" onClick={() => setShowCancelDialog(true)} className="w-full mt-4 text-destructive">Cancelar viaje</Button>
               </div>
             )}
             {status === "NO_DRIVERS" && (
@@ -341,7 +348,7 @@ export default function PassengerViajar() {
                 {status === "ASSIGNED" || status === "DRIVER_APPROACHING" ? (
                   <p className="text-center text-sm text-muted-foreground">{status === "DRIVER_APPROACHING" ? "Tu conductor está en camino" : "Conductor asignado, en camino..."}</p>
                 ) : null}
-                <Button variant="outline" onClick={handleCancel} className="w-full mt-3 text-destructive text-sm">Cancelar viaje</Button>
+                <Button variant="outline" onClick={() => setShowCancelDialog(true)} className="w-full mt-3 text-destructive text-sm">Cancelar viaje</Button>
               </div>
             )}
             {["PIN_VALIDATION", "IN_PROGRESS", "ARRIVED", "PAYMENT_PENDING"].includes(status) && (
@@ -357,6 +364,12 @@ export default function PassengerViajar() {
             )}
           </Card>
         </div>
+        <CancelRideDialog
+          open={showCancelDialog}
+          onOpenChange={setShowCancelDialog}
+          onConfirm={handleCancel}
+          isDriver={false}
+        />
       </div>
     );
   }

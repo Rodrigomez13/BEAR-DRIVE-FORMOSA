@@ -9,6 +9,8 @@ import { toast } from "@/components/ui/use-toast";
 import MapView from "@/components/bear/MapView";
 import { Car, Power, Loader2, MapPin, Clock, DollarSign, Navigation, CheckCircle2, KeyRound, X, AlertTriangle, Wallet } from "lucide-react";
 import { getCurrentPosition, FORMOSA_CENTER } from "@/lib/geo";
+import CancelRideDialog from "@/components/bear/CancelRideDialog";
+import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
 
 export default function DriverConducir() {
   const { user } = useAuth();
@@ -21,6 +23,7 @@ export default function DriverConducir() {
   const [pinInput, setPinInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [driverPos, setDriverPos] = useState(FORMOSA_CENTER);
   const pollRef = useRef(null);
   const posRef = useRef(null);
@@ -77,6 +80,9 @@ export default function DriverConducir() {
     const interval = setInterval(poll, 3000);
     return () => clearInterval(interval);
   }, [activeRide?.id]);
+
+  // Guard against closing app during active ride
+  useActiveRideGuard(!!activeRide);
 
   // Update driver position when online
   useEffect(() => {
@@ -182,6 +188,18 @@ export default function DriverConducir() {
     }
   };
 
+  const handleCancel = async () => {
+    if (!activeRide) return;
+    try {
+      await base44.entities.Ride.update(activeRide.id, { status: "CANCELLED", cancelled_date: new Date().toISOString(), cancel_reason: "driver_cancelled" });
+      setActiveRide(null);
+      setShowCancelDialog(false);
+      toast({ title: "Viaje cancelado" });
+    } catch (err) {
+      toast({ title: "No se pudo cancelar", variant: "destructive" });
+    }
+  };
+
   const formatPrice = (v) => `$${(v || 0).toLocaleString("es-AR")}`;
 
   if (loading) return <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
@@ -244,6 +262,7 @@ export default function DriverConducir() {
               <div>
                 <p className="text-sm text-center text-muted-foreground mb-3">Dirigite al punto de encuentro</p>
                 <Button onClick={handleArrived} className="w-full bear-gold-gradient text-foreground border-0">Llegué</Button>
+                <Button variant="outline" onClick={() => setShowCancelDialog(true)} className="w-full mt-2 text-destructive text-sm">Cancelar viaje</Button>
               </div>
             )}
             {status === "DRIVER_ARRIVED" && (
@@ -269,6 +288,12 @@ export default function DriverConducir() {
             )}
           </Card>
         </div>
+        <CancelRideDialog
+          open={showCancelDialog}
+          onOpenChange={setShowCancelDialog}
+          onConfirm={handleCancel}
+          isDriver={true}
+        />
       </div>
     );
   }

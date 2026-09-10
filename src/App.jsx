@@ -29,6 +29,8 @@ import AdminShell from '@/pages/admin/AdminShell';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminDrivers from '@/pages/admin/AdminDrivers';
 import AdminPricing from '@/pages/admin/AdminPricing';
+import SecurityPrivacy from '@/pages/shared/SecurityPrivacy';
+import HelpSupport from '@/pages/shared/HelpSupport';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -71,6 +73,8 @@ const AuthenticatedApp = () => {
           <Route path="profile" element={<DriverProfile />} />
         </Route>
         <Route path="/onboarding" element={<DriverOnboarding />} />
+        <Route path="/security-privacy" element={<SecurityPrivacy />} />
+        <Route path="/help-support" element={<HelpSupport />} />
         <Route path="/admin" element={<AdminShell />}>
           <Route index element={<AdminDashboard />} />
           <Route path="drivers" element={<AdminDrivers />} />
