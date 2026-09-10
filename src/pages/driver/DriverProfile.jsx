@@ -8,7 +8,9 @@ import { toast } from "@/components/ui/use-toast";
 import StarRating from "@/components/bear/StarRating";
 import BearAvatar from "@/components/bear/BearAvatar";
 import ThemeToggle from "@/components/bear/ThemeToggle";
-import { Car, LogOut, User, FileText, ChevronRight, Shield, HelpCircle, CheckCircle2, AlertTriangle, Camera, Loader2 } from "lucide-react";
+import { Car, LogOut, User, FileText, ChevronRight, Shield, HelpCircle, CheckCircle2, AlertTriangle, Camera, Loader2, Clock } from "lucide-react";
+import { businessDaysUntil } from "@/lib/businessDays";
+import { validateFile, optimizeForWeb } from "@/lib/imageUtils";
 
 export default function DriverProfile() {
   const { user, logout, checkUserAuth } = useAuth();
@@ -17,13 +19,20 @@ export default function DriverProfile() {
   const [docs, setDocs] = useState([]);
   const [photoUrl, setPhotoUrl] = useState(user?.profile_photo_url || "");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [application, setApplication] = useState(null);
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      toast({ title: "Archivo inválido", description: validation.error, variant: "destructive" });
+      return;
+    }
     setUploadingPhoto(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const optimized = await optimizeForWeb(file);
+      const { file_url } = await base44.integrations.Core.UploadFile({ file: optimized });
       await base44.auth.updateMe({ profile_photo_url: file_url });
       setPhotoUrl(file_url);
       await checkUserAuth();
@@ -42,6 +51,10 @@ export default function DriverProfile() {
         setVehicles(v);
         const d = await base44.entities.DriverDocument.filter({ driver_id: user.id });
         setDocs(d);
+        if (user?.driver_capability === "PENDING_REVIEW") {
+          const apps = await base44.entities.DriverApplication.filter({ user_id: user.id }, "-created_date", 1);
+          if (apps.length > 0) setApplication(apps[0]);
+        }
       } catch (err) {}
     };
     load();
@@ -88,6 +101,19 @@ export default function DriverProfile() {
           </span>
         </div>
       </Card>
+
+      {cap === "PENDING_REVIEW" && application?.status === "UNDER_REVIEW" && application?.review_deadline && (
+        <Card className="p-5 mb-4 bear-gradient text-white">
+          <div className="flex items-center gap-3">
+            <Clock className="w-8 h-8 text-accent shrink-0" />
+            <div>
+              <p className="font-semibold text-sm">Revisión en curso</p>
+              <p className="text-3xl font-extrabold text-accent">{businessDaysUntil(application.review_deadline)}</p>
+              <p className="text-xs text-white/60">días hábiles restantes para aprobación</p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card className="p-2 mb-4">
         <div className="p-3">

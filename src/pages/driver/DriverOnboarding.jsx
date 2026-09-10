@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import { Upload, Car, FileText, CheckCircle2, Loader2, ArrowLeft, ArrowRight, User, Shield, X, AlertTriangle, Clock } from "lucide-react";
 import { sanitizeString, sanitizePhone, sanitizeDNI, sanitizePlate, sanitizeInt } from "@/lib/sanitize";
+import { validateFile, optimizeForWeb } from "@/lib/imageUtils";
 import { businessDaysUntil } from "@/lib/businessDays";
 
 const STEPS = [
@@ -63,8 +64,14 @@ export default function DriverOnboarding() {
   }, [user]);
 
   const handleFileUpload = async (code, file) => {
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      toast({ title: "Archivo inválido", description: validation.error, variant: "destructive" });
+      return;
+    }
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const optimized = await optimizeForWeb(file);
+      const { file_url } = await base44.integrations.Core.UploadFile({ file: optimized });
       setDocuments(d => ({ ...d, [code]: { ...d[code], file_url } }));
       toast({ title: "Documento cargado" });
     } catch (err) {
@@ -117,13 +124,18 @@ export default function DriverOnboarding() {
         setApplication(created);
       }
 
-      // Create vehicle
-      await base44.entities.Vehicle.create({
-        driver_id: user.id,
-        ...cleanVehicle,
-        status: "pending",
-        category: "basic",
-      });
+      // Update or create vehicle (avoid duplicates on resubmission)
+      const existingVehicles = await base44.entities.Vehicle.filter({ driver_id: user.id });
+      if (existingVehicles.length > 0) {
+        await base44.entities.Vehicle.update(existingVehicles[0].id, { ...cleanVehicle, status: "pending" });
+      } else {
+        await base44.entities.Vehicle.create({ driver_id: user.id, ...cleanVehicle, status: "pending", category: "basic" });
+      }
+
+      // Delete old documents for this application (in case of resubmission)
+      if (appId) {
+        await base44.entities.DriverDocument.deleteMany({ application_id: appId });
+      }
 
       // Create documents
       for (const req of requirements) {
@@ -205,7 +217,7 @@ export default function DriverOnboarding() {
             <p className="text-sm text-destructive">{application.auto_review_notes}</p>
           </Card>
         )}
-        <Button onClick={() => { setApplication(null); setStep(0); }} className="w-full bear-gold-gradient text-foreground border-0">Corregir y reenviar</Button>
+        <Button onClick={() => setStep(2)} className="w-full bear-gold-gradient text-foreground border-0">Corregir y reenviar</Button>
       </div>
     );
   }
@@ -255,7 +267,7 @@ export default function DriverOnboarding() {
         <h1 className="text-2xl font-bold mb-2">Solicitud rechazada</h1>
         <p className="text-sm text-muted-foreground mb-2">Tu postulación no fue aprobada.</p>
         {application.rejection_reason && <p className="text-sm bg-destructive/5 p-3 rounded-lg mb-4">Motivo: {application.rejection_reason}</p>}
-        <Button onClick={() => { setApplication(null); setStep(0); }} className="w-full bear-gold-gradient text-foreground border-0">Postular nuevamente</Button>
+        <Button onClick={() => setStep(0)} className="w-full bear-gold-gradient text-foreground border-0">Postular nuevamente</Button>
       </div>
     );
   }

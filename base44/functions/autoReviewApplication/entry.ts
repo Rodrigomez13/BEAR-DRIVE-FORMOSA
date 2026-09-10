@@ -60,6 +60,16 @@ export default async function(req) {
         review_deadline: deadline.toISOString(),
         auto_review_notes: "Verificación automática completada. Documentos legibles y válidos."
       });
+      // Notify driver that documentation passed to review
+      try {
+        await base44.asServiceRole.integrations.Core.SendEmail({
+          to: application.applicant_email,
+          subject: "BearDrive - Tu documentación pasó a revisión",
+          text: `Hola ${application.applicant_name || ""},\n\nTu documentación fue verificada automáticamente y pasó a la etapa de revisión administrativa. Tenés 3 días hábiles para que nuestro equipo confirme tu solicitud.\n\nGracias por postularte a BearDrive.`,
+        });
+      } catch (e) {
+        // Email failure shouldn't block the flow
+      }
       return Response.json({ ok: true, status: "UNDER_REVIEW", deadline: deadline.toISOString() });
     } else {
       // Issues found → request more info
