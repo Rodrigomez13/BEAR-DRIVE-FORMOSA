@@ -14,7 +14,7 @@ import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
 import { sanitizeString } from "@/lib/sanitize";
 import BearAvatar from "@/components/bear/BearAvatar";
-import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard } from "lucide-react";
+import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown } from "lucide-react";
 
 const CATEGORIES = [
   { code: "basic", name: "BearDrive", desc: "Servicio estándar" },
@@ -48,6 +48,9 @@ export default function PassengerViajar() {
   const [paying, setPaying] = useState(false);
   const [driverPos, setDriverPos] = useState(null);
   const [enableReview, setEnableReview] = useState(true);
+  const [originExpanded, setOriginExpanded] = useState(false);
+  const [destExpanded, setDestExpanded] = useState(true);
+  const [paymentExpanded, setPaymentExpanded] = useState(false);
   const pollRef = useRef(null);
 
   // Handle Stripe redirect return
@@ -78,6 +81,13 @@ export default function PassengerViajar() {
           if (rides[0].destination_lat) setDestination({ lat: rides[0].destination_lat, lng: rides[0].destination_lng });
           setOriginAddress(rides[0].origin_address || "");
           setDestinationAddress(rides[0].destination_address || "");
+        } else {
+          try {
+            const pos = await getCurrentPosition();
+            setOrigin(pos);
+            const addr = await reverseGeocode(pos.lat, pos.lng);
+            setOriginAddress(addr);
+          } catch (err) { /* ignore */ }
         }
       } catch (err) {
         // ignore
@@ -474,43 +484,12 @@ export default function PassengerViajar() {
         className="absolute inset-0"
       />
 
-      {/* Top search bar */}
-      <div className="absolute inset-x-0 top-0 z-10 p-3">
-        <Card className="rounded-2xl p-3 max-w-md mx-auto">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={selectingTarget === "origin" ? "Buscar origen..." : "¿A dónde vas?"}
-              className="pl-10 h-11"
-            />
-            {(searchingPlace || geocoding) && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin" />}
-          </div>
-          {searchResults.length > 0 && (
-            <div className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-border">
-              {searchResults.map((r, i) => (
-                <button key={i} onClick={() => handleSelectPlace(r)} className="w-full text-left p-3 hover:bg-secondary/50 border-b border-border last:border-0">
-                  <p className="text-sm font-medium truncate">{r.main_text}</p>
-                  <p className="text-xs text-muted-foreground truncate">{r.secondary_text || r.label}</p>
-                </button>
-              ))}
-            </div>
-          )}
-          {searchResults.length === 0 && searchQuery.trim().length < 3 && (
-            <div className="mt-2">
-              <FavoritesBar onSelect={handleSelectFavorite} />
-            </div>
-          )}
-        </Card>
-      </div>
-
       {/* GPS button */}
-      <button onClick={handleGPS} className="absolute right-4 bottom-[340px] z-10 w-11 h-11 rounded-full bg-card shadow-lg flex items-center justify-center hover:bg-secondary">
+      <button onClick={handleGPS} className="absolute right-4 bottom-[420px] z-10 w-11 h-11 rounded-full bg-card shadow-lg flex items-center justify-center hover:bg-secondary">
         <Crosshair className="w-5 h-5 text-accent" />
       </button>
 
-      {/* Bottom panel with origin/destination + payment + quote */}
+      {/* Bottom panel with search + collapsibles + quote */}
       <div className="absolute inset-x-0 bottom-0 z-10 p-3">
         <Card className="rounded-2xl p-4 max-w-md mx-auto">
           {quote ? (
@@ -550,46 +529,95 @@ export default function PassengerViajar() {
             </div>
           ) : (
             <div>
-              <div className="space-y-2 mb-3">
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={selectingTarget === "origin" ? "Buscar origen..." : "¿A dónde vas?"}
+                  className="pl-10 h-11"
+                />
+                {(searchingPlace || geocoding) && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin" />}
+              </div>
+              {searchResults.length > 0 && (
+                <div className="mb-3 max-h-48 overflow-y-auto rounded-xl border border-border">
+                  {searchResults.map((r, i) => (
+                    <button key={i} onClick={() => handleSelectPlace(r)} className="w-full text-left p-3 hover:bg-secondary/50 border-b border-border last:border-0">
+                      <p className="text-sm font-medium truncate">{r.main_text}</p>
+                      <p className="text-xs text-muted-foreground truncate">{r.secondary_text || r.label}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {searchResults.length === 0 && searchQuery.trim().length < 3 && (
+                <div className="mb-3">
+                  <FavoritesBar onSelect={handleSelectFavorite} />
+                </div>
+              )}
+
+              <div className="mb-2">
                 <button
-                  onClick={() => setSelectingTarget("origin")}
+                  onClick={() => { setOriginExpanded(!originExpanded); setSelectingTarget("origin"); }}
                   className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${selectingTarget === "origin" ? "border-accent bg-accent/5" : "border-border bg-secondary/50"}`}
                 >
                   <span className="w-3 h-3 rounded-full bg-foreground shrink-0" />
-                  <span className="text-sm text-left flex-1 truncate">{originAddress ? displayAddress(originAddress) : "Elegí origen"}</span>
-                  {origin && <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />}
+                  <span className="text-sm text-left flex-1 truncate">{originAddress ? displayAddress(originAddress) : "Mi ubicación"}</span>
+                  {originExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
                 </button>
+                {originExpanded && (
+                  <div className="mt-1 flex gap-2">
+                    <Button size="sm" variant="outline" onClick={handleGPS} className="flex-1">
+                      <Crosshair className="w-3.5 h-3.5 mr-1" />Usar ubicación actual
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="mb-2">
                 <button
-                  onClick={() => setSelectingTarget("destination")}
+                  onClick={() => { setDestExpanded(!destExpanded); setSelectingTarget("destination"); }}
                   className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${selectingTarget === "destination" ? "border-accent bg-accent/5" : "border-border bg-secondary/50"}`}
                 >
                   <span className="w-3 h-3 rounded-full bg-accent shrink-0" />
                   <span className="text-sm text-left flex-1 truncate">{destinationAddress ? displayAddress(destinationAddress) : "Elegí destino"}</span>
                   {destination && <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />}
+                  {destExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
                 </button>
               </div>
-              <div className="flex gap-2 mb-3">
-                <button onClick={() => setPaymentMethod("cash")} className={`flex-1 p-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${paymentMethod === "cash" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
-                  <Banknote className="w-4 h-4" />Efectivo
-                </button>
-                <button onClick={() => setPaymentMethod("qr")} className={`flex-1 p-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${paymentMethod === "qr" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
-                  <QrCode className="w-4 h-4" />QR
-                </button>
-                <button onClick={() => setPaymentMethod("card")} className={`flex-1 p-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${paymentMethod === "card" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
-                  <CreditCard className="w-4 h-4" />Tarjeta
-                </button>
-              </div>
-              {origin && destination ? (
-                <Button
-                  onClick={handleQuote}
-                  disabled={quoteLoading}
-                  className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold"
+
+              <div className="mb-3">
+                <button
+                  onClick={() => setPaymentExpanded(!paymentExpanded)}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-border bg-secondary/50 transition-colors"
                 >
+                  {paymentMethod === "card" && <CreditCard className="w-4 h-4 text-accent shrink-0" />}
+                  {paymentMethod === "cash" && <Banknote className="w-4 h-4 text-accent shrink-0" />}
+                  {paymentMethod === "qr" && <QrCode className="w-4 h-4 text-accent shrink-0" />}
+                  <span className="text-sm text-left flex-1">{paymentMethod === "card" ? "Tarjeta" : paymentMethod === "cash" ? "Efectivo" : "QR"}</span>
+                  {paymentExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
+                </button>
+                {paymentExpanded && (
+                  <div className="mt-1 flex gap-2">
+                    <button onClick={() => setPaymentMethod("cash")} className={`flex-1 p-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${paymentMethod === "cash" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+                      <Banknote className="w-4 h-4" />Efectivo
+                    </button>
+                    <button onClick={() => setPaymentMethod("qr")} className={`flex-1 p-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${paymentMethod === "qr" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+                      <QrCode className="w-4 h-4" />QR
+                    </button>
+                    <button onClick={() => setPaymentMethod("card")} className={`flex-1 p-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${paymentMethod === "card" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+                      <CreditCard className="w-4 h-4" />Tarjeta
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {origin && destination ? (
+                <Button onClick={handleQuote} disabled={quoteLoading} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold">
                   {quoteLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cotizando...</> : "Cotizar viaje"}
                 </Button>
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-2">
-                  Elegí origen y destino para cotizar
+                  {origin ? "Elegí destino para cotizar" : "Activa tu ubicación para empezar"}
                 </p>
               )}
             </div>
