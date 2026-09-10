@@ -12,6 +12,8 @@ import FavoritesBar from "@/components/bear/FavoritesBar";
 import { searchPlaces, geocodePlace, reverseGeocode, getCurrentPosition, FORMOSA_CENTER, displayAddress, isCoordinateLike } from "@/lib/geo";
 import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
+import { sanitizeString } from "@/lib/sanitize";
+import BearAvatar from "@/components/bear/BearAvatar";
 import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote } from "lucide-react";
 
 const CATEGORIES = [
@@ -187,12 +189,12 @@ export default function PassengerViajar() {
     try {
       const ride = await base44.entities.Ride.create({
         passenger_id: user.id,
-        passenger_name: user.full_name || user.email,
+        passenger_name: sanitizeString(user.full_name || user.email, 100),
         status: "SEARCHING",
-        origin_address: originAddress,
+        origin_address: sanitizeString(originAddress, 300) || "Ubicación seleccionada",
         origin_lat: origin.lat,
         origin_lng: origin.lng,
-        destination_address: destinationAddress,
+        destination_address: sanitizeString(destinationAddress, 300) || "Ubicación seleccionada",
         destination_lat: destination.lat,
         destination_lng: destination.lng,
         category,
@@ -329,9 +331,7 @@ export default function PassengerViajar() {
             {["ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING"].includes(status) && (
               <div>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bear-gradient flex items-center justify-center text-accent font-bold text-lg">
-                    {(activeRide.driver_name || "C").charAt(0)}
-                  </div>
+                  <BearAvatar size={48} />
                   <div className="flex-1">
                     <p className="font-semibold">{activeRide.driver_name || "Conductor"}</p>
                     <div className="flex items-center gap-2 text-sm">

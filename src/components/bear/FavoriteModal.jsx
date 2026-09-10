@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Star, Loader2, MapPin } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "@/components/ui/use-toast";
+import { sanitizeString } from "@/lib/sanitize";
 
 export default function FavoriteModal({ open, onClose, destination }) {
   const [label, setLabel] = useState("");
@@ -22,8 +23,8 @@ export default function FavoriteModal({ open, onClose, destination }) {
     setSaving(true);
     try {
       await base44.entities.FavoritePlace.create({
-        label: label.trim() || "Destino",
-        address: destination.address,
+        label: sanitizeString(label, 50) || "Destino",
+        address: sanitizeString(destination.address, 300) || "Ubicación seleccionada",
         lat: destination.lat,
         lng: destination.lng,
       });
