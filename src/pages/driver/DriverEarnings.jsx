@@ -50,7 +50,7 @@ export default function DriverEarnings() {
   if (loading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-secondary border-t-accent rounded-full animate-spin" /></div>;
 
   return (
-    <div className="max-w-md mx-auto px-5 pt-10 pb-10">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in">
       <h1 className="text-2xl font-bold mb-6">Ganancias</h1>
 
       {/* Debt alert */}

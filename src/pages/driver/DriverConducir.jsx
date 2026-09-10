@@ -310,7 +310,7 @@ export default function DriverConducir() {
 
   // Online / offline home
   return (
-    <div className="max-w-md mx-auto px-4 pt-6 pb-8">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Conducir</h1>
         <div className={`px-3 py-1 rounded-full text-xs font-semibold ${online ? "bg-green-100 text-green-700" : "bg-secondary text-muted-foreground"}`}>

@@ -3,7 +3,9 @@ import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import StarRating from "@/components/bear/StarRating";
-import { MapPin, Clock, DollarSign, Star } from "lucide-react";
+import EmptyState from "@/components/bear/EmptyState";
+import { SkeletonList } from "@/components/bear/SkeletonCard";
+import { MapPin, Clock, DollarSign, Star, Car } from "lucide-react";
 import { displayAddress } from "@/lib/geo";
 
 const STATUS_LABELS = {
@@ -30,14 +32,15 @@ export default function DriverActivity() {
   const formatDate = (d) => d ? new Date(d).toLocaleDateString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
 
   return (
-    <div className="max-w-md mx-auto px-5 pt-10 pb-10">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in">
       <h1 className="text-2xl font-bold mb-6">Actividad</h1>
-      {loading ? <div className="text-center py-10 text-muted-foreground">Cargando...</div> :
+      {loading ? <SkeletonList count={4} /> :
        rides.length === 0 ? (
-        <div className="text-center py-16">
-          <MapPin className="w-12 h-12 mx-auto mb-3 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">Todavía no hiciste viajes como conductor</p>
-        </div>
+        <EmptyState
+          icon={Car}
+          title="Todavía no hiciste viajes como conductor"
+          description="Conectate desde la pestaña Conducir para recibir solicitudes"
+        />
       ) : (
         <div className="space-y-3">
           {rides.map(ride => (

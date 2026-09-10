@@ -3,7 +3,9 @@ import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import StarRating from "@/components/bear/StarRating";
-import { MapPin, Clock, DollarSign, Receipt } from "lucide-react";
+import EmptyState from "@/components/bear/EmptyState";
+import { SkeletonList } from "@/components/bear/SkeletonCard";
+import { MapPin, Clock, DollarSign, Navigation } from "lucide-react";
 import { displayAddress } from "@/lib/geo";
 
 const STATUS_LABELS = {
@@ -41,17 +43,17 @@ export default function PassengerActivity() {
   const formatDate = (d) => d ? new Date(d).toLocaleDateString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
 
   return (
-    <div className="max-w-md mx-auto px-5 pt-10 pb-10">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in">
       <h1 className="text-2xl font-bold mb-6">Actividad</h1>
 
       {loading ? (
-        <div className="text-center py-10 text-muted-foreground">Cargando...</div>
+        <SkeletonList count={4} />
       ) : rides.length === 0 ? (
-        <div className="text-center py-16">
-          <MapPin className="w-12 h-12 mx-auto mb-3 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">Todavía no hiciste viajes</p>
-          <p className="text-xs text-muted-foreground mt-1">Pedí tu primer viaje desde la pestaña Viajar</p>
-        </div>
+        <EmptyState
+          icon={Navigation}
+          title="Todavía no hiciste viajes"
+          description="Pedí tu primer viaje desde la pestaña Viajar"
+        />
       ) : (
         <div className="space-y-3">
           {rides.map((ride) => (

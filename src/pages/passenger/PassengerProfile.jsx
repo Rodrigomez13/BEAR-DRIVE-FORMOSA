@@ -9,6 +9,7 @@ import { toast } from "@/components/ui/use-toast";
 import StarRating from "@/components/bear/StarRating";
 import BearAvatar from "@/components/bear/BearAvatar";
 import ThemeToggle from "@/components/bear/ThemeToggle";
+import ModeSwitcher from "@/components/bear/ModeSwitcher";
 import { Phone, MapPin, Camera, LogOut, Car, ChevronRight, Shield, HelpCircle, Bell, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -58,7 +59,7 @@ export default function PassengerProfile() {
   const isDriver = driverCap === "APPROVED_ELIGIBLE";
 
   return (
-    <div className="max-w-md mx-auto px-4 pt-6 pb-8">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Perfil</h1>
         <ThemeToggle />
@@ -98,20 +99,10 @@ export default function PassengerProfile() {
         </Button>
       </Card>
 
-      <Card className="p-0 mb-4 overflow-hidden">
-        {isDriver ? (
-          <button
-            onClick={() => navigate("/driver")}
-            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/50 transition-colors"
-          >
-            <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center"><Car className="w-5 h-5 text-accent" /></div>
-            <div className="flex-1 text-left">
-              <p className="font-medium text-sm">Cambiar a modo Conductor</p>
-              <p className="text-xs text-muted-foreground">Estás habilitado para conducir</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          </button>
-        ) : (
+      <ModeSwitcher />
+
+      {!isDriver && (
+        <Card className="p-0 mb-4 overflow-hidden">
           <button
             onClick={() => navigate("/onboarding")}
             className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/50 transition-colors"
@@ -123,8 +114,10 @@ export default function PassengerProfile() {
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
-        )}
-        <div className="h-px bg-border mx-4" />
+        </Card>
+      )}
+
+      <Card className="p-0 mb-4 overflow-hidden">
         <button onClick={() => navigate("/security-privacy")} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/50 transition-colors">
           <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center"><Shield className="w-5 h-5 text-muted-foreground" /></div>
           <div className="flex-1 text-left"><p className="font-medium text-sm">Seguridad y privacidad</p></div>

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
+import EmptyState from "@/components/bear/EmptyState";
+import { SkeletonList } from "@/components/bear/SkeletonCard";
 import { Gift, Star } from "lucide-react";
 
 export default function PassengerBenefits() {
@@ -25,7 +27,7 @@ export default function PassengerBenefits() {
   }, []);
 
   return (
-    <div className="max-w-md mx-auto px-5 pt-10 pb-10">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in">
       <h1 className="text-2xl font-bold mb-2">Beneficios</h1>
       <p className="text-sm text-muted-foreground mb-6">Acumulá BearPoints y canjealos por descuentos</p>
 
@@ -44,12 +46,13 @@ export default function PassengerBenefits() {
 
       <h2 className="font-semibold mb-3">Beneficios disponibles</h2>
       {loading ? (
-        <div className="text-center py-10 text-muted-foreground">Cargando...</div>
+        <SkeletonList count={3} lines={2} />
       ) : benefits.length === 0 ? (
-        <div className="text-center py-10 text-muted-foreground">
-          <Gift className="w-12 h-12 mx-auto mb-3 opacity-40" />
-          <p className="text-sm">No hay beneficios disponibles por ahora</p>
-        </div>
+        <EmptyState
+          icon={Gift}
+          title="No hay beneficios disponibles por ahora"
+          description="Seguí acumulando BearPoints con cada viaje"
+        />
       ) : (
         <div className="space-y-3">
           {benefits.map((b) => (
