@@ -2,6 +2,7 @@ import { onMapsSDKReady } from "./mapsConfig";
 
 export const FORMOSA_CENTER = { lat: -26.1849, lng: -58.1731 };
 
+// Returns predictions instantly (no geocoding) for fast autocomplete display
 export async function searchPlaces(query) {
   if (!query || query.trim().length < 3) return [];
   try {
@@ -16,28 +17,34 @@ export async function searchPlaces(query) {
         }
       );
     });
-    if (!predictions.length) return [];
-    const geocoder = new g.maps.Geocoder();
-    const results = await Promise.all(
-      predictions.slice(0, 5).map((p) =>
-        new Promise((resolve) => {
-          geocoder.geocode({ placeId: p.place_id }, (res, status) => {
-            if (status === g.maps.GeocoderStatus.OK && res && res[0]) {
-              resolve({
-                label: p.description,
-                lat: res[0].geometry.location.lat(),
-                lng: res[0].geometry.location.lng(),
-              });
-            } else {
-              resolve(null);
-            }
-          });
-        })
-      )
-    );
-    return results.filter(Boolean);
+    return predictions.slice(0, 5).map((p) => ({
+      place_id: p.place_id,
+      label: p.description,
+    }));
   } catch {
     return [];
+  }
+}
+
+// Geocodes a single selected place by place_id — called only on selection
+export async function geocodePlace(placeId) {
+  try {
+    const g = await onMapsSDKReady();
+    const geocoder = new g.maps.Geocoder();
+    const result = await new Promise((resolve) => {
+      geocoder.geocode({ placeId }, (res, status) => {
+        if (status === g.maps.GeocoderStatus.OK && res && res[0]) {
+          resolve({
+            lat: res[0].geometry.location.lat(),
+            lng: res[0].geometry.location.lng(),
+            label: res[0].formatted_address,
+          });
+        } else resolve(null);
+      });
+    });
+    return result;
+  } catch {
+    return null;
   }
 }
 

@@ -3,23 +3,31 @@ import { APIProvider, Map, useMap } from "@vis.gl/react-google-maps";
 import { getMapsApiKey } from "@/lib/mapsConfig";
 
 const DARK_MAP_STYLES = [
-  { elementType: "geometry", stylers: [{ color: "#0d111c" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#0d111c" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#7a8294" }] },
-  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#c9a44e" }] },
+  { elementType: "geometry", stylers: [{ color: "#0e1320" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#0e1320" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#8b93a8" }] },
+  { featureType: "administrative", elementType: "labels.text.fill", stylers: [{ color: "#c9a44e" }] },
+  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#e0b85e" }] },
   { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#8a92a6" }] },
-  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#6a7080" }] },
-  { featureType: "poi", elementType: "labels.icon", stylers: [{ visibility: "simplified" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#1a1f30" }] },
-  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#252b3f" }] },
-  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#9aa0b0" }] },
-  { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#7d8294" }] },
-  { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#6a6f80" }] },
+  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#9aa2b5" }] },
+  { featureType: "poi", elementType: "labels.icon", stylers: [{ visibility: "on" }] },
+  { featureType: "poi.business", elementType: "labels.text.fill", stylers: [{ color: "#b8a46e" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#101820" }] },
+  { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6a8a6a" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#1c2236" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#8b93a8" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#2a3148" }] },
+  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#aab2c8" }] },
+  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#202840" }] },
+  { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#181e30" }] },
+  { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#7a8294" }] },
   { featureType: "transit", elementType: "geometry", stylers: [{ color: "#161b2a" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#070a12" }] },
-  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#3a4a5a" }] },
-  { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#0a0e1a" }] },
-  { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#10141f" }] },
+  { featureType: "transit", elementType: "labels.text.fill", stylers: [{ color: "#6a7080" }] },
+  { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#b8a46e" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0a1018" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#4a5a6a" }] },
+  { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#0b0f1c" }] },
+  { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#121828" }] },
 ];
 
 function originIcon(g) {
@@ -43,11 +51,10 @@ function MapContent({ origin, destination, driverPos, path, onMapClick, recenter
   const dirRendererRef = useRef(null);
   const dirServiceRef = useRef(null);
 
-  // Init overlays once the map is ready
   useEffect(() => {
     if (!map) return;
     const g = window.google.maps;
-    map.setOptions({ styles: DARK_MAP_STYLES, backgroundColor: "#0a0e1a" });
+    map.setOptions({ styles: DARK_MAP_STYLES, backgroundColor: "#0e1320" });
     markersRef.current.origin = new g.Marker({ map, icon: originIcon(g), visible: false });
     markersRef.current.destination = new g.Marker({ map, icon: destinationIcon(g), visible: false });
     markersRef.current.driver = new g.Marker({ map, icon: carIcon(g), visible: false });
@@ -62,7 +69,6 @@ function MapContent({ origin, destination, driverPos, path, onMapClick, recenter
     };
   }, [map]);
 
-  // Update markers
   useEffect(() => {
     if (!map) return;
     const m = markersRef.current;
@@ -71,7 +77,6 @@ function MapContent({ origin, destination, driverPos, path, onMapClick, recenter
     if (driverPos) { m.driver.setPosition(driverPos); m.driver.setVisible(true); } else if (m.driver) m.driver.setVisible(false);
   }, [origin, destination, driverPos, map]);
 
-  // Route: real Google Directions, or provided path, or fallback straight line
   useEffect(() => {
     if (!map || !dirServiceRef.current) return;
     const g = window.google.maps;
@@ -101,13 +106,11 @@ function MapContent({ origin, destination, driverPos, path, onMapClick, recenter
     dirRendererRef.current.set("directions", null);
   }, [origin, destination, path, map]);
 
-  // Recenter
   useEffect(() => {
     if (!map || !recenter) return;
     map.panTo(recenter);
   }, [recenter, map]);
 
-  // Click handler
   useEffect(() => {
     if (!map || !interactive || !onMapClick) return;
     const g = window.google.maps;
@@ -139,7 +142,7 @@ export default function MapView({
 
   if (!apiKey) {
     return (
-      <div className={`relative w-full h-full bg-[#0a0e1a] flex items-center justify-center ${className}`}>
+      <div className={`relative w-full h-full bg-[#0e1320] flex items-center justify-center ${className}`}>
         <div className="w-8 h-8 border-4 border-secondary border-t-accent rounded-full animate-spin" />
       </div>
     );
@@ -154,8 +157,8 @@ export default function MapView({
           gestureHandling={interactive ? "auto" : "none"}
           disableDefaultUI
           clickableIcons={false}
-          backgroundColor="#0a0e1a"
-          style={{ width: "100%", height: "100%", background: "#0a0e1a" }}
+          backgroundColor="#0e1320"
+          style={{ width: "100%", height: "100%", background: "#0e1320" }}
         >
           <MapContent
             origin={origin}

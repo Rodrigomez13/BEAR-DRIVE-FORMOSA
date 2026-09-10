@@ -1,0 +1,44 @@
+{
+  "name": "FavoritePlace",
+  "type": "object",
+  "properties": {
+    "label": {
+      "type": "string",
+      "description": "Custom name for the favorite place"
+    },
+    "address": {
+      "type": "string",
+      "description": "Full address string"
+    },
+    "lat": {
+      "type": "number"
+    },
+    "lng": {
+      "type": "number"
+    },
+    "place_id": {
+      "type": "string",
+      "description": "Google Places place_id if available"
+    }
+  },
+  "required": [
+    "label",
+    "address",
+    "lat",
+    "lng"
+  ],
+  "rls": {
+    "read": {
+      "created_by_id": "{{user.id}}"
+    },
+    "create": {
+      "created_by_id": "{{user.id}}"
+    },
+    "update": {
+      "created_by_id": "{{user.id}}"
+    },
+    "delete": {
+      "created_by_id": "{{user.id}}"
+    }
+  }
+}

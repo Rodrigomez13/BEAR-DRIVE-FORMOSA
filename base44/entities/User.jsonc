@@ -10,6 +10,10 @@
         "user"
       ]
     },
+    "dni": {
+      "type": "string",
+      "description": "National ID number (DNI) - unique per user"
+    },
     "phone": {
       "type": "string",
       "description": "Phone number"

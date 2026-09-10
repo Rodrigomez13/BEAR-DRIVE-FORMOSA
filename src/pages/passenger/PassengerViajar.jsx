@@ -7,7 +7,9 @@ import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import MapView from "@/components/bear/MapView";
 import StarRating from "@/components/bear/StarRating";
-import { searchPlaces, reverseGeocode, getCurrentPosition, FORMOSA_CENTER } from "@/lib/geo";
+import FavoriteModal from "@/components/bear/FavoriteModal";
+import FavoritesBar from "@/components/bear/FavoritesBar";
+import { searchPlaces, geocodePlace, reverseGeocode, getCurrentPosition, FORMOSA_CENTER } from "@/lib/geo";
 import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote } from "lucide-react";
 
 const CATEGORIES = [
@@ -27,7 +29,8 @@ export default function PassengerViajar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searchingPlace, setSearchingPlace] = useState(false);
-  const [selectingTarget, setSelectingTarget] = useState("destination"); // "origin" | "destination"
+  const [geocoding, setGeocoding] = useState(false);
+  const [selectingTarget, setSelectingTarget] = useState("destination");
   const [quote, setQuote] = useState(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [category, setCategory] = useState("basic");
@@ -36,6 +39,7 @@ export default function PassengerViajar() {
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState(0);
   const [ratingComment, setRatingComment] = useState("");
+  const [showFavoriteModal, setShowFavoriteModal] = useState(false);
   const pollRef = useRef(null);
 
   // Recover active ride on mount
@@ -86,7 +90,7 @@ export default function PassengerViajar() {
     }
   };
 
-  // Place search
+  // Instant place search — predictions only, no geocoding delay
   useEffect(() => {
     if (searchQuery.trim().length < 3) { setSearchResults([]); return; }
     setSearchingPlace(true);
@@ -94,20 +98,39 @@ export default function PassengerViajar() {
       const results = await searchPlaces(searchQuery);
       setSearchResults(results);
       setSearchingPlace(false);
-    }, 500);
+    }, 300);
     return () => clearTimeout(t);
   }, [searchQuery]);
 
-  const handleSelectPlace = (place) => {
-    if (selectingTarget === "origin") {
-      setOrigin({ lat: place.lat, lng: place.lng });
-      setOriginAddress(place.label);
-    } else {
-      setDestination({ lat: place.lat, lng: place.lng });
-      setDestinationAddress(place.label);
-    }
+  const handleSelectPlace = async (place) => {
     setSearchQuery("");
     setSearchResults([]);
+    setGeocoding(true);
+    try {
+      const geo = await geocodePlace(place.place_id);
+      if (!geo) { toast({ title: "No se pudo obtener la ubicación", variant: "destructive" }); return; }
+      if (selectingTarget === "origin") {
+        setOrigin({ lat: geo.lat, lng: geo.lng });
+        setOriginAddress(geo.label);
+      } else {
+        setDestination({ lat: geo.lat, lng: geo.lng });
+        setDestinationAddress(geo.label);
+      }
+    } catch {
+      toast({ title: "Error al buscar el lugar", variant: "destructive" });
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
+  const handleSelectFavorite = (fav) => {
+    if (selectingTarget === "origin") {
+      setOrigin({ lat: fav.lat, lng: fav.lng });
+      setOriginAddress(fav.address);
+    } else {
+      setDestination({ lat: fav.lat, lng: fav.lng });
+      setDestinationAddress(fav.address);
+    }
   };
 
   const handleMapClick = useCallback((pos) => {
@@ -185,18 +208,28 @@ export default function PassengerViajar() {
     }
   };
 
-  // Rate ride
+  // Rate ride — then offer to save favorite
   const handleRate = async () => {
     if (rating === 0) return;
     try {
       await base44.functions.invoke("rateRide", { ride_id: activeRide.id, score: rating, comment: ratingComment });
       toast({ title: "¡Gracias por tu calificación!" });
-      setActiveRide(null);
-      setRating(0);
-      setRatingComment("");
+      setShowFavoriteModal(true);
     } catch (err) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
+  };
+
+  // Skip rating — go straight to favorite modal
+  const handleSkipRating = () => {
+    setShowFavoriteModal(true);
+  };
+
+  const handleFavoriteClose = () => {
+    setShowFavoriteModal(false);
+    setActiveRide(null);
+    setRating(0);
+    setRatingComment("");
   };
 
   const formatPrice = (v) => `$${(v || 0).toLocaleString("es-AR")}`;
@@ -213,33 +246,40 @@ export default function PassengerViajar() {
 
     if (status === "COMPLETED") {
       return (
-        <div className="max-w-md mx-auto px-5 pt-10 pb-10">
-          <div className="text-center mb-6">
-            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 className="w-8 h-8 text-green-600" />
+        <>
+          <div className="max-w-md mx-auto px-5 pt-10 pb-10">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              </div>
+              <h1 className="text-2xl font-bold">¡Viaje completado!</h1>
             </div>
-            <h1 className="text-2xl font-bold">¡Viaje completado!</h1>
+            <Card className="p-5 mb-4 space-y-3">
+              <div className="flex justify-between"><span className="text-sm text-muted-foreground">Origen</span><span className="text-sm font-medium text-right truncate ml-3">{activeRide.origin_address}</span></div>
+              <div className="flex justify-between"><span className="text-sm text-muted-foreground">Destino</span><span className="text-sm font-medium text-right truncate ml-3">{activeRide.destination_address}</span></div>
+              <div className="flex justify-between"><span className="text-sm text-muted-foreground">Distancia</span><span className="text-sm font-medium">{activeRide.distance_km} km</span></div>
+              <div className="flex justify-between"><span className="text-sm text-muted-foreground">Duración</span><span className="text-sm font-medium">{activeRide.duration_min} min</span></div>
+              <div className="flex justify-between"><span className="text-sm text-muted-foreground">Pago</span><span className="text-sm font-medium capitalize">{activeRide.payment_method}</span></div>
+              <div className="h-px bg-border" />
+              <div className="flex justify-between items-center">
+                <span className="font-semibold">Total</span>
+                <span className="text-2xl font-extrabold text-accent">{formatPrice(activeRide.final_fare || activeRide.quoted_fare)}</span>
+              </div>
+            </Card>
+            <Card className="p-5 mb-4">
+              <p className="font-semibold mb-3 text-center">Calificá a tu conductor</p>
+              <div className="flex justify-center mb-4"><StarRating value={rating} onChange={setRating} size={32} /></div>
+              <Input value={ratingComment} onChange={(e) => setRatingComment(e.target.value)} placeholder="Comentario (opcional)" className="mb-3" />
+              <Button onClick={handleRate} disabled={rating === 0} className="w-full bear-gold-gradient text-foreground border-0">Enviar calificación</Button>
+              <Button variant="ghost" onClick={handleSkipRating} className="w-full mt-2 text-sm">Omitir</Button>
+            </Card>
           </div>
-          <Card className="p-5 mb-4 space-y-3">
-            <div className="flex justify-between"><span className="text-sm text-muted-foreground">Origen</span><span className="text-sm font-medium text-right truncate ml-3">{activeRide.origin_address}</span></div>
-            <div className="flex justify-between"><span className="text-sm text-muted-foreground">Destino</span><span className="text-sm font-medium text-right truncate ml-3">{activeRide.destination_address}</span></div>
-            <div className="flex justify-between"><span className="text-sm text-muted-foreground">Distancia</span><span className="text-sm font-medium">{activeRide.distance_km} km</span></div>
-            <div className="flex justify-between"><span className="text-sm text-muted-foreground">Duración</span><span className="text-sm font-medium">{activeRide.duration_min} min</span></div>
-            <div className="flex justify-between"><span className="text-sm text-muted-foreground">Pago</span><span className="text-sm font-medium capitalize">{activeRide.payment_method}</span></div>
-            <div className="h-px bg-border" />
-            <div className="flex justify-between items-center">
-              <span className="font-semibold">Total</span>
-              <span className="text-2xl font-extrabold text-accent">{formatPrice(activeRide.final_fare || activeRide.quoted_fare)}</span>
-            </div>
-          </Card>
-          <Card className="p-5 mb-4">
-            <p className="font-semibold mb-3 text-center">Calificá a tu conductor</p>
-            <div className="flex justify-center mb-4"><StarRating value={rating} onChange={setRating} size={32} /></div>
-            <Input value={ratingComment} onChange={(e) => setRatingComment(e.target.value)} placeholder="Comentario (opcional)" className="mb-3" />
-            <Button onClick={handleRate} disabled={rating === 0} className="w-full bear-gold-gradient text-foreground border-0">Enviar calificación</Button>
-            <Button variant="ghost" onClick={() => setActiveRide(null)} className="w-full mt-2 text-sm">Omitir</Button>
-          </Card>
-        </div>
+          <FavoriteModal
+            open={showFavoriteModal}
+            onClose={handleFavoriteClose}
+            destination={activeRide.destination_lat ? { lat: activeRide.destination_lat, lng: activeRide.destination_lng, address: activeRide.destination_address } : null}
+          />
+        </>
       );
     }
 
@@ -357,7 +397,7 @@ export default function PassengerViajar() {
               placeholder={selectingTarget === "origin" ? "Buscar origen..." : "¿A dónde vas?"}
               className="pl-10 h-11"
             />
-            {searchingPlace && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin" />}
+            {(searchingPlace || geocoding) && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin" />}
           </div>
           {searchResults.length > 0 && (
             <div className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-border">
@@ -367,6 +407,11 @@ export default function PassengerViajar() {
                   <p className="text-xs text-muted-foreground truncate">{r.label}</p>
                 </button>
               ))}
+            </div>
+          )}
+          {searchResults.length === 0 && searchQuery.trim().length < 3 && (
+            <div className="mt-2">
+              <FavoritesBar onSelect={handleSelectFavorite} />
             </div>
           )}
           {(originAddress || destinationAddress) && (
