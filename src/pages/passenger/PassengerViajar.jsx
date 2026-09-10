@@ -380,7 +380,7 @@ export default function PassengerViajar() {
     }
 
     return (
-      <div className="relative h-full">
+      <div className="absolute inset-0">
         <MapView
           origin={origin}
           destination={destination}
@@ -477,7 +477,7 @@ export default function PassengerViajar() {
 
   // Planning / quoting view
   return (
-    <div className="relative h-full">
+    <div className="absolute inset-0">
       <MapView
         origin={origin}
         destination={destination}

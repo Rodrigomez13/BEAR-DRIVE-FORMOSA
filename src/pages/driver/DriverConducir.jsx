@@ -269,7 +269,7 @@ export default function DriverConducir() {
     return 2 * R * Math.asin(Math.sqrt(a));
   };
 
-  if (loading) return <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
+  if (loading) return <div className="flex items-center justify-center absolute inset-0"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
 
   // Not eligible
   if (!eligible) {
@@ -300,7 +300,7 @@ export default function DriverConducir() {
   if (activeRide) {
     const status = activeRide.status;
     return (
-      <div className="relative h-full">
+      <div className="absolute inset-0">
         <MapView
           origin={{ lat: activeRide.origin_lat, lng: activeRide.origin_lng }}
           destination={{ lat: activeRide.destination_lat, lng: activeRide.destination_lng }}
@@ -391,7 +391,7 @@ export default function DriverConducir() {
   if (online && !activeRide) {
     const incomingRide = availableRides[0];
     return (
-      <div className="relative h-full">
+      <div className="absolute inset-0">
         <MapView driverPos={driverPos} recenter={driverPos} interactive={false} className="absolute inset-0" />
 
         <div className="absolute inset-x-0 top-0 z-10 p-3 safe-top">

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { APIProvider, Map, useMap } from "@vis.gl/react-google-maps";
 import { getMapsApiKey } from "@/lib/mapsConfig";
+import { MapPin } from "lucide-react";
 
 const DARK_MAP_STYLES = [
   { elementType: "geometry", stylers: [{ color: "#0e1320" }] },
@@ -135,15 +136,34 @@ export default function MapView({
   interactive = true,
 }) {
   const [apiKey, setApiKey] = useState(null);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     getMapsApiKey().then(setApiKey);
   }, []);
 
+  useEffect(() => {
+    if (!apiKey) return;
+    const t = setTimeout(() => {
+      if (!window.google?.maps?.Map) setLoadError(true);
+    }, 10000);
+    return () => clearTimeout(t);
+  }, [apiKey]);
+
   if (!apiKey) {
     return (
       <div className={`relative w-full h-full bg-[#0e1320] flex items-center justify-center ${className}`}>
         <div className="w-8 h-8 border-4 border-secondary border-t-accent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className={`relative w-full h-full bg-[#0e1320] flex flex-col items-center justify-center gap-2 p-6 text-center ${className}`}>
+        <MapPin className="w-8 h-8 text-accent/50" />
+        <p className="text-sm text-white/60">No pudimos cargar el mapa. Verificá tu conexión e intentá nuevamente.</p>
+        <button onClick={() => { setLoadError(false); setApiKey(null); getMapsApiKey().then((k) => { setApiKey(k); }); }} className="text-xs text-accent underline mt-1">Reintentar</button>
       </div>
     );
   }

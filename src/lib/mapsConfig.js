@@ -5,8 +5,11 @@ let keyPromise = null;
 export function getMapsApiKey() {
   if (!keyPromise) {
     keyPromise = base44.functions.invoke("getGoogleMapsKey")
-      .then((res) => res.data.apiKey)
-      .catch(() => null);
+      .then((res) => res.data?.apiKey)
+      .catch(() => {
+        keyPromise = null;
+        return null;
+      });
   }
   return keyPromise;
 }

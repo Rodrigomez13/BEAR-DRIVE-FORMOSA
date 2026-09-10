@@ -12,7 +12,7 @@ export default function PassengerShell() {
   ];
   return (
     <div className="h-[100dvh] overflow-hidden flex flex-col bg-background">
-      <main className="flex-1 overflow-y-auto scrollbar-hide">
+      <main className="flex-1 overflow-y-auto scrollbar-hide relative">
         <Outlet />
       </main>
       <BottomNav items={items} basePath="/passenger" />
