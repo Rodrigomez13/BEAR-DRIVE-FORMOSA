@@ -27,6 +27,12 @@ export function getMapsApiKey() {
 let sdkPromise = null;
 let authFailureMessage = null;
 
+// Force-reset the cached SDK promise (used by retry button when SDK is hung)
+export function resetSdkPromise() {
+  sdkPromise = null;
+  authFailureMessage = null;
+}
+
 // Google Maps JS API llama a esta función global cuando la autenticación falla
 // (API key inválida, billing deshabilitado, o API no habilitada)
 window.gm_authFailure = () => {
@@ -62,9 +68,9 @@ export function loadMapsSDK() {
       const timeout = setTimeout(() => {
         delete window[callbackName];
         sdkPromise = null;
-        console.error("[BearDrive Maps] Timeout: el callback no respondió en 15s");
-        reject(new Error("Timeout: el callback de Google Maps no respondió. Posible bloqueo de red o CSP."));
-      }, 15000);
+        console.error("[BearDrive Maps] Timeout: el callback no respondió en 8s");
+        reject(new Error("Timeout: el callback de Google Maps no respondió en 8 segundos. Posible bloqueo de red, CSP, o gm_authFailure."));
+      }, 8000);
 
       window[callbackName] = () => {
         clearTimeout(timeout);

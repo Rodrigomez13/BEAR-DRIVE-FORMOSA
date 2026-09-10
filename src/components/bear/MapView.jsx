@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { loadMapsSDK } from "@/lib/mapsConfig";
+import { loadMapsSDK, getAuthFailure, resetSdkPromise } from "@/lib/mapsConfig";
 import { MapPin, AlertTriangle } from "lucide-react";
 
 const DARK_MAP_STYLES = [
@@ -64,11 +64,14 @@ export default function MapView({
   const dirServiceRef = useRef(null);
   const [status, setStatus] = useState("loading");
   const [errorMsg, setErrorMsg] = useState("");
+  const [debugInfo, setDebugInfo] = useState("Iniciando...");
   const [retryKey, setRetryKey] = useState(0);
+  const [showDebug, setShowDebug] = useState(false);
 
   // Initialize map
   useEffect(() => {
     let cancelled = false;
+    setDebugInfo("Solicitando SDK de Google Maps...");
     console.log("[MapView] Iniciando carga del mapa, intento:", retryKey);
     loadMapsSDK()
       .then((g) => {
@@ -76,6 +79,7 @@ export default function MapView({
           console.log("[MapView] Cancelado o contenedor no disponible");
           return;
         }
+        setDebugInfo("SDK cargado, creando instancia del mapa...");
         console.log("[MapView] Creando instancia de google.maps.Map");
         const map = new g.maps.Map(containerRef.current, {
           center,
@@ -95,12 +99,14 @@ export default function MapView({
         dirRendererRef.current.setMap(map);
         dirServiceRef.current = new g.maps.DirectionsService();
         console.log("[MapView] Mapa inicializado correctamente");
+        setDebugInfo("Mapa listo");
         setStatus("ready");
       })
       .catch((err) => {
         if (cancelled) return;
         console.error("[MapView] Error al cargar el mapa:", err);
-        setErrorMsg(err?.message || "Error desconocido");
+        const authFail = getAuthFailure();
+        setErrorMsg(authFail || err?.message || "Error desconocido");
         setStatus("error");
       });
     return () => {
@@ -157,6 +163,20 @@ export default function MapView({
     if (mapRef.current && recenter) mapRef.current.panTo(recenter);
   }, [recenter]);
 
+  // Detect gm_authFailure that fires AFTER the map already loaded
+  useEffect(() => {
+    if (status !== "ready") return;
+    const check = setInterval(() => {
+      const authFail = getAuthFailure();
+      if (authFail) {
+        console.error("[MapView] gm_authFailure detectado post-carga:", authFail);
+        setErrorMsg(authFail);
+        setStatus("error");
+      }
+    }, 2000);
+    return () => clearInterval(check);
+  }, [status]);
+
   // Click handler
   useEffect(() => {
     const g = window.google?.maps;
@@ -168,8 +188,29 @@ export default function MapView({
 
   if (status === "loading") {
     return (
-      <div className={`relative w-full h-full bg-[#0e1320] flex items-center justify-center ${className}`}>
+      <div className={`relative w-full h-full bg-[#0e1320] flex flex-col items-center justify-center gap-3 ${className}`}>
         <div className="w-8 h-8 border-4 border-secondary border-t-accent rounded-full animate-spin" />
+        <p className="text-xs text-white/50">{debugInfo}</p>
+        <button
+          onClick={() => { resetSdkPromise(); setDebugInfo("Reintentando desde cero..."); setStatus("loading"); setRetryKey((k) => k + 1); }}
+          className="text-xs text-accent underline font-medium mt-2"
+        >
+          Forzar reintentar
+        </button>
+        <button
+          onClick={() => setShowDebug(!showDebug)}
+          className="text-[10px] text-white/30 underline"
+        >
+          {showDebug ? "Ocultar debug" : "Ver debug"}
+        </button>
+        {showDebug && (
+          <div className="mt-2 p-3 rounded-lg bg-white/5 border border-white/10 max-w-xs text-left">
+            <p className="text-[10px] text-white/40 font-mono mb-1">Estado: loading</p>
+            <p className="text-[10px] text-white/50 font-mono break-all">{debugInfo}</p>
+            <p className="text-[10px] text-white/30 font-mono mt-1">Reintentos: {retryKey}</p>
+            <p className="text-[10px] text-white/30 font-mono">SDK cargado: {window.google?.maps ? "sí" : "no"}</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -182,20 +223,26 @@ export default function MapView({
         {errorMsg && (
           <p className="text-xs text-white/50 max-w-xs leading-relaxed">{errorMsg}</p>
         )}
-        <div className="mt-2 p-3 rounded-lg bg-white/5 border border-white/10 text-left max-w-xs">
-          <p className="text-[10px] text-white/40 font-mono mb-1">Posibles causas:</p>
-          <ul className="text-[10px] text-white/50 space-y-0.5 list-disc list-inside">
-            <li>Facturación deshabilitada en Google Cloud</li>
-            <li>Maps JavaScript API no habilitada</li>
-            <li>Restricción de dominio no incluye este sitio</li>
-          </ul>
-        </div>
         <button
-          onClick={() => { setErrorMsg(""); setStatus("loading"); setRetryKey((k) => k + 1); }}
+          onClick={() => { resetSdkPromise(); setErrorMsg(""); setDebugInfo("Reintentando desde cero..."); setStatus("loading"); setRetryKey((k) => k + 1); }}
           className="text-xs text-accent underline mt-1 font-medium"
         >
           Reintentar
         </button>
+        <button
+          onClick={() => setShowDebug(!showDebug)}
+          className="text-[10px] text-white/30 underline"
+        >
+          {showDebug ? "Ocultar debug" : "Ver debug"}
+        </button>
+        {showDebug && (
+          <div className="mt-2 p-3 rounded-lg bg-white/5 border border-white/10 text-left max-w-xs">
+            <p className="text-[10px] text-white/40 font-mono mb-1">Error detallado:</p>
+            <p className="text-[10px] text-red-300/70 font-mono break-all">{errorMsg}</p>
+            <p className="text-[10px] text-white/30 font-mono mt-2">Reintentos: {retryKey}</p>
+            <p className="text-[10px] text-white/30 font-mono">SDK cargado: {window.google?.maps ? "sí" : "no"}</p>
+          </div>
+        )}
       </div>
     );
   }
