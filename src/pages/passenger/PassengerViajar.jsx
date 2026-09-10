@@ -15,6 +15,8 @@ import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
 import { sanitizeString } from "@/lib/sanitize";
 import BearAvatar from "@/components/bear/BearAvatar";
 import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown } from "lucide-react";
+import { Image } from "@/components/ui/image";
+import { BEAR_LOGO_MARK } from "@/lib/brandAssets";
 
 const CATEGORIES = [
   { code: "basic", name: "BearDrive", desc: "Servicio estándar" },
@@ -483,6 +485,19 @@ export default function PassengerViajar() {
         recenter={origin || (destination ? null : null)}
         className="absolute inset-0"
       />
+
+      {/* Top header */}
+      <div className="absolute inset-x-0 top-0 z-10 p-3 safe-top">
+        <div className="max-w-md mx-auto flex items-center gap-3 px-4 py-2.5 rounded-2xl glass-navy">
+          <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0">
+            <Image src={BEAR_LOGO_MARK} fittingType="fit" className="block w-full h-full" />
+          </div>
+          <div className="leading-none">
+            <p className="text-sm font-bold text-white">Bear<span className="text-accent">Drive</span></p>
+            <p className="text-[10px] text-white/60 mt-0.5">Formosa</p>
+          </div>
+        </div>
+      </div>
 
       {/* GPS button */}
       <button onClick={handleGPS} className="absolute right-4 bottom-[420px] z-10 w-11 h-11 rounded-full bg-card shadow-lg flex items-center justify-center hover:bg-secondary">

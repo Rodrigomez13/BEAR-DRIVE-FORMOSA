@@ -168,41 +168,6 @@ export default function Login() {
               </Link>
             </p>
           </div>
-        ) : !permissionsGranted ? (
-          <div className="space-y-5">
-            <div className="flex items-center justify-between">
-              <button onClick={() => { setMode(null); setPermissionsGranted(false); }} className="text-sm text-muted-foreground hover:text-foreground">
-                ← Volver
-              </button>
-              <span className="text-sm font-medium capitalize flex items-center gap-1.5">
-                {mode === "passenger" ? <User className="w-4 h-4" /> : <Car className="w-4 h-4" />}
-                {mode === "passenger" ? "Pasajero" : "Conductor"}
-              </span>
-            </div>
-            <div className="text-center py-8">
-              <div className="w-20 h-20 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-6">
-                <MapPin className="w-10 h-10 text-accent" />
-              </div>
-              <h2 className="text-xl font-bold mb-3">Necesitamos tu ubicación</h2>
-              <p className="text-sm text-muted-foreground mb-2">
-                BearDrive usa tu ubicación para {mode === "passenger" ? "conectar con conductores cercanos y mostrar tu viaje en tiempo real" : "recibir solicitudes de pasajeros cercanos y navegar a sus puntos de encuentro"}.
-              </p>
-              <p className="text-xs text-muted-foreground mb-6">
-                También necesitamos permiso para enviarte notificaciones sobre el estado de tus viajes.
-              </p>
-              {permissionError && (
-                <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm text-center mb-4">
-                  {permissionError}
-                </div>
-              )}
-              <Button onClick={handleRequestPermissions} disabled={requestingPermission} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold mb-2">
-                {requestingPermission ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Solicitando...</> : <><MapPin className="w-4 h-4 mr-2" />Permitir ubicación</>}
-              </Button>
-              <Button variant="ghost" onClick={() => setPermissionsGranted(true)} className="w-full text-sm">
-                Continuar de todos modos
-              </Button>
-            </div>
-          </div>
         ) : (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
@@ -258,6 +223,40 @@ export default function Login() {
           </div>
         )}
       </div>
+
+      {/* Permission modal */}
+      {mode && !permissionsGranted && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
+          <div className="w-full max-w-sm bg-card rounded-2xl p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">Permisos necesarios</h3>
+              <button onClick={() => setPermissionsGranted(true)} className="text-muted-foreground hover:text-foreground"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="text-center mb-5">
+              <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
+                <MapPin className="w-8 h-8 text-accent" />
+              </div>
+              <p className="text-sm text-muted-foreground mb-2">
+                BearDrive usa tu ubicación para {mode === "passenger" ? "conectar con conductores cercanos y mostrar tu viaje en tiempo real" : "recibir solicitudes de pasajeros cercanos y navegar a sus puntos de encuentro"}.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                También necesitamos permiso para enviarte notificaciones sobre el estado de tus viajes.
+              </p>
+            </div>
+            {permissionError && (
+              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm text-center mb-4">
+                {permissionError}
+              </div>
+            )}
+            <Button onClick={handleRequestPermissions} disabled={requestingPermission} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold mb-2">
+              {requestingPermission ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Solicitando...</> : <><MapPin className="w-4 h-4 mr-2" />Permitir ubicación</>}
+            </Button>
+            <Button variant="ghost" onClick={() => setPermissionsGranted(true)} className="w-full text-sm">
+              Continuar de todos modos
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Hidden admin access modal */}
       {adminModal && (

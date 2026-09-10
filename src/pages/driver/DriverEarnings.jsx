@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
-import { DollarSign, TrendingUp, Car, AlertCircle, Receipt } from "lucide-react";
+import { DollarSign, TrendingUp, Car, AlertCircle, Receipt, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { displayAddress } from "@/lib/geo";
 
 export default function DriverEarnings() {
@@ -12,6 +12,7 @@ export default function DriverEarnings() {
   const [rides, setRides] = useState([]);
   const [charges, setCharges] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
 
   useEffect(() => {
     const load = async () => {
@@ -33,6 +34,17 @@ export default function DriverEarnings() {
 
   const pendingCharges = charges.filter(c => c.status === "pending");
   const totalDebt = pendingCharges.reduce((s, c) => s + (c.total_due || c.amount || 0), 0);
+
+  const monthRides = rides.filter(r => r.completed_date && r.completed_date.slice(0, 7) === selectedMonth);
+  const monthEarnings = monthRides.reduce((s, r) => s + (r.final_fare || r.quoted_fare || 0), 0);
+  const monthAvg = monthRides.length > 0 ? monthEarnings / monthRides.length : 0;
+  const monthLabel = new Date(selectedMonth + "-01").toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+
+  const changeMonth = (delta) => {
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setSelectedMonth(d.toISOString().slice(0, 7));
+  };
 
   const formatPrice = (v) => `$${(v || 0).toLocaleString("es-AR")}`;
   const formatDate = (d) => d ? new Date(d).toLocaleDateString("es-AR", { day: "2-digit", month: "short" }) : "";
@@ -89,6 +101,56 @@ export default function DriverEarnings() {
           <p className="text-xs text-muted-foreground">Total</p>
           <p className="text-lg font-bold">{formatPrice(totalEarnings)}</p>
         </Card>
+      </div>
+
+      {/* Monthly summary with date filter */}
+      <Card className="p-4 mb-4">
+        <div className="flex items-center justify-between mb-4">
+          <button onClick={() => changeMonth(-1)} className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center hover:bg-secondary/80">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground flex items-center justify-center gap-1"><Calendar className="w-3 h-3" />Mes</p>
+            <p className="font-semibold text-sm capitalize">{monthLabel}</p>
+          </div>
+          <button onClick={() => changeMonth(1)} className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center hover:bg-secondary/80">
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="text-center p-2 rounded-xl bg-accent/10">
+            <p className="text-xs text-muted-foreground">Ingresos</p>
+            <p className="text-base font-bold text-accent">{formatPrice(monthEarnings)}</p>
+          </div>
+          <div className="text-center p-2 rounded-xl bg-secondary/50">
+            <p className="text-xs text-muted-foreground">Viajes</p>
+            <p className="text-base font-bold">{monthRides.length}</p>
+          </div>
+          <div className="text-center p-2 rounded-xl bg-secondary/50">
+            <p className="text-xs text-muted-foreground">Promedio</p>
+            <p className="text-base font-bold">{formatPrice(monthAvg)}</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Rides for selected month */}
+      <h2 className="font-semibold text-sm mb-2 capitalize">Viajes de {monthLabel}</h2>
+      <div className="space-y-2 mb-6">
+        {monthRides.length === 0 ? (
+          <Card className="p-4 text-center">
+            <p className="text-sm text-muted-foreground">Sin viajes este mes</p>
+          </Card>
+        ) : (
+          monthRides.map(r => (
+            <Card key={r.id} className="p-3 flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">{displayAddress(r.destination_address)}</p>
+                <p className="text-xs text-muted-foreground">{formatDate(r.completed_date)} · {r.payment_method === "cash" ? "Efectivo" : r.payment_method === "card" ? "Tarjeta" : "QR"}</p>
+              </div>
+              <p className="font-bold text-accent ml-2">{formatPrice(r.final_fare || r.quoted_fare)}</p>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Daily summary */}

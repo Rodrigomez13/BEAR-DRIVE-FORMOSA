@@ -54,6 +54,20 @@ export default async function(req) {
       });
     }
 
+    // 4. Notify passenger of pending digital payment
+    const pm = payment_method || ride.payment_method;
+    if ((pm === "card" || pm === "qr") && passenger?.email) {
+      try {
+        await base44.asServiceRole.integrations.Core.SendEmail({
+          to: passenger.email,
+          subject: "BearDrive — Pago pendiente de tu viaje",
+          body: `Hola,\n\nTu viaje ha finalizado pero tenés un pago pendiente con ${pm === "card" ? "tarjeta" : "QR"}.\n\nMonto: $${fare.toLocaleString("es-AR")}\n\nIngresá a la app para completar el pago desde tu viaje activo.\n\nGracias,\nEquipo BearDrive`
+        });
+      } catch (emailErr) {
+        console.error("Error sending payment notification:", emailErr);
+      }
+    }
+
     // 3. Driver daily charge — only on first completed ride of the business day
     const businessDay = todayBusinessDay(completedDate);
     const existingCharges = await base44.asServiceRole.entities.DriverDailyCharge.filter({
