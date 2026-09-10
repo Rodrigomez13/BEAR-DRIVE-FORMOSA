@@ -5,7 +5,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import { DollarSign, TrendingUp, Car, AlertCircle, Receipt } from "lucide-react";
-import { displayAddress } from "@/lib/geo";
 
 export default function DriverEarnings() {
   const { user } = useAuth();
@@ -91,30 +90,6 @@ export default function DriverEarnings() {
         </Card>
       </div>
 
-      {/* Daily summary */}
-      <Card className="p-4 mb-4">
-        <p className="font-semibold text-sm mb-3 flex items-center gap-2"><Receipt className="w-4 h-4 text-accent" />Resumen de hoy</p>
-        {todayRides.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-3">Sin viajes hoy todavía</p>
-        ) : (
-          <div className="space-y-2">
-            {todayRides.map(r => (
-              <div key={r.id} className="flex items-center justify-between text-sm py-1.5 border-b border-border last:border-0">
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium truncate">{displayAddress(r.destination_address)}</p>
-                  <p className="text-xs text-muted-foreground">{new Date(r.completed_date).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} · {r.payment_method === "cash" ? "Efectivo" : "QR"}</p>
-                </div>
-                <p className="font-bold text-accent ml-2">{formatPrice(r.final_fare || r.quoted_fare)}</p>
-              </div>
-            ))}
-            <div className="flex justify-between pt-2 mt-1 border-t border-border">
-              <p className="font-semibold text-sm">Total del día</p>
-              <p className="font-bold text-accent">{formatPrice(todayEarnings)}</p>
-            </div>
-          </div>
-        )}
-      </Card>
-
       {/* Daily charges */}
       <h2 className="font-semibold text-sm mb-2">Cargos diarios BearDrive</h2>
       <Card className="p-4 mb-4">
@@ -146,7 +121,7 @@ export default function DriverEarnings() {
         {rides.slice(0, 10).map(r => (
           <Card key={r.id} className="p-3 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">{displayAddress(r.destination_address)}</p>
+              <p className="text-sm font-medium">{r.destination_address?.split(",")[0]}</p>
               <p className="text-xs text-muted-foreground">{formatDate(r.completed_date)}</p>
             </div>
             <p className="font-bold text-accent">{formatPrice(r.final_fare || r.quoted_fare)}</p>

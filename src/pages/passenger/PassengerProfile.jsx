@@ -7,35 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import StarRating from "@/components/bear/StarRating";
-import BearAvatar from "@/components/bear/BearAvatar";
-import { Phone, MapPin, Camera, LogOut, Car, ChevronRight, Shield, HelpCircle, Bell, Loader2 } from "lucide-react";
+import { Phone, MapPin, Camera, LogOut, Car, ChevronRight, Shield, HelpCircle, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function PassengerProfile() {
-  const { user, logout, checkUserAuth } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [phone, setPhone] = useState(user?.phone || "");
   const [city, setCity] = useState(user?.city || "Formosa");
   const [saving, setSaving] = useState(false);
-  const [photoUrl, setPhotoUrl] = useState(user?.profile_photo_url || "");
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-
-  const handlePhotoUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setUploadingPhoto(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      await base44.auth.updateMe({ profile_photo_url: file_url });
-      setPhotoUrl(file_url);
-      await checkUserAuth();
-      toast({ title: "Foto actualizada" });
-    } catch (err) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    } finally {
-      setUploadingPhoto(false);
-    }
-  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -62,12 +42,8 @@ export default function PassengerProfile() {
 
       <Card className="p-5 mb-4 bear-gradient text-white">
         <div className="flex items-center gap-4">
-          <div className="relative">
-            <BearAvatar photoUrl={photoUrl} size={64} />
-            <label className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-accent flex items-center justify-center cursor-pointer shadow-lg">
-              {uploadingPhoto ? <Loader2 className="w-3.5 h-3.5 text-foreground animate-spin" /> : <Camera className="w-3.5 h-3.5 text-foreground" />}
-              <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-            </label>
+          <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-2xl font-bold text-accent">
+            {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-lg truncate">{user?.full_name || "Pasajero"}</p>
