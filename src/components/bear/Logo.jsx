@@ -1,6 +1,4 @@
 import React, { useRef, useCallback } from "react";
-import { Image } from "@/components/ui/image";
-import { BEAR_LOGO_MARK } from "@/lib/brandAssets";
 
 // BearDrive logo. Supports long-press (>=2.5s) to trigger the hidden admin access.
 export default function Logo({ size = "md", onLongPress, className = "" }) {
@@ -42,8 +40,18 @@ export default function Logo({ size = "md", onLongPress, className = "" }) {
       onContextMenu={(e) => e.preventDefault()}
     >
       <div className="flex flex-col items-center gap-3">
-        <div className={`${s.box} rounded-2xl overflow-hidden bg-black shadow-lg shadow-black/30`}>
-          <Image src={BEAR_LOGO_MARK} fittingType="fit" className="block w-full h-full" />
+        <div className={`${s.box} rounded-2xl bear-gold-gradient flex items-center justify-center shadow-lg shadow-amber-900/20`}>
+          <svg viewBox="0 0 48 48" className="w-2/3 h-2/3" fill="none">
+            {/* Stylized bear head */}
+            <circle cx="24" cy="26" r="13" fill="#181E2F"/>
+            <circle cx="11" cy="14" r="5.5" fill="#181E2F"/>
+            <circle cx="37" cy="14" r="5.5" fill="#181E2F"/>
+            <circle cx="11" cy="14" r="2.5" fill="#EECD84"/>
+            <circle cx="37" cy="14" r="2.5" fill="#EECD84"/>
+            <circle cx="19" cy="24" r="2" fill="#EECD84"/>
+            <circle cx="29" cy="24" r="2" fill="#EECD84"/>
+            <ellipse cx="24" cy="30" rx="3.5" ry="2.5" fill="#EECD84"/>
+          </svg>
         </div>
         <div className="text-center leading-none">
           <span className={`${s.text} font-extrabold tracking-tight text-foreground`}>

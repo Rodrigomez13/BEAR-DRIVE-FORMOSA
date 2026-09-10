@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import StarRating from "@/components/bear/StarRating";
 import BearAvatar from "@/components/bear/BearAvatar";
-import ThemeToggle from "@/components/bear/ThemeToggle";
 import { Phone, MapPin, Camera, LogOut, Car, ChevronRight, Shield, HelpCircle, Bell, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -59,10 +58,7 @@ export default function PassengerProfile() {
 
   return (
     <div className="max-w-md mx-auto px-5 pt-10 pb-10">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Perfil</h1>
-        <ThemeToggle />
-      </div>
+      <h1 className="text-2xl font-bold mb-6">Perfil</h1>
 
       <Card className="p-5 mb-4 bear-gradient text-white">
         <div className="flex items-center gap-4">

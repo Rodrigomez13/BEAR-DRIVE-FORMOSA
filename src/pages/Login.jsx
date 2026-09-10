@@ -8,7 +8,6 @@ import { Mail, Lock, Loader2, User, Car, ShieldCheck, X } from "lucide-react";
 import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
 import Logo from "@/components/bear/Logo";
-import ThemeToggle from "@/components/bear/ThemeToggle";
 
 export default function Login() {
   const [mode, setMode] = useState(null); // "passenger" | "driver" | null
@@ -89,8 +88,7 @@ export default function Login() {
   };
 
   return (
-    <div className="relative h-[100dvh] overflow-y-auto flex flex-col items-center justify-center px-6 py-10 bg-gradient-to-b from-background to-secondary/40">
-      <div className="absolute top-4 right-4 z-10"><ThemeToggle /></div>
+    <div className="h-[100dvh] overflow-y-auto flex flex-col items-center justify-center px-6 py-10 bg-gradient-to-b from-background to-secondary/40">
       <div className="w-full max-w-sm">
         {adminDenied && (
           <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm text-center">
