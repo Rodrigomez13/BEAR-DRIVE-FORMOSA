@@ -46,6 +46,8 @@ export default function PassengerViajar() {
   const [showFavoriteModal, setShowFavoriteModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [driverPos, setDriverPos] = useState(null);
+  const [enableReview, setEnableReview] = useState(true);
   const pollRef = useRef(null);
 
   // Handle Stripe redirect return
@@ -93,6 +95,10 @@ export default function PassengerViajar() {
       try {
         const updated = await base44.entities.Ride.get(activeRide.id);
         if (updated) setActiveRide(updated);
+        if (updated?.driver_id) {
+          const locs = await base44.entities.DriverLocation.filter({ driver_id: updated.driver_id });
+          if (locs.length > 0) setDriverPos({ lat: locs[0].lat, lng: locs[0].lng });
+        }
       } catch (err) {
         // ignore
       }
@@ -228,6 +234,12 @@ export default function PassengerViajar() {
     try {
       await base44.entities.Ride.update(activeRide.id, { status: "CANCELLED", cancelled_date: new Date().toISOString(), cancel_reason: "passenger_cancelled" });
       setActiveRide(null);
+      setOrigin(null);
+      setDestination(null);
+      setOriginAddress("");
+      setDestinationAddress("");
+      setQuote(null);
+      setDriverPos(null);
       setShowCancelDialog(false);
       toast({ title: "Viaje cancelado" });
     } catch (err) {
@@ -257,6 +269,16 @@ export default function PassengerViajar() {
     setActiveRide(null);
     setRating(0);
     setRatingComment("");
+    setEnableReview(true);
+    setDriverPos(null);
+  };
+
+  const handlePostpone = () => {
+    setActiveRide(null);
+    setRating(0);
+    setRatingComment("");
+    setEnableReview(true);
+    setDriverPos(null);
   };
 
   // Pay with card via Stripe Checkout
@@ -317,11 +339,23 @@ export default function PassengerViajar() {
               </div>
             </Card>
             <Card className="p-5 mb-4">
-              <p className="font-semibold mb-3 text-center">Calificá a tu conductor</p>
-              <div className="flex justify-center mb-4"><StarRating value={rating} onChange={setRating} size={32} /></div>
-              <Input value={ratingComment} onChange={(e) => setRatingComment(e.target.value)} placeholder="Comentario (opcional)" className="mb-3" />
-              <Button onClick={handleRate} disabled={rating === 0} className="w-full bear-gold-gradient text-foreground border-0">Enviar calificación</Button>
-              <Button variant="ghost" onClick={handleSkipRating} className="w-full mt-2 text-sm">Omitir</Button>
+              <label className="flex items-center gap-2 mb-4 cursor-pointer">
+                <input type="checkbox" checked={enableReview} onChange={(e) => setEnableReview(e.target.checked)} className="w-4 h-4 rounded accent-accent" />
+                <span className="text-sm font-medium">Calificar este viaje</span>
+              </label>
+              {enableReview ? (
+                <>
+                  <div className="flex justify-center mb-4"><StarRating value={rating} onChange={setRating} size={32} /></div>
+                  <Input value={ratingComment} onChange={(e) => setRatingComment(e.target.value)} placeholder="Comentario (opcional)" className="mb-3" />
+                  <Button onClick={handleRate} disabled={rating === 0} className="w-full bear-gold-gradient text-foreground border-0">Enviar calificación</Button>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center mb-3">Calificación deshabilitada para este viaje</p>
+              )}
+              <Button variant="outline" onClick={() => setShowFavoriteModal(true)} className="w-full mt-2 text-sm">
+                <Star className="w-4 h-4 mr-2" />Guardar destino como favorito
+              </Button>
+              <Button variant="ghost" onClick={handlePostpone} className="w-full mt-2 text-sm">Cerrar y calificar después</Button>
             </Card>
           </div>
           <FavoriteModal
@@ -338,7 +372,8 @@ export default function PassengerViajar() {
         <MapView
           origin={origin}
           destination={destination}
-          recenter={origin}
+          driverPos={driverPos}
+          recenter={driverPos || origin}
           interactive={false}
           className="absolute inset-0"
         />
@@ -441,21 +476,7 @@ export default function PassengerViajar() {
 
       {/* Top search bar */}
       <div className="absolute inset-x-0 top-0 z-10 p-3">
-        <Card className="rounded-2xl p-4 max-w-md mx-auto">
-          <div className="flex gap-2 mb-2">
-            <button
-              onClick={() => setSelectingTarget("origin")}
-              className={`flex-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${selectingTarget === "origin" ? "bear-gradient text-white" : "bg-secondary text-muted-foreground"}`}
-            >
-              <MapPin className="w-3 h-3 inline mr-1" />Origen
-            </button>
-            <button
-              onClick={() => setSelectingTarget("destination")}
-              className={`flex-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${selectingTarget === "destination" ? "bear-gradient text-white" : "bg-secondary text-muted-foreground"}`}
-            >
-              <Navigation className="w-3 h-3 inline mr-1" />Destino
-            </button>
-          </div>
+        <Card className="rounded-2xl p-3 max-w-md mx-auto">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -481,21 +502,15 @@ export default function PassengerViajar() {
               <FavoritesBar onSelect={handleSelectFavorite} />
             </div>
           )}
-          {(originAddress || destinationAddress) && (
-            <div className="mt-2 space-y-1.5 text-xs">
-              {originAddress && <p className="flex items-center gap-1.5 text-muted-foreground"><span className="w-2 h-2 rounded-full bg-foreground shrink-0" />{displayAddress(originAddress)}</p>}
-              {destinationAddress && <p className="flex items-center gap-1.5 text-muted-foreground"><span className="w-2 h-2 rounded-full bg-accent shrink-0" />{displayAddress(destinationAddress)}</p>}
-            </div>
-          )}
         </Card>
       </div>
 
       {/* GPS button */}
-      <button onClick={handleGPS} className="absolute right-4 bottom-72 z-10 w-11 h-11 rounded-full bg-card shadow-lg flex items-center justify-center hover:bg-secondary">
+      <button onClick={handleGPS} className="absolute right-4 bottom-[340px] z-10 w-11 h-11 rounded-full bg-card shadow-lg flex items-center justify-center hover:bg-secondary">
         <Crosshair className="w-5 h-5 text-accent" />
       </button>
 
-      {/* Bottom panel */}
+      {/* Bottom panel with origin/destination + payment + quote */}
       <div className="absolute inset-x-0 bottom-0 z-10 p-3">
         <Card className="rounded-2xl p-4 max-w-md mx-auto">
           {quote ? (
@@ -535,16 +550,48 @@ export default function PassengerViajar() {
             </div>
           ) : (
             <div>
-              <p className="text-sm text-muted-foreground text-center mb-3">
-                {origin && destination ? "Listo para cotizar" : "Elegí origen y destino en el mapa o buscá un lugar arriba"}
-              </p>
-              <Button
-                onClick={handleQuote}
-                disabled={!origin || !destination || quoteLoading}
-                className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold"
-              >
-                {quoteLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cotizando...</> : "Cotizar viaje"}
-              </Button>
+              <div className="space-y-2 mb-3">
+                <button
+                  onClick={() => setSelectingTarget("origin")}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${selectingTarget === "origin" ? "border-accent bg-accent/5" : "border-border bg-secondary/50"}`}
+                >
+                  <span className="w-3 h-3 rounded-full bg-foreground shrink-0" />
+                  <span className="text-sm text-left flex-1 truncate">{originAddress ? displayAddress(originAddress) : "Elegí origen"}</span>
+                  {origin && <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />}
+                </button>
+                <button
+                  onClick={() => setSelectingTarget("destination")}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${selectingTarget === "destination" ? "border-accent bg-accent/5" : "border-border bg-secondary/50"}`}
+                >
+                  <span className="w-3 h-3 rounded-full bg-accent shrink-0" />
+                  <span className="text-sm text-left flex-1 truncate">{destinationAddress ? displayAddress(destinationAddress) : "Elegí destino"}</span>
+                  {destination && <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />}
+                </button>
+              </div>
+              <div className="flex gap-2 mb-3">
+                <button onClick={() => setPaymentMethod("cash")} className={`flex-1 p-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${paymentMethod === "cash" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+                  <Banknote className="w-4 h-4" />Efectivo
+                </button>
+                <button onClick={() => setPaymentMethod("qr")} className={`flex-1 p-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${paymentMethod === "qr" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+                  <QrCode className="w-4 h-4" />QR
+                </button>
+                <button onClick={() => setPaymentMethod("card")} className={`flex-1 p-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${paymentMethod === "card" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+                  <CreditCard className="w-4 h-4" />Tarjeta
+                </button>
+              </div>
+              {origin && destination ? (
+                <Button
+                  onClick={handleQuote}
+                  disabled={quoteLoading}
+                  className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold"
+                >
+                  {quoteLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cotizando...</> : "Cotizar viaje"}
+                </Button>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-2">
+                  Elegí origen y destino para cotizar
+                </p>
+              )}
             </div>
           )}
         </Card>
