@@ -62,7 +62,8 @@ export default function MapView({
   const polylineRef = useRef(null);
   const dirRendererRef = useRef(null);
   const dirServiceRef = useRef(null);
-  const [status, setStatus] = useState("loading"); // loading | ready | error
+  const [status, setStatus] = useState("loading");
+  const [errorMsg, setErrorMsg] = useState("");
 
   // Initialize map
   useEffect(() => {
@@ -89,8 +90,10 @@ export default function MapView({
         dirServiceRef.current = new g.maps.DirectionsService();
         setStatus("ready");
       })
-      .catch(() => {
-        if (!cancelled) setStatus("error");
+      .catch((err) => {
+        if (cancelled) return;
+        setErrorMsg(err?.message || "Error desconocido");
+        setStatus("error");
       });
     return () => {
       cancelled = true;
@@ -167,11 +170,24 @@ export default function MapView({
     return (
       <div className={`relative w-full h-full bg-[#0e1320] flex flex-col items-center justify-center gap-2 p-6 text-center ${className}`}>
         <MapPin className="w-8 h-8 text-accent/50" />
-        <p className="text-sm text-white/60">No pudimos cargar el mapa. Verificá tu conexión e intentá nuevamente.</p>
-        <button onClick={() => setStatus("loading")} className="text-xs text-accent underline mt-1">Reintentar</button>
+        <p className="text-sm text-white/60">No pudimos cargar el mapa.</p>
+        {errorMsg && <p className="text-xs text-white/40 max-w-xs">{errorMsg}</p>}
+        <button
+          onClick={() => { setErrorMsg(""); setStatus("loading"); }}
+          className="text-xs text-accent underline mt-1"
+        >
+          Reintentar
+        </button>
       </div>
     );
   }
 
-  return <div ref={containerRef} className={`w-full h-full ${className}`} style={{ background: "#0e1320" }} />;
+  return (
+    <div className={className} style={{ background: "#0e1320" }}>
+      <div
+        ref={containerRef}
+        style={{ width: "100%", height: "100%", position: "relative", background: "#0e1320" }}
+      />
+    </div>
+  );
 }
