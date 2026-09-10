@@ -88,7 +88,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 py-10 bg-gradient-to-b from-background to-secondary/40">
+    <div className="h-[100dvh] overflow-y-auto flex flex-col items-center justify-center px-6 py-10 bg-gradient-to-b from-background to-secondary/40">
       <div className="w-full max-w-sm">
         {adminDenied && (
           <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm text-center">

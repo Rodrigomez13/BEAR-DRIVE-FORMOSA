@@ -284,7 +284,7 @@ export default function PassengerViajar() {
     }
 
     return (
-      <div className="relative h-screen">
+      <div className="relative h-full">
         <MapView
           origin={origin}
           destination={destination}

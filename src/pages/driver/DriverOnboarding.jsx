@@ -130,7 +130,7 @@ export default function DriverOnboarding() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
+    return <div className="flex items-center justify-center h-[100dvh]"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
   }
 
   // Status screen if already submitted
