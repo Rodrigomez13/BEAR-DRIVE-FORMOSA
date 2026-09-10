@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import StarRating from "@/components/bear/StarRating";
 import { CheckCircle2, XCircle, Loader2, FileText, Car, User, Clock, MoreHorizontal } from "lucide-react";
+import { businessDaysUntil } from "@/lib/businessDays";
 
 const STATUS_LABELS = {
   DRAFT: "Borrador", SUBMITTED: "Enviada", UNDER_REVIEW: "En revisión",
@@ -120,6 +121,25 @@ export default function AdminDrivers() {
         </Card>
 
         {selected.status === "SUBMITTED" || selected.status === "UNDER_REVIEW" ? (
+          <>
+          {selected.status === "UNDER_REVIEW" && selected.review_deadline && (
+            <Card className="p-4 mb-4 bear-gradient text-white">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-accent" />
+                <div>
+                  <p className="font-semibold text-sm">Cuenta regresiva de revisión</p>
+                  <p className="text-2xl font-bold text-accent">{businessDaysUntil(selected.review_deadline)} días hábiles restantes</p>
+                  <p className="text-xs text-white/60">Vence: {new Date(selected.review_deadline).toLocaleDateString("es-AR")}</p>
+                </div>
+              </div>
+            </Card>
+          )}
+          {selected.auto_review_notes && (
+            <Card className="p-4 mb-4 bg-accent/5">
+              <p className="text-xs font-semibold text-muted-foreground mb-1">Verificación automática</p>
+              <p className="text-sm">{selected.auto_review_notes}</p>
+            </Card>
+          )}
           <Card className="p-4">
             <p className="font-semibold text-sm mb-3">Acciones</p>
             <div className="space-y-3">
@@ -140,6 +160,7 @@ export default function AdminDrivers() {
               </div>
             </div>
           </Card>
+          </>
         ) : (
           <Card className="p-4">
             <p className="text-sm">Estado: <span className="font-semibold">{STATUS_LABELS[selected.status]}</span></p>
@@ -165,6 +186,9 @@ export default function AdminDrivers() {
                   <p className="font-semibold">{app.first_name} {app.last_name}</p>
                   <p className="text-sm text-muted-foreground">{app.applicant_email}</p>
                   <p className="text-xs text-muted-foreground mt-1">Enviada: {new Date(app.submitted_date || app.created_date).toLocaleDateString("es-AR")}</p>
+                  {app.status === "UNDER_REVIEW" && app.review_deadline && (
+                    <p className="text-xs text-accent mt-1 flex items-center gap-1"><Clock className="w-3 h-3" />{businessDaysUntil(app.review_deadline)} días hábiles restantes</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent">{STATUS_LABELS[app.status]}</span>

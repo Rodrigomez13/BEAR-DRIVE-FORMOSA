@@ -61,6 +61,15 @@
       "type": "string",
       "format": "date-time"
     },
+    "review_deadline": {
+      "type": "string",
+      "format": "date-time",
+      "description": "3 business day deadline for admin review (set by auto-review)"
+    },
+    "auto_review_notes": {
+      "type": "string",
+      "description": "Notes from the automatic document verification"
+    },
     "rejection_reason": {
       "type": "string"
     },

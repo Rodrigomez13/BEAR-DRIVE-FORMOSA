@@ -249,8 +249,8 @@ export default function DriverConducir() {
               <span className="font-bold text-lg text-accent">{formatPrice(activeRide.quoted_fare)}</span>
             </div>
             <div className="space-y-2 text-sm mb-4">
-              <p className="text-muted-foreground"><MapPin className="w-3.5 h-3.5 inline mr-1" />{activeRide.origin_address?.split(",")[0]}</p>
-              <p className="text-muted-foreground"><Navigation className="w-3.5 h-3.5 inline mr-1" />{activeRide.destination_address?.split(",")[0]}</p>
+              <p className="text-muted-foreground truncate"><MapPin className="w-3.5 h-3.5 inline mr-1 shrink-0" />{activeRide.origin_address}</p>
+              <p className="text-muted-foreground truncate"><Navigation className="w-3.5 h-3.5 inline mr-1 shrink-0" />{activeRide.destination_address}</p>
               <div className="flex gap-3 text-xs text-muted-foreground pt-1">
                 <span><Clock className="w-3 h-3 inline mr-1" />{activeRide.duration_min} min</span>
                 <span><MapPin className="w-3 h-3 inline mr-1" />{activeRide.distance_km} km</span>
@@ -355,8 +355,8 @@ export default function DriverConducir() {
                   <Card key={ride.id} className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate"><MapPin className="w-3.5 h-3.5 inline mr-1 text-muted-foreground" />{ride.origin_address?.split(",")[0]}</p>
-                        <p className="text-sm text-muted-foreground truncate"><Navigation className="w-3.5 h-3.5 inline mr-1" />{ride.destination_address?.split(",")[0]}</p>
+                        <p className="text-sm font-medium truncate"><MapPin className="w-3.5 h-3.5 inline mr-1 text-muted-foreground shrink-0" />{ride.origin_address}</p>
+                        <p className="text-sm text-muted-foreground truncate"><Navigation className="w-3.5 h-3.5 inline mr-1 shrink-0" />{ride.destination_address}</p>
                       </div>
                       <p className="font-bold text-lg text-accent shrink-0 ml-2">{formatPrice(ride.quoted_fare)}</p>
                     </div>

@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-import { Upload, Car, FileText, CheckCircle2, Loader2, ArrowLeft, ArrowRight, User, Shield, X } from "lucide-react";
+import { Upload, Car, FileText, CheckCircle2, Loader2, ArrowLeft, ArrowRight, User, Shield, X, AlertTriangle, Clock } from "lucide-react";
+import { sanitizeString, sanitizePhone, sanitizeDNI, sanitizePlate, sanitizeInt } from "@/lib/sanitize";
+import { businessDaysUntil } from "@/lib/businessDays";
 
 const STEPS = [
   { key: "intro", label: "Introducción" },
@@ -26,6 +28,7 @@ export default function DriverOnboarding() {
   const [requirements, setRequirements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [autoReviewing, setAutoReviewing] = useState(false);
 
   // Form data
   const [personal, setPersonal] = useState({
@@ -72,6 +75,30 @@ export default function DriverOnboarding() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
+      // Sanitize personal data
+      const cleanPersonal = {
+        first_name: sanitizeString(personal.first_name, 100),
+        last_name: sanitizeString(personal.last_name, 100),
+        dni_number: sanitizeDNI(personal.dni_number),
+        birth_date: personal.birth_date || null,
+        phone: sanitizePhone(personal.phone),
+        address: sanitizeString(personal.address, 200),
+        license_number: sanitizeString(personal.license_number, 50),
+        license_class: sanitizeString(personal.license_class, 10),
+      };
+
+      // Sanitize vehicle data
+      const cleanVehicle = {
+        make: sanitizeString(vehicle.make, 50),
+        model: sanitizeString(vehicle.model, 50),
+        year: sanitizeInt(vehicle.year),
+        plate: sanitizePlate(vehicle.plate),
+        color: sanitizeString(vehicle.color, 30),
+        nickname: sanitizeString(vehicle.nickname, 50),
+        segment: vehicle.segment,
+        has_ac: vehicle.has_ac,
+      };
+
       // Create or update application
       let appId = application?.id;
       const appData = {
@@ -80,7 +107,7 @@ export default function DriverOnboarding() {
         applicant_email: user.email,
         status: "SUBMITTED",
         submitted_date: new Date().toISOString(),
-        ...personal,
+        ...cleanPersonal,
       };
       if (appId) {
         await base44.entities.DriverApplication.update(appId, appData);
@@ -91,11 +118,11 @@ export default function DriverOnboarding() {
       }
 
       // Create vehicle
-      const vehicleRec = await base44.entities.Vehicle.create({
+      await base44.entities.Vehicle.create({
         driver_id: user.id,
-        make: vehicle.make, model: vehicle.model, year: parseInt(vehicle.year) || null,
-        plate: vehicle.plate, color: vehicle.color, nickname: vehicle.nickname,
-        segment: vehicle.segment, has_ac: vehicle.has_ac, status: "pending", category: "basic",
+        ...cleanVehicle,
+        status: "pending",
+        category: "basic",
       });
 
       // Create documents
@@ -109,7 +136,7 @@ export default function DriverOnboarding() {
             code: req.code,
             label: req.label,
             file_url: doc.file_url,
-            document_number: doc.document_number || null,
+            document_number: sanitizeString(doc.document_number, 50) || null,
             issued_at: doc.issued_at || null,
             expires_at: doc.expires_at || null,
             status: "PENDING",
@@ -120,12 +147,30 @@ export default function DriverOnboarding() {
       // Update user driver status
       await base44.auth.updateMe({ driver_status: "PENDING_REVIEW", driver_capability: "PENDING_REVIEW" });
 
-      toast({ title: "Solicitud enviada", description: "Operations revisará tu postulación" });
-      navigate("/driver");
+      // Run automatic document review
+      setSubmitting(false);
+      setAutoReviewing(true);
+      try {
+        await base44.functions.invoke("autoReviewApplication", { application_id: appId });
+      } catch (reviewErr) {
+        // Auto-review failed — application still submitted, admin can review manually
+      }
+      const updatedApp = await base44.entities.DriverApplication.get(appId);
+      setApplication(updatedApp);
+      setAutoReviewing(false);
+
+      if (updatedApp.status === "UNDER_REVIEW") {
+        toast({ title: "Solicitud enviada", description: "Documentos verificados. En revisión administrativa." });
+      } else if (updatedApp.status === "MORE_INFO_REQUIRED") {
+        toast({ title: "Revisá tu documentación", description: "Algunos documentos necesitan corrección.", variant: "destructive" });
+      } else {
+        toast({ title: "Solicitud enviada", description: "Operations revisará tu postulación" });
+      }
     } catch (err) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setSubmitting(false);
+      setAutoReviewing(false);
     }
   };
 
@@ -133,17 +178,60 @@ export default function DriverOnboarding() {
     return <div className="flex items-center justify-center h-[100dvh]"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
   }
 
-  // Status screen if already submitted
+  // Auto-review processing
+  if (autoReviewing) {
+    return (
+      <div className="max-w-md mx-auto px-5 pt-16 pb-10 text-center">
+        <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
+          <Loader2 className="w-8 h-8 text-accent animate-spin" />
+        </div>
+        <h1 className="text-2xl font-bold mb-2">Verificando documentación</h1>
+        <p className="text-sm text-muted-foreground mb-6">Estamos realizando una verificación automática de tus documentos. Esto puede tardar unos segundos.</p>
+      </div>
+    );
+  }
+
+  // More info required — auto-review found issues
+  if (application && application.status === "MORE_INFO_REQUIRED") {
+    return (
+      <div className="max-w-md mx-auto px-5 pt-16 pb-10 text-center">
+        <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+          <AlertTriangle className="w-8 h-8 text-destructive" />
+        </div>
+        <h1 className="text-2xl font-bold mb-2">Revisá tu documentación</h1>
+        <p className="text-sm text-muted-foreground mb-4">La verificación automática detectó los siguientes problemas:</p>
+        {application.auto_review_notes && (
+          <Card className="p-4 text-left mb-4">
+            <p className="text-sm text-destructive">{application.auto_review_notes}</p>
+          </Card>
+        )}
+        <Button onClick={() => { setApplication(null); setStep(0); }} className="w-full bear-gold-gradient text-foreground border-0">Corregir y reenviar</Button>
+      </div>
+    );
+  }
+
+  // Status screen if already submitted or under review
   if (application && (application.status === "SUBMITTED" || application.status === "UNDER_REVIEW")) {
+    const daysLeft = businessDaysUntil(application.review_deadline);
     return (
       <div className="max-w-md mx-auto px-5 pt-16 pb-10 text-center">
         <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
           <Loader2 className="w-8 h-8 text-accent animate-spin" />
         </div>
         <h1 className="text-2xl font-bold mb-2">Solicitud en revisión</h1>
-        <p className="text-sm text-muted-foreground mb-6">Tu postulación como conductor está siendo revisada por el equipo de Operations. Te avisaremos cuando haya novedades.</p>
+        <p className="text-sm text-muted-foreground mb-6">Tu postulación como conductor está siendo revisada por el equipo de Operations.</p>
+        {application.status === "UNDER_REVIEW" && daysLeft !== null && (
+          <Card className="p-5 mb-4 bear-gradient text-white">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Clock className="w-5 h-5 text-accent" />
+              <p className="font-semibold">Tiempo restante de revisión</p>
+            </div>
+            <p className="text-4xl font-extrabold text-accent">{daysLeft}</p>
+            <p className="text-sm text-white/60">días hábiles para confirmar tu solicitud</p>
+          </Card>
+        )}
         <Card className="p-5 text-left mb-4">
-          <p className="font-semibold mb-3">Estado: <span className="text-accent">EN REVISIÓN</span></p>
+          <p className="font-semibold mb-3">Estado: <span className="text-accent">{application.status === "UNDER_REVIEW" ? "EN REVISIÓN" : "ENVIADA"}</span></p>
           <div className="space-y-2">
             {requirements.map(r => (
               <div key={r.code} className="flex items-center gap-2 text-sm">
