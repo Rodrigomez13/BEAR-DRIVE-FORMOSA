@@ -101,6 +101,13 @@ export default function MapView({
         console.log("[MapView] Mapa inicializado correctamente");
         setDebugInfo("Mapa listo");
         setStatus("ready");
+        // Forzar redibujado tras el primer frame para que el mapa pinte correctamente
+        requestAnimationFrame(() => {
+          if (mapRef.current && window.google?.maps) {
+            window.google.maps.event.trigger(mapRef.current, "resize");
+            mapRef.current.setCenter(center);
+          }
+        });
       })
       .catch((err) => {
         if (cancelled) return;
@@ -186,74 +193,74 @@ export default function MapView({
     return () => g.event.removeListener(listener);
   }, [onMapClick, interactive]);
 
-  if (status === "loading") {
-    return (
-      <div className={`${className} bg-[#0e1320] flex flex-col items-center justify-center gap-3`}>
-        <div className="w-8 h-8 border-4 border-secondary border-t-accent rounded-full animate-spin" />
-        <p className="text-xs text-white/50">{debugInfo}</p>
-        <button
-          onClick={() => { resetSdkPromise(); setDebugInfo("Reintentando desde cero..."); setStatus("loading"); setRetryKey((k) => k + 1); }}
-          className="text-xs text-accent underline font-medium mt-2"
-        >
-          Forzar reintentar
-        </button>
-        <button
-          onClick={() => setShowDebug(!showDebug)}
-          className="text-[10px] text-white/30 underline"
-        >
-          {showDebug ? "Ocultar debug" : "Ver debug"}
-        </button>
-        {showDebug && (
-          <div className="mt-2 p-3 rounded-lg bg-white/5 border border-white/10 max-w-xs text-left">
-            <p className="text-[10px] text-white/40 font-mono mb-1">Estado: loading</p>
-            <p className="text-[10px] text-white/50 font-mono break-all">{debugInfo}</p>
-            <p className="text-[10px] text-white/30 font-mono mt-1">Reintentos: {retryKey}</p>
-            <p className="text-[10px] text-white/30 font-mono">SDK cargado: {window.google?.maps ? "sí" : "no"}</p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (status === "error") {
-    return (
-      <div className={`${className} bg-[#0e1320] flex flex-col items-center justify-center gap-3 p-6 text-center`}>
-        <AlertTriangle className="w-10 h-10 text-red-400/70" />
-        <p className="text-sm text-white/70 font-medium">No pudimos cargar el mapa</p>
-        {errorMsg && (
-          <p className="text-xs text-white/50 max-w-xs leading-relaxed">{errorMsg}</p>
-        )}
-        <button
-          onClick={() => { resetSdkPromise(); setErrorMsg(""); setDebugInfo("Reintentando desde cero..."); setStatus("loading"); setRetryKey((k) => k + 1); }}
-          className="text-xs text-accent underline mt-1 font-medium"
-        >
-          Reintentar
-        </button>
-        <button
-          onClick={() => setShowDebug(!showDebug)}
-          className="text-[10px] text-white/30 underline"
-        >
-          {showDebug ? "Ocultar debug" : "Ver debug"}
-        </button>
-        {showDebug && (
-          <div className="mt-2 p-3 rounded-lg bg-white/5 border border-white/10 text-left max-w-xs">
-            <p className="text-[10px] text-white/40 font-mono mb-1">Error detallado:</p>
-            <p className="text-[10px] text-red-300/70 font-mono break-all">{errorMsg}</p>
-            <p className="text-[10px] text-white/30 font-mono mt-2">Reintentos: {retryKey}</p>
-            <p className="text-[10px] text-white/30 font-mono">SDK cargado: {window.google?.maps ? "sí" : "no"}</p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div className={className} style={{ background: "#0e1320" }}>
+      {/* Contenedor del mapa siempre presente en el DOM */}
       <div
         ref={containerRef}
         className="absolute inset-0"
         style={{ background: "#0e1320" }}
       />
+
+      {/* Overlay de loading */}
+      {status === "loading" && (
+        <div className="absolute inset-0 z-10 bg-[#0e1320] flex flex-col items-center justify-center gap-3">
+          <div className="w-8 h-8 border-4 border-secondary border-t-accent rounded-full animate-spin" />
+          <p className="text-xs text-white/50">{debugInfo}</p>
+          <button
+            onClick={() => { resetSdkPromise(); setDebugInfo("Reintentando desde cero..."); setStatus("loading"); setRetryKey((k) => k + 1); }}
+            className="text-xs text-accent underline font-medium mt-2"
+          >
+            Forzar reintentar
+          </button>
+          <button
+            onClick={() => setShowDebug(!showDebug)}
+            className="text-[10px] text-white/30 underline"
+          >
+            {showDebug ? "Ocultar debug" : "Ver debug"}
+          </button>
+          {showDebug && (
+            <div className="mt-2 p-3 rounded-lg bg-white/5 border border-white/10 max-w-xs text-left">
+              <p className="text-[10px] text-white/40 font-mono mb-1">Estado: loading</p>
+              <p className="text-[10px] text-white/50 font-mono break-all">{debugInfo}</p>
+              <p className="text-[10px] text-white/30 font-mono mt-1">Reintentos: {retryKey}</p>
+              <p className="text-[10px] text-white/30 font-mono">SDK cargado: {window.google?.maps ? "sí" : "no"}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Overlay de error */}
+      {status === "error" && (
+        <div className="absolute inset-0 z-10 bg-[#0e1320] flex flex-col items-center justify-center gap-3 p-6 text-center">
+          <AlertTriangle className="w-10 h-10 text-red-400/70" />
+          <p className="text-sm text-white/70 font-medium">No pudimos cargar el mapa</p>
+          {errorMsg && (
+            <p className="text-xs text-white/50 max-w-xs leading-relaxed">{errorMsg}</p>
+          )}
+          <button
+            onClick={() => { resetSdkPromise(); setErrorMsg(""); setDebugInfo("Reintentando desde cero..."); setStatus("loading"); setRetryKey((k) => k + 1); }}
+            className="text-xs text-accent underline mt-1 font-medium"
+          >
+            Reintentar
+          </button>
+          <button
+            onClick={() => setShowDebug(!showDebug)}
+            className="text-[10px] text-white/30 underline"
+          >
+            {showDebug ? "Ocultar debug" : "Ver debug"}
+          </button>
+          {showDebug && (
+            <div className="mt-2 p-3 rounded-lg bg-white/5 border border-white/10 text-left max-w-xs">
+              <p className="text-[10px] text-white/40 font-mono mb-1">Error detallado:</p>
+              <p className="text-[10px] text-red-300/70 font-mono break-all">{errorMsg}</p>
+              <p className="text-[10px] text-white/30 font-mono mt-2">Reintentos: {retryKey}</p>
+              <p className="text-[10px] text-white/30 font-mono">SDK cargado: {window.google?.maps ? "sí" : "no"}</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {status === "ready" && (
         <div className="absolute top-2 right-2 z-10 px-2 py-0.5 rounded-full bg-green-500/20 border border-green-400/40 text-[9px] text-green-300 font-mono pointer-events-none">
           MAP OK
