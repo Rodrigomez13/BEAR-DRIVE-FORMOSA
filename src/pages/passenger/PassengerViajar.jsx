@@ -403,8 +403,8 @@ export default function PassengerViajar() {
             <div className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-border">
               {searchResults.map((r, i) => (
                 <button key={i} onClick={() => handleSelectPlace(r)} className="w-full text-left p-3 hover:bg-secondary/50 border-b border-border last:border-0">
-                  <p className="text-sm font-medium truncate">{r.label.split(",")[0]}</p>
-                  <p className="text-xs text-muted-foreground truncate">{r.label}</p>
+                  <p className="text-sm font-medium truncate">{r.main_text}</p>
+                  <p className="text-xs text-muted-foreground truncate">{r.secondary_text || r.label}</p>
                 </button>
               ))}
             </div>
@@ -416,8 +416,8 @@ export default function PassengerViajar() {
           )}
           {(originAddress || destinationAddress) && (
             <div className="mt-2 space-y-1.5 text-xs">
-              {originAddress && <p className="flex items-center gap-1.5 text-muted-foreground"><span className="w-2 h-2 rounded-full bg-foreground shrink-0" />{originAddress.split(",")[0]}</p>}
-              {destinationAddress && <p className="flex items-center gap-1.5 text-muted-foreground"><span className="w-2 h-2 rounded-full bg-accent shrink-0" />{destinationAddress.split(",")[0]}</p>}
+              {originAddress && <p className="flex items-center gap-1.5 text-muted-foreground"><span className="w-2 h-2 rounded-full bg-foreground shrink-0" />{originAddress}</p>}
+              {destinationAddress && <p className="flex items-center gap-1.5 text-muted-foreground"><span className="w-2 h-2 rounded-full bg-accent shrink-0" />{destinationAddress}</p>}
             </div>
           )}
         </Card>
