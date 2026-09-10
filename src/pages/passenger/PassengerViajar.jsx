@@ -256,7 +256,7 @@ export default function PassengerViajar() {
     if (status === "COMPLETED") {
       return (
         <>
-          <div className="max-w-md mx-auto px-5 pt-10 pb-10">
+          <div className="max-w-md mx-auto px-4 pt-6 pb-8">
             <div className="text-center mb-6">
               <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
                 <CheckCircle2 className="w-8 h-8 text-green-600" />
@@ -302,7 +302,7 @@ export default function PassengerViajar() {
           className="absolute inset-0"
         />
         <div className="absolute inset-x-0 bottom-0 z-10 p-3">
-          <Card className="rounded-2xl p-5 max-w-md mx-auto">
+          <Card className="rounded-2xl p-4 max-w-md mx-auto">
             {status === "SEARCHING" && (
               <div className="text-center py-2">
                 <Loader2 className="w-10 h-10 animate-spin text-accent mx-auto mb-3" />
@@ -387,7 +387,7 @@ export default function PassengerViajar() {
 
       {/* Top search bar */}
       <div className="absolute inset-x-0 top-0 z-10 p-3">
-        <Card className="rounded-2xl p-3 max-w-md mx-auto">
+        <Card className="rounded-2xl p-4 max-w-md mx-auto">
           <div className="flex gap-2 mb-2">
             <button
               onClick={() => setSelectingTarget("origin")}
@@ -437,7 +437,7 @@ export default function PassengerViajar() {
       </div>
 
       {/* GPS button */}
-      <button onClick={handleGPS} className="absolute right-4 top-44 z-10 w-12 h-12 rounded-full bg-card shadow-lg flex items-center justify-center hover:bg-secondary">
+      <button onClick={handleGPS} className="absolute right-4 bottom-72 z-10 w-11 h-11 rounded-full bg-card shadow-lg flex items-center justify-center hover:bg-secondary">
         <Crosshair className="w-5 h-5 text-accent" />
       </button>
 

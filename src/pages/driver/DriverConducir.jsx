@@ -211,7 +211,7 @@ export default function DriverConducir() {
   if (!eligible) {
     const cap = user?.driver_capability || "NO_DRIVER";
     return (
-      <div className="max-w-md mx-auto px-5 pt-16 pb-10 text-center">
+      <div className="max-w-md mx-auto px-4 pt-10 pb-8 text-center">
         <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
           <AlertTriangle className="w-8 h-8 text-accent" />
         </div>
@@ -246,7 +246,7 @@ export default function DriverConducir() {
           className="absolute inset-0"
         />
         <div className="absolute inset-x-0 bottom-0 z-10 p-3">
-          <Card className="rounded-2xl p-5 max-w-md mx-auto">
+          <Card className="rounded-2xl p-4 max-w-md mx-auto">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent capitalize">{status.replace(/_/g, " ")}</span>
               <span className="font-bold text-lg text-accent">{formatPrice(activeRide.quoted_fare)}</span>
@@ -310,7 +310,7 @@ export default function DriverConducir() {
 
   // Online / offline home
   return (
-    <div className="max-w-md mx-auto px-5 pt-8 pb-10">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Conducir</h1>
         <div className={`px-3 py-1 rounded-full text-xs font-semibold ${online ? "bg-green-100 text-green-700" : "bg-secondary text-muted-foreground"}`}>

@@ -58,7 +58,7 @@ export default function PassengerProfile() {
   const isDriver = driverCap === "APPROVED_ELIGIBLE";
 
   return (
-    <div className="max-w-md mx-auto px-5 pt-10 pb-10">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Perfil</h1>
         <ThemeToggle />
@@ -98,11 +98,11 @@ export default function PassengerProfile() {
         </Button>
       </Card>
 
-      <Card className="p-2 mb-4">
+      <Card className="p-0 mb-4 overflow-hidden">
         {isDriver ? (
           <button
             onClick={() => navigate("/driver")}
-            className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-secondary/50 transition-colors"
+            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/50 transition-colors"
           >
             <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center"><Car className="w-5 h-5 text-accent" /></div>
             <div className="flex-1 text-left">
@@ -114,7 +114,7 @@ export default function PassengerProfile() {
         ) : (
           <button
             onClick={() => navigate("/onboarding")}
-            className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-secondary/50 transition-colors"
+            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/50 transition-colors"
           >
             <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center"><Car className="w-5 h-5 text-accent" /></div>
             <div className="flex-1 text-left">
@@ -124,14 +124,14 @@ export default function PassengerProfile() {
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
         )}
-        <div className="h-px bg-border mx-3" />
-        <button onClick={() => navigate("/security-privacy")} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-secondary/50 transition-colors">
+        <div className="h-px bg-border mx-4" />
+        <button onClick={() => navigate("/security-privacy")} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/50 transition-colors">
           <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center"><Shield className="w-5 h-5 text-muted-foreground" /></div>
           <div className="flex-1 text-left"><p className="font-medium text-sm">Seguridad y privacidad</p></div>
           <ChevronRight className="w-5 h-5 text-muted-foreground" />
         </button>
-        <div className="h-px bg-border mx-3" />
-        <button onClick={() => navigate("/help-support")} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-secondary/50 transition-colors">
+        <div className="h-px bg-border mx-4" />
+        <button onClick={() => navigate("/help-support")} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/50 transition-colors">
           <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center"><HelpCircle className="w-5 h-5 text-muted-foreground" /></div>
           <div className="flex-1 text-left"><p className="font-medium text-sm">Ayuda y soporte</p></div>
           <ChevronRight className="w-5 h-5 text-muted-foreground" />
