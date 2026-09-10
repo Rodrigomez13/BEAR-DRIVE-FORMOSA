@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { APIProvider, Map, useMap } from "@vis.gl/react-google-maps";
-import { getMapsApiKey } from "@/lib/mapsConfig";
+import { loadMapsSDK } from "@/lib/mapsConfig";
 import { MapPin } from "lucide-react";
 
 const DARK_MAP_STYLES = [
@@ -45,84 +44,6 @@ function carIcon(g) {
   };
 }
 
-function MapContent({ origin, destination, driverPos, path, onMapClick, recenter, interactive }) {
-  const map = useMap();
-  const markersRef = useRef({});
-  const polylineRef = useRef(null);
-  const dirRendererRef = useRef(null);
-  const dirServiceRef = useRef(null);
-
-  useEffect(() => {
-    if (!map) return;
-    const g = window.google.maps;
-    map.setOptions({ styles: DARK_MAP_STYLES, backgroundColor: "#0e1320" });
-    markersRef.current.origin = new g.Marker({ map, icon: originIcon(g), label: { text: "Origen", color: "#E9B74E", fontSize: "11px", fontWeight: "bold" }, visible: false });
-    markersRef.current.destination = new g.Marker({ map, icon: destinationIcon(g), label: { text: "Destino", color: "#E9B74E", fontSize: "11px", fontWeight: "bold" }, visible: false });
-    markersRef.current.driver = new g.Marker({ map, icon: carIcon(g), visible: false });
-    polylineRef.current = new g.Polyline({ map, path: [], strokeColor: "#E9B74E", strokeWeight: 4, strokeOpacity: 0.85, visible: false });
-    dirRendererRef.current = new g.DirectionsRenderer({ suppressMarkers: true, polylineOptions: { strokeColor: "#E9B74E", strokeWeight: 4, strokeOpacity: 0.9 } });
-    dirRendererRef.current.setMap(map);
-    dirServiceRef.current = new g.DirectionsService();
-    return () => {
-      Object.values(markersRef.current).forEach((m) => m && m.setMap(null));
-      if (polylineRef.current) polylineRef.current.setMap(null);
-      if (dirRendererRef.current) dirRendererRef.current.setMap(null);
-    };
-  }, [map]);
-
-  useEffect(() => {
-    if (!map) return;
-    const m = markersRef.current;
-    if (origin) { m.origin.setPosition(origin); m.origin.setVisible(true); } else if (m.origin) m.origin.setVisible(false);
-    if (destination) { m.destination.setPosition(destination); m.destination.setVisible(true); } else if (m.destination) m.destination.setVisible(false);
-    if (driverPos) { m.driver.setPosition(driverPos); m.driver.setVisible(true); } else if (m.driver) m.driver.setVisible(false);
-  }, [origin, destination, driverPos, map]);
-
-  useEffect(() => {
-    if (!map || !dirServiceRef.current) return;
-    const g = window.google.maps;
-    if (path && path.length >= 2) {
-      dirRendererRef.current.set("directions", null);
-      polylineRef.current.setPath(path.map((p) => ({ lat: p.lat, lng: p.lng })));
-      polylineRef.current.setVisible(true);
-      return;
-    }
-    if (origin && destination) {
-      polylineRef.current.setVisible(false);
-      dirServiceRef.current.route(
-        { origin, destination, travelMode: g.TravelMode.DRIVING },
-        (res, status) => {
-          if (status === "OK" && res) {
-            dirRendererRef.current.setDirections(res);
-          } else {
-            dirRendererRef.current.set("directions", null);
-            polylineRef.current.setPath([origin, destination]);
-            polylineRef.current.setVisible(true);
-          }
-        }
-      );
-      return;
-    }
-    polylineRef.current.setVisible(false);
-    dirRendererRef.current.set("directions", null);
-  }, [origin, destination, path, map]);
-
-  useEffect(() => {
-    if (!map || !recenter) return;
-    map.panTo(recenter);
-  }, [recenter, map]);
-
-  useEffect(() => {
-    if (!map || !interactive || !onMapClick) return;
-    const g = window.google.maps;
-    const handler = (e) => onMapClick({ lat: e.latLng.lat(), lng: e.latLng.lng() });
-    const listener = g.event.addListener(map, "click", handler);
-    return () => g.event.removeListener(listener);
-  }, [map, onMapClick, interactive]);
-
-  return null;
-}
-
 export default function MapView({
   center = { lat: -26.1849, lng: -58.1731 },
   zoom = 13,
@@ -135,22 +56,106 @@ export default function MapView({
   recenter,
   interactive = true,
 }) {
-  const [apiKey, setApiKey] = useState(null);
-  const [loadError, setLoadError] = useState(false);
+  const containerRef = useRef(null);
+  const mapRef = useRef(null);
+  const markersRef = useRef({});
+  const polylineRef = useRef(null);
+  const dirRendererRef = useRef(null);
+  const dirServiceRef = useRef(null);
+  const [status, setStatus] = useState("loading"); // loading | ready | error
 
+  // Initialize map
   useEffect(() => {
-    getMapsApiKey().then(setApiKey);
+    let cancelled = false;
+    loadMapsSDK()
+      .then((g) => {
+        if (cancelled || !containerRef.current) return;
+        const map = new g.maps.Map(containerRef.current, {
+          center,
+          zoom,
+          styles: DARK_MAP_STYLES,
+          backgroundColor: "#0e1320",
+          gestureHandling: interactive ? "auto" : "none",
+          disableDefaultUI: true,
+          clickableIcons: false,
+        });
+        mapRef.current = map;
+        markersRef.current.origin = new g.maps.Marker({ map, icon: originIcon(g), label: { text: "Origen", color: "#E9B74E", fontSize: "11px", fontWeight: "bold" }, visible: false });
+        markersRef.current.destination = new g.maps.Marker({ map, icon: destinationIcon(g), label: { text: "Destino", color: "#E9B74E", fontSize: "11px", fontWeight: "bold" }, visible: false });
+        markersRef.current.driver = new g.maps.Marker({ map, icon: carIcon(g), visible: false });
+        polylineRef.current = new g.maps.Polyline({ map, path: [], strokeColor: "#E9B74E", strokeWeight: 4, strokeOpacity: 0.85, visible: false });
+        dirRendererRef.current = new g.maps.DirectionsRenderer({ suppressMarkers: true, polylineOptions: { strokeColor: "#E9B74E", strokeWeight: 4, strokeOpacity: 0.9 } });
+        dirRendererRef.current.setMap(map);
+        dirServiceRef.current = new g.maps.DirectionsService();
+        setStatus("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setStatus("error");
+      });
+    return () => {
+      cancelled = true;
+      Object.values(markersRef.current).forEach((m) => m && m.setMap(null));
+      if (polylineRef.current) polylineRef.current.setMap(null);
+      if (dirRendererRef.current) dirRendererRef.current.setMap(null);
+      markersRef.current = {};
+      mapRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Update markers
   useEffect(() => {
-    if (!apiKey) return;
-    const t = setTimeout(() => {
-      if (!window.google?.maps?.Map) setLoadError(true);
-    }, 10000);
-    return () => clearTimeout(t);
-  }, [apiKey]);
+    const m = markersRef.current;
+    if (!m.origin) return;
+    if (origin) { m.origin.setPosition(origin); m.origin.setVisible(true); } else m.origin.setVisible(false);
+    if (destination) { m.destination.setPosition(destination); m.destination.setVisible(true); } else m.destination.setVisible(false);
+    if (driverPos) { m.driver.setPosition(driverPos); m.driver.setVisible(true); } else m.driver.setVisible(false);
+  }, [origin, destination, driverPos]);
 
-  if (!apiKey) {
+  // Update route (polyline or directions)
+  useEffect(() => {
+    const g = window.google?.maps;
+    if (!g || !mapRef.current || !dirServiceRef.current) return;
+    if (path && path.length >= 2) {
+      dirRendererRef.current.set("directions", null);
+      polylineRef.current.setPath(path.map((p) => ({ lat: p.lat, lng: p.lng })));
+      polylineRef.current.setVisible(true);
+      return;
+    }
+    if (origin && destination) {
+      polylineRef.current.setVisible(false);
+      dirServiceRef.current.route(
+        { origin, destination, travelMode: g.TravelMode.DRIVING },
+        (res, stat) => {
+          if (stat === "OK" && res) dirRendererRef.current.setDirections(res);
+          else {
+            dirRendererRef.current.set("directions", null);
+            polylineRef.current.setPath([origin, destination]);
+            polylineRef.current.setVisible(true);
+          }
+        }
+      );
+      return;
+    }
+    polylineRef.current.setVisible(false);
+    dirRendererRef.current.set("directions", null);
+  }, [origin, destination, path]);
+
+  // Recenter
+  useEffect(() => {
+    if (mapRef.current && recenter) mapRef.current.panTo(recenter);
+  }, [recenter]);
+
+  // Click handler
+  useEffect(() => {
+    const g = window.google?.maps;
+    if (!g || !mapRef.current || !interactive || !onMapClick) return;
+    const handler = (e) => onMapClick({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+    const listener = g.event.addListener(mapRef.current, "click", handler);
+    return () => g.event.removeListener(listener);
+  }, [onMapClick, interactive]);
+
+  if (status === "loading") {
     return (
       <div className={`relative w-full h-full bg-[#0e1320] flex items-center justify-center ${className}`}>
         <div className="w-8 h-8 border-4 border-secondary border-t-accent rounded-full animate-spin" />
@@ -158,39 +163,15 @@ export default function MapView({
     );
   }
 
-  if (loadError) {
+  if (status === "error") {
     return (
       <div className={`relative w-full h-full bg-[#0e1320] flex flex-col items-center justify-center gap-2 p-6 text-center ${className}`}>
         <MapPin className="w-8 h-8 text-accent/50" />
         <p className="text-sm text-white/60">No pudimos cargar el mapa. Verificá tu conexión e intentá nuevamente.</p>
-        <button onClick={() => { setLoadError(false); setApiKey(null); getMapsApiKey().then((k) => { setApiKey(k); }); }} className="text-xs text-accent underline mt-1">Reintentar</button>
+        <button onClick={() => setStatus("loading")} className="text-xs text-accent underline mt-1">Reintentar</button>
       </div>
     );
   }
 
-  return (
-    <div className={`relative w-full h-full ${className}`}>
-      <APIProvider apiKey={apiKey} libraries={["places"]} language="es" region="AR">
-        <Map
-          defaultCenter={center}
-          defaultZoom={zoom}
-          gestureHandling={interactive ? "auto" : "none"}
-          disableDefaultUI
-          clickableIcons={false}
-          backgroundColor="#0e1320"
-          style={{ width: "100%", height: "100%", background: "#0e1320" }}
-        >
-          <MapContent
-            origin={origin}
-            destination={destination}
-            driverPos={driverPos}
-            path={path}
-            onMapClick={onMapClick}
-            recenter={recenter}
-            interactive={interactive}
-          />
-        </Map>
-      </APIProvider>
-    </div>
-  );
+  return <div ref={containerRef} className={`w-full h-full ${className}`} style={{ background: "#0e1320" }} />;
 }
