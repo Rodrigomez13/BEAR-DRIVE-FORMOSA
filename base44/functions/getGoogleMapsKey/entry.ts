@@ -1,7 +1,12 @@
 import { secrets } from "base44:runtime";
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
 export default async function(req) {
   try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
     const key = secrets.get("GOOGLE_MAPS_API_KEY");
     if (!key) return Response.json({ error: "Google Maps API key not configured" }, { status: 500 });
     return Response.json({ apiKey: key });
