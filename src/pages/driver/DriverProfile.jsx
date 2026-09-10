@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import StarRating from "@/components/bear/StarRating";
 import BearAvatar from "@/components/bear/BearAvatar";
+import ThemeToggle from "@/components/bear/ThemeToggle";
 import { Car, LogOut, User, FileText, ChevronRight, Shield, HelpCircle, CheckCircle2, AlertTriangle, Camera, Loader2 } from "lucide-react";
 
 export default function DriverProfile() {
@@ -58,7 +59,10 @@ export default function DriverProfile() {
 
   return (
     <div className="max-w-md mx-auto px-5 pt-10 pb-10">
-      <h1 className="text-2xl font-bold mb-6">Perfil</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Perfil</h1>
+        <ThemeToggle />
+      </div>
 
       <Card className="p-5 mb-4 bear-gradient text-white">
         <div className="flex items-center gap-4">
