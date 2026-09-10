@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { loadMapsSDK } from "@/lib/mapsConfig";
-import { MapPin } from "lucide-react";
+import { MapPin, AlertTriangle } from "lucide-react";
 
 const DARK_MAP_STYLES = [
   { elementType: "geometry", stylers: [{ color: "#0e1320" }] },
@@ -64,13 +64,19 @@ export default function MapView({
   const dirServiceRef = useRef(null);
   const [status, setStatus] = useState("loading");
   const [errorMsg, setErrorMsg] = useState("");
+  const [retryKey, setRetryKey] = useState(0);
 
   // Initialize map
   useEffect(() => {
     let cancelled = false;
+    console.log("[MapView] Iniciando carga del mapa, intento:", retryKey);
     loadMapsSDK()
       .then((g) => {
-        if (cancelled || !containerRef.current) return;
+        if (cancelled || !containerRef.current) {
+          console.log("[MapView] Cancelado o contenedor no disponible");
+          return;
+        }
+        console.log("[MapView] Creando instancia de google.maps.Map");
         const map = new g.maps.Map(containerRef.current, {
           center,
           zoom,
@@ -88,10 +94,12 @@ export default function MapView({
         dirRendererRef.current = new g.maps.DirectionsRenderer({ suppressMarkers: true, polylineOptions: { strokeColor: "#E9B74E", strokeWeight: 4, strokeOpacity: 0.9 } });
         dirRendererRef.current.setMap(map);
         dirServiceRef.current = new g.maps.DirectionsService();
+        console.log("[MapView] Mapa inicializado correctamente");
         setStatus("ready");
       })
       .catch((err) => {
         if (cancelled) return;
+        console.error("[MapView] Error al cargar el mapa:", err);
         setErrorMsg(err?.message || "Error desconocido");
         setStatus("error");
       });
@@ -104,7 +112,7 @@ export default function MapView({
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [retryKey]);
 
   // Update markers
   useEffect(() => {
@@ -168,13 +176,23 @@ export default function MapView({
 
   if (status === "error") {
     return (
-      <div className={`relative w-full h-full bg-[#0e1320] flex flex-col items-center justify-center gap-2 p-6 text-center ${className}`}>
-        <MapPin className="w-8 h-8 text-accent/50" />
-        <p className="text-sm text-white/60">No pudimos cargar el mapa.</p>
-        {errorMsg && <p className="text-xs text-white/40 max-w-xs">{errorMsg}</p>}
+      <div className={`relative w-full h-full bg-[#0e1320] flex flex-col items-center justify-center gap-3 p-6 text-center ${className}`}>
+        <AlertTriangle className="w-10 h-10 text-red-400/70" />
+        <p className="text-sm text-white/70 font-medium">No pudimos cargar el mapa</p>
+        {errorMsg && (
+          <p className="text-xs text-white/50 max-w-xs leading-relaxed">{errorMsg}</p>
+        )}
+        <div className="mt-2 p-3 rounded-lg bg-white/5 border border-white/10 text-left max-w-xs">
+          <p className="text-[10px] text-white/40 font-mono mb-1">Posibles causas:</p>
+          <ul className="text-[10px] text-white/50 space-y-0.5 list-disc list-inside">
+            <li>Facturación deshabilitada en Google Cloud</li>
+            <li>Maps JavaScript API no habilitada</li>
+            <li>Restricción de dominio no incluye este sitio</li>
+          </ul>
+        </div>
         <button
-          onClick={() => { setErrorMsg(""); setStatus("loading"); }}
-          className="text-xs text-accent underline mt-1"
+          onClick={() => { setErrorMsg(""); setStatus("loading"); setRetryKey((k) => k + 1); }}
+          className="text-xs text-accent underline mt-1 font-medium"
         >
           Reintentar
         </button>
@@ -188,6 +206,11 @@ export default function MapView({
         ref={containerRef}
         style={{ width: "100%", height: "100%", position: "relative", background: "#0e1320" }}
       />
+      {status === "ready" && (
+        <div className="absolute top-2 right-2 z-10 px-2 py-0.5 rounded-full bg-green-500/20 border border-green-400/40 text-[9px] text-green-300 font-mono pointer-events-none">
+          MAP OK
+        </div>
+      )}
     </div>
   );
 }
