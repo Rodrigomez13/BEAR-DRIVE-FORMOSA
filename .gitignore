@@ -36,6 +36,10 @@ dist-ssr
 .vite
 base44/.app.jsonc
 
-# Proyecto nativo Android generado por Capacitor
-android/
+# Android/Capacitor is source code and must be versioned.
+# Never commit release signing keys or local Android machine config.
 *.keystore
+*.jks
+android/local.properties
+android/.gradle/
+android/**/build/
