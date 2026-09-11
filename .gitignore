@@ -37,9 +37,10 @@ dist-ssr
 base44/.app.jsonc
 
 # Android/Capacitor is source code and must be versioned.
-# Never commit release signing keys or local Android machine config.
+# Never commit release signing keys, Google Navigation secrets, or local machine config.
 *.keystore
 *.jks
 android/local.properties
+android/secrets.properties
 android/.gradle/
 android/**/build/
