@@ -9,6 +9,11 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- Injected at build time by the Secrets Gradle Plugin from android/secrets.properties. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
+
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
@@ -35,14 +40,14 @@
         </provider>
     </application>
 
-    <!-- Permissions -->
-
+    <!-- Connectivity and location required by Driver navigation. -->
     <uses-permission android:name="android.permission.INTERNET" />
-
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- BearDrive location -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
+    <!-- Background location is intentionally NOT requested yet. It requires a separate product/policy gate. -->
     <uses-feature
         android:name="android.hardware.location.gps"
         android:required="false" />
