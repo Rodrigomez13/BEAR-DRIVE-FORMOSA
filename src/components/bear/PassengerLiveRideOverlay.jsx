@@ -42,6 +42,34 @@ function parseRoutePath(value) {
   }
 }
 
+function squaredDistance(a, b) {
+  const latScale = Math.cos(((a.lat + b.lat) / 2) * Math.PI / 180);
+  const dLat = a.lat - b.lat;
+  const dLng = (a.lng - b.lng) * latScale;
+  return dLat * dLat + dLng * dLng;
+}
+
+function remainingRoutePath(path, driverPos) {
+  if (!path || path.length < 2 || !driverPos) return path;
+
+  let closestIndex = 0;
+  let closestDistance = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < path.length; index += 1) {
+    const distance = squaredDistance(path[index], driverPos);
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestIndex = index;
+    }
+  }
+
+  // Keep one point behind the snapped position so the line visually connects
+  // to the interpolated vehicle marker without drawing the already-travelled route.
+  const startIndex = Math.max(0, closestIndex - 1);
+  const remaining = path.slice(startIndex);
+  if (remaining.length < 2) return path.slice(-2);
+  return remaining;
+}
+
 function formatEta(seconds) {
   if (!Number.isFinite(Number(seconds))) return "";
   const minutes = Math.max(1, Math.ceil(Number(seconds) / 60));
@@ -86,7 +114,7 @@ export default function PassengerLiveRideOverlay() {
         );
         if (!cancelled) setActiveRide(rides?.[0] || null);
       } catch {
-        // Realtime puede recuperar el estado.
+        // Realtime can recover the state on the next change.
       }
     };
 
@@ -136,7 +164,7 @@ export default function PassengerLiveRideOverlay() {
         );
         if (!cancelled && records?.[0]) setTracking(records[0]);
       } catch {
-        // El primer evento realtime completará el estado.
+        // The first realtime event will complete the state.
       }
     };
 
@@ -191,9 +219,12 @@ export default function PassengerLiveRideOverlay() {
     }
   }, [driverPos?.lat, driverPos?.lng, tracking?.route_version]);
 
+  const routePath = useMemo(() => {
+    return remainingRoutePath(parseRoutePath(tracking?.route_polyline), driverPos);
+  }, [tracking?.route_polyline, tracking?.route_version, driverPos?.lat, driverPos?.lng]);
+
   if (location.pathname !== "/passenger" || !activeRide || !phase) return null;
 
-  const routePath = parseRoutePath(tracking?.route_polyline);
   const etaText = formatEta(tracking?.eta_seconds) || fallbackRouteInfo?.durationText || "Calculando...";
   const distanceText = formatDistance(tracking?.distance_meters) || fallbackRouteInfo?.distanceText || "";
   const pickupPhase = phase === "pickup";
@@ -210,7 +241,7 @@ export default function PassengerLiveRideOverlay() {
       setActiveRide(null);
       setTracking(null);
     } catch {
-      // PassengerViajar conserva el fallback de cancelación si el request falla.
+      // PassengerViajar keeps its cancellation fallback if this request fails.
     }
   };
 
