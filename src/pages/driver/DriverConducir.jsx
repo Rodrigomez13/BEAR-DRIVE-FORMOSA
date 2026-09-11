@@ -601,7 +601,7 @@ export default function DriverConducir() {
           driverPos={driverPos}
           interactive={true}
           followDriver={isNavigating}
-          navigationZoom={17}
+          navigationZoom={18}
           onRouteInfo={setRouteInfo}
           className="absolute inset-0"
         />

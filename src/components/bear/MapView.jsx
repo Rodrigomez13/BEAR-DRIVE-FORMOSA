@@ -372,6 +372,8 @@ export default function MapView({
         nextInstruction: steps[stepIndex]?.instruction || "Seguí la ruta",
         nextManeuver: steps[stepIndex]?.maneuver || "",
         nextManeuverDistanceMeters: Math.round(distanceToManeuver),
+        afterNextInstruction: steps[stepIndex + 1]?.instruction || "",
+        afterNextManeuver: steps[stepIndex + 1]?.maneuver || "",
       });
     }
   }, [driverPos?.lat, driverPos?.lng, driverPos?.heading, followDriver, followSuspended, navigationZoom, status]);
@@ -417,8 +419,11 @@ export default function MapView({
               durationSeconds: leg?.duration?.value || null,
               durationText: leg?.duration?.text || "",
               nextInstruction: steps[0]?.instruction || "Seguí la ruta",
+              nextManeuver: steps[0]?.maneuver || "",
               nextManeuverDistanceMeters: steps[0]?.distanceMeters || null,
               currentStepIndex: 0,
+              afterNextInstruction: steps[1]?.instruction || "",
+              afterNextManeuver: steps[1]?.maneuver || "",
             };
             onRouteInfoRef.current?.(routeInfoRef.current);
 
