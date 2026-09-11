@@ -53,6 +53,7 @@ export default function PassengerViajar() {
   const [originExpanded, setOriginExpanded] = useState(false);
   const [destExpanded, setDestExpanded] = useState(true);
   const [paymentExpanded, setPaymentExpanded] = useState(false);
+  const [panelExpanded, setPanelExpanded] = useState(true);
   const pollRef = useRef(null);
 
   // Handle Stripe redirect return
@@ -562,11 +563,20 @@ export default function PassengerViajar() {
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setPanelExpanded(true)}
                   placeholder={selectingTarget === "origin" ? "Buscar origen..." : "¿A dónde vas?"}
                   className="pl-10 h-11"
                 />
-                {(searchingPlace || geocoding) && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin" />}
+                {panelExpanded && !searchingPlace && !geocoding ? (
+                  <button onClick={() => setPanelExpanded(false)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <ChevronUp className="w-4 h-4" />
+                  </button>
+                ) : (searchingPlace || geocoding) ? (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin" />
+                ) : null}
               </div>
+              {panelExpanded && (
+                <>
               {searchResults.length > 0 && (
                 <div className="mb-3 max-h-48 overflow-y-auto rounded-xl border border-border">
                   {searchResults.map((r, i) => (
@@ -639,14 +649,12 @@ export default function PassengerViajar() {
                 )}
               </div>
 
-              {origin && destination ? (
+              {origin && destination && (
                 <Button onClick={handleQuote} disabled={quoteLoading} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold">
                   {quoteLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cotizando...</> : "Cotizar viaje"}
                 </Button>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-2">
-                  {origin ? "Elegí destino para cotizar" : "Activa tu ubicación para empezar"}
-                </p>
+              )}
+                </>
               )}
             </div>
           )}
