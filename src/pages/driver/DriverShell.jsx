@@ -1,6 +1,7 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
 import BottomNav from "@/components/bear/BottomNav";
+import DriverNavigationCoordinator from "@/components/bear/DriverNavigationCoordinator";
 import { Car, Activity, DollarSign, User } from "lucide-react";
 
 export default function DriverShell() {
@@ -10,8 +11,10 @@ export default function DriverShell() {
     { path: "earnings", label: "Ganancias", icon: DollarSign },
     { path: "profile", label: "Perfil", icon: User },
   ];
+
   return (
     <div className="app-screen h-[100dvh] overflow-hidden flex flex-col bg-background">
+      <DriverNavigationCoordinator />
       <main className="flex-1 min-h-0 overflow-hidden relative">
         <Outlet />
       </main>
