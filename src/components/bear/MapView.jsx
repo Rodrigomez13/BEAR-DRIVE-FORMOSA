@@ -370,7 +370,10 @@ export default function MapView({
         ...routeInfo,
         currentStepIndex: stepIndex,
         nextInstruction: steps[stepIndex]?.instruction || "Seguí la ruta",
+        nextManeuver: steps[stepIndex]?.maneuver || "",
         nextManeuverDistanceMeters: Math.round(distanceToManeuver),
+        afterNextInstruction: steps[stepIndex + 1]?.instruction || "",
+        afterNextManeuver: steps[stepIndex + 1]?.maneuver || "",
       });
     }
   }, [driverPos?.lat, driverPos?.lng, driverPos?.heading, followDriver, followSuspended, navigationZoom, status]);
@@ -401,6 +404,7 @@ export default function MapView({
             const leg = result.routes?.[0]?.legs?.[0];
             const steps = (leg?.steps || []).map((step) => ({
               instruction: stripHtml(step.instructions) || "Seguí la ruta",
+              maneuver: step.maneuver || "",
               distanceMeters: step.distance?.value || 0,
               end: step.end_location
                 ? { lat: step.end_location.lat(), lng: step.end_location.lng() }
@@ -415,8 +419,11 @@ export default function MapView({
               durationSeconds: leg?.duration?.value || null,
               durationText: leg?.duration?.text || "",
               nextInstruction: steps[0]?.instruction || "Seguí la ruta",
+              nextManeuver: steps[0]?.maneuver || "",
               nextManeuverDistanceMeters: steps[0]?.distanceMeters || null,
               currentStepIndex: 0,
+              afterNextInstruction: steps[1]?.instruction || "",
+              afterNextManeuver: steps[1]?.maneuver || "",
             };
             onRouteInfoRef.current?.(routeInfoRef.current);
 

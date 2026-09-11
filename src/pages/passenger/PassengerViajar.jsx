@@ -50,6 +50,8 @@ export default function PassengerViajar() {
   const [paying, setPaying] = useState(false);
   const [driverPos, setDriverPos] = useState(null);
   const [userPos, setUserPos] = useState(null);
+  const [cardMinimized, setCardMinimized] = useState(false);
+  const [routeOrigin, setRouteOrigin] = useState(null);
   const [enableReview, setEnableReview] = useState(true);
   const [originExpanded, setOriginExpanded] = useState(false);
   const [destExpanded, setDestExpanded] = useState(true);
@@ -132,6 +134,24 @@ export default function PassengerViajar() {
     pollRef.current = setInterval(poll, 3000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [activeRide?.id]);
+
+  // Auto-minimize card and capture route origin when driver is assigned
+  useEffect(() => {
+    if (activeRide && ["ASSIGNED", "DRIVER_APPROACHING"].includes(activeRide.status)) {
+      setCardMinimized(true);
+    }
+    if (!activeRide) {
+      setCardMinimized(false);
+      setRouteOrigin(null);
+    }
+  }, [activeRide?.status, activeRide?.id]);
+
+  // Capture driver's initial position as route origin (avoids recalculating route every poll)
+  useEffect(() => {
+    if (driverPos && activeRide && ["ASSIGNED", "DRIVER_APPROACHING"].includes(activeRide.status) && !routeOrigin) {
+      setRouteOrigin({ lat: driverPos.lat, lng: driverPos.lng });
+    }
+  }, [driverPos, activeRide?.status, routeOrigin]);
 
   // Guard against closing app during active ride
   useActiveRideGuard(!!activeRide);
@@ -342,6 +362,7 @@ export default function PassengerViajar() {
   // Active ride view
   if (activeRide) {
     const status = activeRide.status;
+    const approachPhase = ["ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING", "PIN_VALIDATION"].includes(status);
 
     if (status === "COMPLETED") {
       return (
@@ -398,16 +419,43 @@ export default function PassengerViajar() {
       <div className="absolute inset-0">
         <MapView
           center={origin || userPos || FORMOSA_CENTER}
-          origin={origin}
-          destination={destination}
+          origin={approachPhase ? (driverPos || routeOrigin || origin) : origin}
+          destination={approachPhase ? origin : destination}
+          showOriginMarker={!approachPhase}
+          showDestinationMarker={true}
+          originLabel={approachPhase ? "" : "Origen"}
+          destinationLabel={approachPhase ? "Tu ubicación" : "Destino"}
           driverPos={driverPos}
           userPos={userPos}
-          recenter={["IN_PROGRESS", "ARRIVED", "PAYMENT_PENDING"].includes(status) ? driverPos : (origin || userPos)}
-          interactive={false}
+          recenter={origin || userPos}
+          interactive={true}
           className="absolute inset-0"
         />
+        {cardMinimized && !["SEARCHING", "NO_DRIVERS"].includes(status) && (
+          <div className="absolute inset-x-0 bottom-0 z-10 p-3">
+            <button
+              onClick={() => setCardMinimized(false)}
+              className="w-full max-w-md mx-auto flex items-center gap-3 p-3 rounded-2xl bg-card shadow-lg border"
+            >
+              <BearAvatar size={40} />
+              <div className="flex-1 text-left min-w-0">
+                <p className="font-semibold text-sm truncate">{activeRide.driver_name || "Conductor"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {status === "DRIVER_APPROACHING" ? "En camino a tu ubicación" : status === "DRIVER_ARRIVED" ? "Llegó al punto de encuentro" : "Conductor asignado"}
+                </p>
+              </div>
+              <ChevronUp className="w-5 h-5 text-muted-foreground shrink-0" />
+            </button>
+          </div>
+        )}
+        {!cardMinimized && (
         <div className="absolute inset-x-0 bottom-0 z-10 p-3">
           <Card className="rounded-2xl p-4 max-w-md mx-auto">
+            {!["SEARCHING", "NO_DRIVERS"].includes(status) && (
+              <button onClick={() => setCardMinimized(true)} className="w-full flex items-center justify-center gap-1 text-xs text-muted-foreground mb-2">
+                <ChevronDown className="w-4 h-4" /> Minimizar
+              </button>
+            )}
             {status === "SEARCHING" && (
               <div className="text-center py-2">
                 <Loader2 className="w-10 h-10 animate-spin text-accent mx-auto mb-3" />
@@ -482,6 +530,7 @@ export default function PassengerViajar() {
             )}
           </Card>
         </div>
+        )}
         <CancelRideDialog
           open={showCancelDialog}
           onOpenChange={setShowCancelDialog}

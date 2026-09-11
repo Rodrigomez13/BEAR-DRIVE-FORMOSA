@@ -21,6 +21,8 @@ import {
   Banknote,
   QrCode,
   Bell,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import {
   getCurrentPosition,
@@ -32,6 +34,7 @@ import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
 import BearAvatar from "@/components/bear/BearAvatar";
 import RideRequestModal from "@/components/bear/RideRequestModal";
+import TurnByTurnNav from "@/components/bear/TurnByTurnNav";
 
 const PICKUP_STATUSES = ["ASSIGNED", "DRIVER_APPROACHING"];
 const ACTIVE_RIDE_STATUSES = [
@@ -85,6 +88,7 @@ export default function DriverConducir() {
   const [notifAsked, setNotifAsked] = useState(false);
   const [navigationStart, setNavigationStart] = useState(null);
   const [routeInfo, setRouteInfo] = useState(null);
+  const [cardMinimized, setCardMinimized] = useState(false);
 
   const pollRef = useRef(null);
   const positionWatchRef = useRef(null);
@@ -212,6 +216,13 @@ export default function DriverConducir() {
     arrivalHitsRef.current = { pickup: 0, destination: 0 };
     transitionInFlightRef.current = false;
   }, [activeRide?.id, activeRide?.status]);
+
+  // Auto-minimize info card during navigation so the map is fully visible
+  useEffect(() => {
+    const phase = navigationPhase(activeRide?.status);
+    if (phase) setCardMinimized(true);
+    if (!activeRide) setCardMinimized(false);
+  }, [activeRide?.status, activeRide?.id]);
 
   // Un único watcher GPS alimenta la UI, detección de llegada y persistencia del Driver.
   // No hacemos una consulta GPS independiente cada 5/15 segundos.
@@ -590,51 +601,42 @@ export default function DriverConducir() {
           driverPos={driverPos}
           interactive={true}
           followDriver={isNavigating}
-          navigationZoom={17}
+          navigationZoom={15}
           onRouteInfo={setRouteInfo}
           className="absolute inset-0"
         />
 
         {isNavigating && (
-          <div className="absolute inset-x-0 top-0 z-10 p-3 safe-top pointer-events-none">
-            <Card className="max-w-md mx-auto rounded-2xl bg-[#181E2F]/95 border-white/10 text-white shadow-xl pointer-events-auto overflow-hidden">
-              <div className="px-4 py-3 flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center shrink-0">
-                  <Navigation className="w-5 h-5 text-accent" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[11px] uppercase tracking-wide text-white/55 font-semibold">
-                      {navigatingToPickup ? "Ir a buscar al pasajero" : "En viaje"}
-                    </p>
-                    {(routeInfo?.durationText || routeInfo?.distanceText) && (
-                      <span className="text-xs text-accent font-semibold whitespace-nowrap">
-                        {[routeInfo?.durationText, routeInfo?.distanceText].filter(Boolean).join(" · ")}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm font-semibold mt-0.5 truncate">{navigationAddress}</p>
-                  <div className="mt-2 flex items-start gap-2 rounded-xl bg-white/5 px-3 py-2">
-                    <Navigation className="w-4 h-4 mt-0.5 text-accent shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm leading-snug">
-                        {routeInfo?.nextInstruction || "Calculando la mejor ruta..."}
-                      </p>
-                      {Number.isFinite(routeInfo?.nextManeuverDistanceMeters) && (
-                        <p className="text-[11px] text-white/50 mt-0.5">
-                          Próxima indicación en {formatManeuverDistance(routeInfo.nextManeuverDistanceMeters)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
+          <TurnByTurnNav
+            routeInfo={routeInfo}
+            phaseLabel={navigatingToPickup ? "Ir a buscar al pasajero" : "En viaje al destino"}
+            targetAddress={navigationAddress}
+            remainingTime={routeInfo?.durationText}
+            remainingDistance={routeInfo?.distanceText}
+          />
         )}
 
+        {cardMinimized && isNavigating && (
+          <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
+            <button
+              onClick={() => setCardMinimized(false)}
+              className="max-w-md mx-auto flex items-center gap-2 px-3 py-2 rounded-full bg-[#0e1320]/90 border border-white/10 text-white shadow-lg backdrop-blur-md"
+            >
+              <BearAvatar size={24} />
+              <span className="font-medium text-xs truncate flex-1 text-left">{activeRide.passenger_name || "Pasajero"}</span>
+              <span className="text-xs font-bold text-accent shrink-0">{formatPrice(activeRide.quoted_fare)}</span>
+              <ChevronUp className="w-3.5 h-3.5 text-white/40 shrink-0" />
+            </button>
+          </div>
+        )}
+        {!cardMinimized && (
         <div className="absolute inset-x-0 bottom-0 z-10 p-3">
           <Card className="rounded-2xl p-4 max-w-md mx-auto">
+            {isNavigating && (
+              <button onClick={() => setCardMinimized(true)} className="w-full flex items-center justify-center gap-1 text-xs text-muted-foreground mb-3">
+                <ChevronDown className="w-4 h-4" /> Minimizar
+              </button>
+            )}
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent capitalize">
                 {status.replace(/_/g, " ")}
@@ -773,6 +775,7 @@ export default function DriverConducir() {
             )}
           </Card>
         </div>
+        )}
 
         <CancelRideDialog
           open={showCancelDialog}
