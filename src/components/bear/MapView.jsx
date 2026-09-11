@@ -85,6 +85,16 @@ function haversineMeters(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+function offsetCenter(pos, tilt, heading) {
+  if (!tilt) return pos;
+  const offsetDist = 0.004;
+  const headingRad = ((heading || 0) * Math.PI) / 180;
+  return {
+    lat: pos.lat + offsetDist * Math.cos(headingRad),
+    lng: pos.lng + offsetDist * Math.sin(headingRad),
+  };
+}
+
 export default function MapView({
   center = { lat: -26.1849, lng: -58.1731 },
   zoom = 15,
@@ -104,6 +114,9 @@ export default function MapView({
   followDriver = false,
   navigationZoom = 17,
   onRouteInfo,
+  tilt = 0,
+  heading = 0,
+  markerAnimationDuration = 900,
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -115,6 +128,8 @@ export default function MapView({
   const mapListenersRef = useRef([]);
   const followDriverRef = useRef(followDriver);
   const onRouteInfoRef = useRef(onRouteInfo);
+  const tiltRef = useRef(tilt);
+  const headingRef = useRef(heading);
   const routeInfoRef = useRef(null);
   const routeStepsRef = useRef([]);
   const currentStepRef = useRef(0);
@@ -139,6 +154,11 @@ export default function MapView({
   useEffect(() => {
     onRouteInfoRef.current = onRouteInfo;
   }, [onRouteInfo]);
+
+  useEffect(() => {
+    tiltRef.current = tilt;
+    headingRef.current = heading;
+  }, [tilt, heading]);
 
   // Initialize map.
   useEffect(() => {
@@ -327,7 +347,7 @@ export default function MapView({
       const startLng = startPos.lng();
       const endLat = driverPos.lat;
       const endLng = driverPos.lng;
-      const duration = 900;
+      const duration = markerAnimationDuration;
       const startTime = Date.now();
       let raf;
 
@@ -347,7 +367,7 @@ export default function MapView({
     }
 
     if (followDriver && !followSuspended && mapRef.current) {
-      mapRef.current.panTo({ lat: driverPos.lat, lng: driverPos.lng });
+      mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, tilt, heading));
       const currentZoom = mapRef.current.getZoom() || 0;
       if (currentZoom < navigationZoom - 1 || currentZoom > navigationZoom + 2) {
         mapRef.current.setZoom(navigationZoom);
@@ -376,7 +396,7 @@ export default function MapView({
         afterNextManeuver: steps[stepIndex + 1]?.maneuver || "",
       });
     }
-  }, [driverPos?.lat, driverPos?.lng, driverPos?.heading, followDriver, followSuspended, navigationZoom, status]);
+  }, [driverPos?.lat, driverPos?.lng, driverPos?.heading, followDriver, followSuspended, navigationZoom, tilt, heading, status, markerAnimationDuration]);
 
   // Update route only when endpoints/path actually change. Driver GPS updates do not trigger route API calls.
   useEffect(() => {
@@ -428,7 +448,7 @@ export default function MapView({
             onRouteInfoRef.current?.(routeInfoRef.current);
 
             if (followDriverRef.current && driverPos && mapRef.current) {
-              mapRef.current.panTo({ lat: driverPos.lat, lng: driverPos.lng });
+              mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, tiltRef.current, headingRef.current));
               mapRef.current.setZoom(navigationZoom);
             }
           } else {
@@ -484,14 +504,24 @@ export default function MapView({
   const resumeFollow = () => {
     setFollowSuspended(false);
     if (driverPos && mapRef.current) {
-      mapRef.current.panTo({ lat: driverPos.lat, lng: driverPos.lng });
+      mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, tilt, heading));
       mapRef.current.setZoom(navigationZoom);
     }
   };
 
   return (
     <div className={className} style={{ background: "#0e1320" }}>
-      <div ref={containerRef} className="absolute inset-0" style={{ background: "#0e1320" }} />
+      <div
+        ref={containerRef}
+        className="absolute inset-0"
+        style={{
+          background: "#0e1320",
+          transform: tilt > 0 ? `perspective(1200px) rotateX(${tilt}deg) rotateZ(${-heading}deg) scale(1.25)` : "none",
+          transformOrigin: "center center",
+          transition: "transform 0.4s ease-out",
+          backfaceVisibility: "hidden",
+        }}
+      />
 
       {followDriver && followSuspended && status === "ready" && (
         <button

@@ -7,9 +7,12 @@ export const FORMOSA_CENTER = { lat: -26.1849, lng: -58.1731 };
 
 const DEFAULT_POSITION_OPTIONS = {
   enableHighAccuracy: true,
-  timeout: 15000,
-  maximumAge: 5000,
+  timeout: 10000,
+  maximumAge: 2000,
 };
+
+// Posiciones con exactitud peor a este umbral (metros) se descartan para navegación.
+export const NAVIGATION_ACCURACY_THRESHOLD = 50;
 
 function formatAddressFromResult(result) {
   const comps = result.address_components || [];

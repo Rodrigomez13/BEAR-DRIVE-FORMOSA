@@ -1,11 +1,14 @@
 import React, { useRef, useCallback } from "react";
 import { Image } from "@/components/ui/image";
-import { BEAR_LOGO_MARK } from "@/lib/brandAssets";
+import { BEAR_LOGO_LIGHT, BEAR_LOGO_DARK } from "@/lib/brandAssets";
+import { useTheme } from "@/lib/ThemeContext";
 
 // BearDrive logo. Supports long-press (>=2.5s) to trigger the hidden admin access.
 export default function Logo({ size = "md", onLongPress, className = "" }) {
   const timerRef = useRef(null);
   const triggeredRef = useRef(false);
+  const { theme } = useTheme();
+  const logoSrc = theme === "dark" ? BEAR_LOGO_DARK : BEAR_LOGO_LIGHT;
 
   const sizes = {
     sm: { box: "w-9 h-9", text: "text-lg" },
@@ -43,7 +46,7 @@ export default function Logo({ size = "md", onLongPress, className = "" }) {
     >
       <div className="flex flex-col items-center gap-3">
         <div className={`${s.box} rounded-2xl overflow-hidden`}>
-          <Image src={BEAR_LOGO_MARK} fittingType="fit" className="block w-full h-full" />
+          <Image src={logoSrc} fittingType="fit" className="block w-full h-full" />
         </div>
         <div className="text-center leading-none">
           <span className={`${s.text} font-extrabold tracking-tight text-foreground`}>

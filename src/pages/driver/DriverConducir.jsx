@@ -23,6 +23,7 @@ import {
   Bell,
   ChevronUp,
   ChevronDown,
+  Map as MapIcon,
 } from "lucide-react";
 import {
   getCurrentPosition,
@@ -71,6 +72,17 @@ function formatManeuverDistance(meters) {
   return `${(meters / 1000).toFixed(1).replace(".", ",")} km`;
 }
 
+function computeBearing(from, to) {
+  const toRad = (v) => (v * Math.PI) / 180;
+  const toDeg = (v) => (v * 180) / Math.PI;
+  const dLng = toRad(to.lng - from.lng);
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
 export default function DriverConducir() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -89,11 +101,14 @@ export default function DriverConducir() {
   const [navigationStart, setNavigationStart] = useState(null);
   const [routeInfo, setRouteInfo] = useState(null);
   const [cardMinimized, setCardMinimized] = useState(false);
+  const [navMode, setNavMode] = useState("gps");
+  const [navHeading, setNavHeading] = useState(0);
 
   const pollRef = useRef(null);
   const positionWatchRef = useRef(null);
   const lastLocationPersistRef = useRef(0);
   const silencedRides = useRef(new Set());
+  const prevPosRef = useRef(null);
   const arrivalHitsRef = useRef({ pickup: 0, destination: 0 });
   const transitionInFlightRef = useRef(false);
   const phaseRef = useRef(null);
@@ -233,7 +248,8 @@ export default function DriverConducir() {
     const persistDriverLocation = async (position) => {
       if (!driverLocationId) return;
       const now = Date.now();
-      if (now - lastLocationPersistRef.current < 15000) return;
+      const persistInterval = activeRide ? 4000 : 15000;
+      if (now - lastLocationPersistRef.current < persistInterval) return;
       lastLocationPersistRef.current = now;
 
       try {
@@ -242,6 +258,7 @@ export default function DriverConducir() {
           lng: position.lng,
           online: true,
           vehicle_id: selectedVehicle?.id,
+          heading: Number.isFinite(position.heading) ? position.heading : null,
         });
       } catch {
         // La siguiente ventana de persistencia vuelve a intentar.
@@ -311,15 +328,37 @@ export default function DriverConducir() {
         positionWatchRef.current = await watchCurrentPosition(
           (position, error) => {
             if (cancelled || error || !position) return;
-            setDriverPos(position);
+
+            // Descartar lecturas de baja precisión para el marcador y la navegación.
+            const accuracy = Number.isFinite(position.accuracy) ? position.accuracy : 999;
+            const isAccurate = accuracy <= 50;
+
+            if (isAccurate) {
+              setDriverPos(position);
+            } else if (!prevPosRef.current) {
+              // Primera lectura aunque sea imprecisa: mejor algo que nada.
+              setDriverPos(position);
+            }
+
+            if (prevPosRef.current) {
+              const movedKm = haversineKm(prevPosRef.current.lat, prevPosRef.current.lng, position.lat, position.lng);
+              // Solo calcular rumbo si el movimiento supera el radio de exactitud
+              // (evita rotaciones erráticas por ruido del GPS).
+              const movedM = movedKm * 1000;
+              if (isAccurate && movedM > Math.max(10, accuracy)) {
+                const bearing = computeBearing(prevPosRef.current, position);
+                if (Number.isFinite(bearing)) setNavHeading(bearing);
+              }
+            }
+            prevPosRef.current = position;
             persistDriverLocation(position);
             evaluateArrival(position);
           },
           {
             enableHighAccuracy: true,
-            maximumAge: 1500,
-            timeout: 15000,
-            minimumUpdateInterval: activeRide ? 2500 : 5000,
+            maximumAge: 1000,
+            timeout: 10000,
+            minimumUpdateInterval: activeRide ? 2000 : 4000,
           }
         );
       } catch (error) {
@@ -412,8 +451,16 @@ export default function DriverConducir() {
   };
 
   const handleAcceptRide = async (ride) => {
+    let position = driverPos;
     try {
-      const position = await getCurrentPosition({ enableHighAccuracy: true, maximumAge: 2000 });
+      position = await getCurrentPosition({ enableHighAccuracy: true, maximumAge: 2000 });
+    } catch {
+      if (!driverPos) {
+        toast({ title: "No se pudo obtener tu ubicación", description: "Activá el GPS e intentá nuevamente", variant: "destructive" });
+        return;
+      }
+    }
+    try {
       setDriverPos(position);
       setNavigationStart({ lat: position.lat, lng: position.lng });
       setRouteInfo(null);
@@ -601,19 +648,32 @@ export default function DriverConducir() {
           driverPos={driverPos}
           interactive={true}
           followDriver={isNavigating}
-          navigationZoom={15}
+          navigationZoom={navMode === "gps" ? 17 : 15}
           onRouteInfo={setRouteInfo}
+          tilt={navMode === "gps" && isNavigating ? 55 : 0}
+          heading={navMode === "gps" && isNavigating ? navHeading : 0}
           className="absolute inset-0"
         />
 
         {isNavigating && (
-          <TurnByTurnNav
-            routeInfo={routeInfo}
-            phaseLabel={navigatingToPickup ? "Ir a buscar al pasajero" : "En viaje al destino"}
-            targetAddress={navigationAddress}
-            remainingTime={routeInfo?.durationText}
-            remainingDistance={routeInfo?.distanceText}
-          />
+          <>
+            {navMode === "gps" && (
+              <TurnByTurnNav
+                routeInfo={routeInfo}
+                phaseLabel={navigatingToPickup ? "Ir a buscar al pasajero" : "En viaje al destino"}
+                targetAddress={navigationAddress}
+                remainingTime={routeInfo?.durationText}
+                remainingDistance={routeInfo?.distanceText}
+              />
+            )}
+            <button
+              onClick={() => setNavMode(navMode === "gps" ? "normal" : "gps")}
+              className="absolute right-3 top-[calc(env(safe-area-inset-top)+8.5rem)] z-20 flex items-center gap-2 rounded-full bg-[#181E2F]/95 px-3 py-2 text-xs font-semibold text-white shadow-lg border border-white/10 active:scale-95 transition"
+            >
+              {navMode === "gps" ? <MapIcon className="w-4 h-4 text-accent" /> : <Navigation className="w-4 h-4 text-accent" />}
+              {navMode === "gps" ? "Vista normal" : "Modo GPS"}
+            </button>
+          </>
         )}
 
         {cardMinimized && isNavigating && (

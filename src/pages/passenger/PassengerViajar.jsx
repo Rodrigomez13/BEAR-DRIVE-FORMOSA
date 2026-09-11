@@ -16,7 +16,7 @@ import { sanitizeString } from "@/lib/sanitize";
 import BearAvatar from "@/components/bear/BearAvatar";
 import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown } from "lucide-react";
 import { Image } from "@/components/ui/image";
-import { BEAR_LOGO_MARK } from "@/lib/brandAssets";
+import { BEAR_LOGO_LIGHT } from "@/lib/brandAssets";
 
 const CATEGORIES = [
   { code: "basic", name: "BearDrive", desc: "Servicio estándar" },
@@ -116,17 +116,13 @@ export default function PassengerViajar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Poll active ride
+  // Poll ride status (location updates arrive in real-time via subscription)
   useEffect(() => {
     if (!activeRide) return;
     const poll = async () => {
       try {
         const updated = await base44.entities.Ride.get(activeRide.id);
         if (updated) setActiveRide(updated);
-        if (updated?.driver_id) {
-          const locs = await base44.entities.DriverLocation.filter({ driver_id: updated.driver_id });
-          if (locs.length > 0) setDriverPos({ lat: locs[0].lat, lng: locs[0].lng });
-        }
       } catch (err) {
         // ignore
       }
@@ -134,6 +130,26 @@ export default function PassengerViajar() {
     pollRef.current = setInterval(poll, 3000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [activeRide?.id]);
+
+  // Real-time driver location subscription — no polling delay
+  useEffect(() => {
+    if (!activeRide?.driver_id) return;
+
+    // Initial fetch so the marker appears immediately
+    base44.entities.DriverLocation.filter({ driver_id: activeRide.driver_id })
+      .then((locs) => {
+        if (locs.length > 0) setDriverPos({ lat: locs[0].lat, lng: locs[0].lng, heading: locs[0].heading });
+      })
+      .catch(() => {});
+
+    const unsubscribe = base44.entities.DriverLocation.subscribe((event) => {
+      if (event.data?.driver_id !== activeRide.driver_id) return;
+      if (event.type === "delete") return;
+      setDriverPos({ lat: event.data.lat, lng: event.data.lng, heading: event.data.heading });
+    });
+
+    return () => unsubscribe();
+  }, [activeRide?.driver_id]);
 
   // Auto-minimize card and capture route origin when driver is assigned
   useEffect(() => {
@@ -222,6 +238,27 @@ export default function PassengerViajar() {
       reverseGeocode(pos.lat, pos.lng).then(setDestinationAddress);
     }
   }, [selectingTarget, activeRide]);
+
+  // Recalculate quote when category changes (if quote already exists)
+  useEffect(() => {
+    if (!quote || !origin || !destination) return;
+    let cancelled = false;
+    const recalculate = async () => {
+      try {
+        const res = await base44.functions.invoke("calculateQuote", {
+          origin_lat: origin.lat, origin_lng: origin.lng,
+          destination_lat: destination.lat, destination_lng: destination.lng,
+          category,
+        });
+        if (!cancelled) setQuote(res.data.quote);
+      } catch {
+        // keep existing quote on error
+      }
+    };
+    recalculate();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category]);
 
   // Quote
   const handleQuote = async () => {
@@ -429,6 +466,7 @@ export default function PassengerViajar() {
           userPos={userPos}
           recenter={origin || userPos}
           interactive={true}
+          markerAnimationDuration={approachPhase ? 3500 : 900}
           className="absolute inset-0"
         />
         {cardMinimized && !["SEARCHING", "NO_DRIVERS"].includes(status) && (
@@ -558,7 +596,7 @@ export default function PassengerViajar() {
       <div className="absolute inset-x-0 top-0 z-10 p-3 safe-top">
         <div className="max-w-md mx-auto flex items-center gap-3 px-4 py-2.5 rounded-2xl glass-navy">
           <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0">
-            <Image src={BEAR_LOGO_MARK} fittingType="fit" className="block w-full h-full" />
+            <Image src={BEAR_LOGO_LIGHT} fittingType="fit" className="block w-full h-full" />
           </div>
           <div className="leading-none">
             <p className="text-sm font-bold text-white">Bear<span className="text-accent">Drive</span></p>
