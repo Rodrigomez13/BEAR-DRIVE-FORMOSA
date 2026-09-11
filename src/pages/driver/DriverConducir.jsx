@@ -248,7 +248,8 @@ export default function DriverConducir() {
     const persistDriverLocation = async (position) => {
       if (!driverLocationId) return;
       const now = Date.now();
-      if (now - lastLocationPersistRef.current < 15000) return;
+      const persistInterval = activeRide ? 4000 : 15000;
+      if (now - lastLocationPersistRef.current < persistInterval) return;
       lastLocationPersistRef.current = now;
 
       try {
@@ -257,6 +258,7 @@ export default function DriverConducir() {
           lng: position.lng,
           online: true,
           vehicle_id: selectedVehicle?.id,
+          heading: Number.isFinite(position.heading) ? position.heading : null,
         });
       } catch {
         // La siguiente ventana de persistencia vuelve a intentar.
@@ -326,10 +328,24 @@ export default function DriverConducir() {
         positionWatchRef.current = await watchCurrentPosition(
           (position, error) => {
             if (cancelled || error || !position) return;
-            setDriverPos(position);
+
+            // Descartar lecturas de baja precisión para el marcador y la navegación.
+            const accuracy = Number.isFinite(position.accuracy) ? position.accuracy : 999;
+            const isAccurate = accuracy <= 50;
+
+            if (isAccurate) {
+              setDriverPos(position);
+            } else if (!prevPosRef.current) {
+              // Primera lectura aunque sea imprecisa: mejor algo que nada.
+              setDriverPos(position);
+            }
+
             if (prevPosRef.current) {
               const movedKm = haversineKm(prevPosRef.current.lat, prevPosRef.current.lng, position.lat, position.lng);
-              if (movedKm > 0.01) {
+              // Solo calcular rumbo si el movimiento supera el radio de exactitud
+              // (evita rotaciones erráticas por ruido del GPS).
+              const movedM = movedKm * 1000;
+              if (isAccurate && movedM > Math.max(10, accuracy)) {
                 const bearing = computeBearing(prevPosRef.current, position);
                 if (Number.isFinite(bearing)) setNavHeading(bearing);
               }
@@ -340,9 +356,9 @@ export default function DriverConducir() {
           },
           {
             enableHighAccuracy: true,
-            maximumAge: 1500,
-            timeout: 15000,
-            minimumUpdateInterval: activeRide ? 2500 : 5000,
+            maximumAge: 1000,
+            timeout: 10000,
+            minimumUpdateInterval: activeRide ? 2000 : 4000,
           }
         );
       } catch (error) {

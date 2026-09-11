@@ -125,15 +125,16 @@ export default function PassengerViajar() {
         if (updated) setActiveRide(updated);
         if (updated?.driver_id) {
           const locs = await base44.entities.DriverLocation.filter({ driver_id: updated.driver_id });
-          if (locs.length > 0) setDriverPos({ lat: locs[0].lat, lng: locs[0].lng });
+          if (locs.length > 0) setDriverPos({ lat: locs[0].lat, lng: locs[0].lng, heading: locs[0].heading });
         }
       } catch (err) {
         // ignore
       }
     };
-    pollRef.current = setInterval(poll, 3000);
+    const isApproaching = ["ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING", "PIN_VALIDATION", "IN_PROGRESS"].includes(activeRide.status);
+    pollRef.current = setInterval(poll, isApproaching ? 2000 : 3000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [activeRide?.id]);
+  }, [activeRide?.id, activeRide?.status]);
 
   // Auto-minimize card and capture route origin when driver is assigned
   useEffect(() => {
