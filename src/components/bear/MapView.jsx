@@ -62,6 +62,7 @@ export default function MapView({
   const polylineRef = useRef(null);
   const dirRendererRef = useRef(null);
   const dirServiceRef = useRef(null);
+  const resizeObserverRef = useRef(null);
   const [status, setStatus] = useState("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [debugInfo, setDebugInfo] = useState("Iniciando...");
@@ -71,43 +72,80 @@ export default function MapView({
   // Initialize map
   useEffect(() => {
     let cancelled = false;
+    let dimObserver = null;
     setDebugInfo("Solicitando SDK de Google Maps...");
     console.log("[MapView] Iniciando carga del mapa, intento:", retryKey);
+
+    const createMapInstance = (g) => {
+      if (cancelled || !containerRef.current) return;
+      setDebugInfo("SDK cargado, creando instancia del mapa...");
+      console.log("[MapView] Creando instancia de google.maps.Map");
+      const map = new g.maps.Map(containerRef.current, {
+        center,
+        zoom,
+        styles: DARK_MAP_STYLES,
+        backgroundColor: "#0e1320",
+        gestureHandling: interactive ? "auto" : "none",
+        disableDefaultUI: true,
+        clickableIcons: false,
+      });
+      mapRef.current = map;
+      markersRef.current.origin = new g.maps.Marker({ map, icon: originIcon(g), label: { text: "Origen", color: "#E9B74E", fontSize: "11px", fontWeight: "bold" }, visible: false });
+      markersRef.current.destination = new g.maps.Marker({ map, icon: destinationIcon(g), label: { text: "Destino", color: "#E9B74E", fontSize: "11px", fontWeight: "bold" }, visible: false });
+      markersRef.current.driver = new g.maps.Marker({ map, icon: carIcon(g), visible: false });
+      polylineRef.current = new g.maps.Polyline({ map, path: [], strokeColor: "#E9B74E", strokeWeight: 4, strokeOpacity: 0.85, visible: false });
+      dirRendererRef.current = new g.maps.DirectionsRenderer({ suppressMarkers: true, polylineOptions: { strokeColor: "#E9B74E", strokeWeight: 4, strokeOpacity: 0.9 } });
+      dirRendererRef.current.setMap(map);
+      dirServiceRef.current = new g.maps.DirectionsService();
+      console.log("[MapView] Mapa inicializado correctamente");
+      setDebugInfo("Mapa listo");
+      setStatus("ready");
+
+      // ResizeObserver persistente: redibuja el mapa ante cualquier cambio de tamaño del contenedor
+      resizeObserverRef.current = new ResizeObserver(() => {
+        if (mapRef.current && window.google?.maps) {
+          window.google.maps.event.trigger(mapRef.current, "resize");
+        }
+      });
+      resizeObserverRef.current.observe(containerRef.current);
+
+      // Forzar redibujado inicial tras el primer frame + fallback con timeout
+      const triggerResize = () => {
+        if (mapRef.current && window.google?.maps) {
+          window.google.maps.event.trigger(mapRef.current, "resize");
+          mapRef.current.setCenter(center);
+        }
+      };
+      requestAnimationFrame(triggerResize);
+      setTimeout(triggerResize, 300);
+    };
+
+    const initWhenReady = (g) => {
+      if (cancelled || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        createMapInstance(g);
+        return;
+      }
+      // El contenedor aún no tiene dimensiones — esperar vía ResizeObserver
+      setDebugInfo("Esperando dimensiones del contenedor...");
+      console.log("[MapView] Contenedor sin dimensiones, esperando...");
+      dimObserver = new ResizeObserver(() => {
+        if (cancelled || !containerRef.current) return;
+        const r = containerRef.current.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) {
+          dimObserver.disconnect();
+          dimObserver = null;
+          createMapInstance(g);
+        }
+      });
+      dimObserver.observe(containerRef.current);
+    };
+
     loadMapsSDK()
       .then((g) => {
-        if (cancelled || !containerRef.current) {
-          console.log("[MapView] Cancelado o contenedor no disponible");
-          return;
-        }
-        setDebugInfo("SDK cargado, creando instancia del mapa...");
-        console.log("[MapView] Creando instancia de google.maps.Map");
-        const map = new g.maps.Map(containerRef.current, {
-          center,
-          zoom,
-          styles: DARK_MAP_STYLES,
-          backgroundColor: "#0e1320",
-          gestureHandling: interactive ? "auto" : "none",
-          disableDefaultUI: true,
-          clickableIcons: false,
-        });
-        mapRef.current = map;
-        markersRef.current.origin = new g.maps.Marker({ map, icon: originIcon(g), label: { text: "Origen", color: "#E9B74E", fontSize: "11px", fontWeight: "bold" }, visible: false });
-        markersRef.current.destination = new g.maps.Marker({ map, icon: destinationIcon(g), label: { text: "Destino", color: "#E9B74E", fontSize: "11px", fontWeight: "bold" }, visible: false });
-        markersRef.current.driver = new g.maps.Marker({ map, icon: carIcon(g), visible: false });
-        polylineRef.current = new g.maps.Polyline({ map, path: [], strokeColor: "#E9B74E", strokeWeight: 4, strokeOpacity: 0.85, visible: false });
-        dirRendererRef.current = new g.maps.DirectionsRenderer({ suppressMarkers: true, polylineOptions: { strokeColor: "#E9B74E", strokeWeight: 4, strokeOpacity: 0.9 } });
-        dirRendererRef.current.setMap(map);
-        dirServiceRef.current = new g.maps.DirectionsService();
-        console.log("[MapView] Mapa inicializado correctamente");
-        setDebugInfo("Mapa listo");
-        setStatus("ready");
-        // Forzar redibujado tras el primer frame para que el mapa pinte correctamente
-        requestAnimationFrame(() => {
-          if (mapRef.current && window.google?.maps) {
-            window.google.maps.event.trigger(mapRef.current, "resize");
-            mapRef.current.setCenter(center);
-          }
-        });
+        if (cancelled) return;
+        initWhenReady(g);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -116,8 +154,11 @@ export default function MapView({
         setErrorMsg(authFail || err?.message || "Error desconocido");
         setStatus("error");
       });
+
     return () => {
       cancelled = true;
+      if (dimObserver) { dimObserver.disconnect(); dimObserver = null; }
+      if (resizeObserverRef.current) { resizeObserverRef.current.disconnect(); resizeObserverRef.current = null; }
       Object.values(markersRef.current).forEach((m) => m && m.setMap(null));
       if (polylineRef.current) polylineRef.current.setMap(null);
       if (dirRendererRef.current) dirRendererRef.current.setMap(null);
