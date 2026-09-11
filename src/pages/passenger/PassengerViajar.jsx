@@ -419,7 +419,7 @@ export default function PassengerViajar() {
       <div className="absolute inset-0">
         <MapView
           center={origin || userPos || FORMOSA_CENTER}
-          origin={approachPhase ? (routeOrigin || driverPos || origin) : origin}
+          origin={approachPhase ? (driverPos || routeOrigin || origin) : origin}
           destination={approachPhase ? origin : destination}
           showOriginMarker={!approachPhase}
           showDestinationMarker={true}
@@ -427,8 +427,8 @@ export default function PassengerViajar() {
           destinationLabel={approachPhase ? "Tu ubicación" : "Destino"}
           driverPos={driverPos}
           userPos={userPos}
-          recenter={["IN_PROGRESS", "ARRIVED", "PAYMENT_PENDING"].includes(status) ? driverPos : (origin || userPos)}
-          interactive={false}
+          recenter={origin || userPos}
+          interactive={true}
           className="absolute inset-0"
         />
         {cardMinimized && !["SEARCHING", "NO_DRIVERS"].includes(status) && (
