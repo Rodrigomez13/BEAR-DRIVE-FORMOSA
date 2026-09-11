@@ -393,6 +393,7 @@ export default function PassengerViajar() {
     return (
       <div className="absolute inset-0">
         <MapView
+          center={origin || FORMOSA_CENTER}
           origin={origin}
           destination={destination}
           driverPos={driverPos}
@@ -490,10 +491,11 @@ export default function PassengerViajar() {
   return (
     <div className="absolute inset-0">
       <MapView
+        center={origin || FORMOSA_CENTER}
         origin={origin}
         destination={destination}
         onMapClick={handleMapClick}
-        recenter={origin || (destination ? null : null)}
+        recenter={origin}
         className="absolute inset-0"
       />
 

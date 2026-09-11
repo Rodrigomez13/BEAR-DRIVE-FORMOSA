@@ -46,7 +46,7 @@ function carIcon(g) {
 
 export default function MapView({
   center = { lat: -26.1849, lng: -58.1731 },
-  zoom = 13,
+  zoom = 15,
   origin,
   destination,
   driverPos,
@@ -302,11 +302,7 @@ export default function MapView({
         </div>
       )}
 
-      {status === "ready" && (
-        <div className="absolute top-2 right-2 z-10 px-2 py-0.5 rounded-full bg-green-500/20 border border-green-400/40 text-[9px] text-green-300 font-mono pointer-events-none">
-          MAP OK
-        </div>
-      )}
+
     </div>
   );
 }

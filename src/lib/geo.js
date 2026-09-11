@@ -56,21 +56,25 @@ export async function searchPlaces(query) {
   }
 }
 
-// Geocodes a single selected place by place_id — called only on selection
+// Resolves a selected place by place_id using Places Details API (same Places API
+// that powers autocomplete predictions, so no extra Geocoding API enablement needed).
 export async function geocodePlace(placeId) {
   try {
     const g = await onMapsSDKReady();
-    const geocoder = new g.maps.Geocoder();
+    const placesService = new g.maps.places.PlacesService(document.createElement("div"));
     const result = await new Promise((resolve) => {
-      geocoder.geocode({ placeId }, (res, status) => {
-        if (status === g.maps.GeocoderStatus.OK && res && res[0]) {
-          resolve({
-            lat: res[0].geometry.location.lat(),
-            lng: res[0].geometry.location.lng(),
-            label: formatAddressFromResult(res[0]) || res[0].formatted_address,
-          });
-        } else resolve(null);
-      });
+      placesService.getDetails(
+        { placeId, fields: ["geometry", "formatted_address", "address_components"] },
+        (res, status) => {
+          if (status === g.maps.places.PlacesServiceStatus.OK && res && res.geometry?.location) {
+            resolve({
+              lat: res.geometry.location.lat(),
+              lng: res.geometry.location.lng(),
+              label: formatAddressFromResult(res) || res.formatted_address,
+            });
+          } else resolve(null);
+        }
+      );
     });
     return result;
   } catch {
