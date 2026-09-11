@@ -116,6 +116,7 @@ export default function MapView({
   onRouteInfo,
   tilt = 0,
   heading = 0,
+  markerAnimationDuration = 900,
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -346,7 +347,7 @@ export default function MapView({
       const startLng = startPos.lng();
       const endLat = driverPos.lat;
       const endLng = driverPos.lng;
-      const duration = 900;
+      const duration = markerAnimationDuration;
       const startTime = Date.now();
       let raf;
 
@@ -395,7 +396,7 @@ export default function MapView({
         afterNextManeuver: steps[stepIndex + 1]?.maneuver || "",
       });
     }
-  }, [driverPos?.lat, driverPos?.lng, driverPos?.heading, followDriver, followSuspended, navigationZoom, tilt, heading, status]);
+  }, [driverPos?.lat, driverPos?.lng, driverPos?.heading, followDriver, followSuspended, navigationZoom, tilt, heading, status, markerAnimationDuration]);
 
   // Update route only when endpoints/path actually change. Driver GPS updates do not trigger route API calls.
   useEffect(() => {
