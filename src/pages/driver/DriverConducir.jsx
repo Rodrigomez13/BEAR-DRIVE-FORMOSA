@@ -34,6 +34,7 @@ import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
 import BearAvatar from "@/components/bear/BearAvatar";
 import RideRequestModal from "@/components/bear/RideRequestModal";
+import TurnByTurnNav from "@/components/bear/TurnByTurnNav";
 
 const PICKUP_STATUSES = ["ASSIGNED", "DRIVER_APPROACHING"];
 const ACTIVE_RIDE_STATUSES = [
@@ -606,38 +607,13 @@ export default function DriverConducir() {
         />
 
         {isNavigating && (
-          <div className="absolute inset-x-0 top-0 z-10 p-3 safe-top pointer-events-none">
-            <Card className="max-w-md mx-auto rounded-2xl bg-[#181E2F]/95 border-white/10 text-white shadow-xl pointer-events-auto overflow-hidden">
-              <div className="flex items-stretch">
-                <div className="flex flex-col items-center justify-center px-4 py-3 bg-accent/15 shrink-0 min-w-[88px]">
-                  {Number.isFinite(routeInfo?.nextManeuverDistanceMeters) ? (
-                    <span className="text-2xl font-extrabold text-accent leading-none">
-                      {formatManeuverDistance(routeInfo.nextManeuverDistanceMeters)}
-                    </span>
-                  ) : (
-                    <Navigation className="w-7 h-7 text-accent" />
-                  )}
-                  <span className="text-[10px] text-white/50 mt-1">próxima</span>
-                </div>
-                <div className="px-4 py-3 flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <p className="text-[11px] uppercase tracking-wide text-white/55 font-semibold">
-                      {navigatingToPickup ? "Ir a buscar al pasajero" : "En viaje al destino"}
-                    </p>
-                    {(routeInfo?.durationText || routeInfo?.distanceText) && (
-                      <span className="text-xs text-accent font-semibold whitespace-nowrap">
-                        {[routeInfo?.durationText, routeInfo?.distanceText].filter(Boolean).join(" · ")}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-base font-bold leading-snug">
-                    {routeInfo?.nextInstruction || "Calculando la mejor ruta..."}
-                  </p>
-                  <p className="text-xs text-white/55 mt-1 truncate">{navigationAddress}</p>
-                </div>
-              </div>
-            </Card>
-          </div>
+          <TurnByTurnNav
+            routeInfo={routeInfo}
+            phaseLabel={navigatingToPickup ? "Ir a buscar al pasajero" : "En viaje al destino"}
+            targetAddress={navigationAddress}
+            remainingTime={routeInfo?.durationText}
+            remainingDistance={routeInfo?.distanceText}
+          />
         )}
 
         {cardMinimized && isNavigating && (

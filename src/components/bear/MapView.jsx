@@ -370,6 +370,7 @@ export default function MapView({
         ...routeInfo,
         currentStepIndex: stepIndex,
         nextInstruction: steps[stepIndex]?.instruction || "Seguí la ruta",
+        nextManeuver: steps[stepIndex]?.maneuver || "",
         nextManeuverDistanceMeters: Math.round(distanceToManeuver),
       });
     }
@@ -401,6 +402,7 @@ export default function MapView({
             const leg = result.routes?.[0]?.legs?.[0];
             const steps = (leg?.steps || []).map((step) => ({
               instruction: stripHtml(step.instructions) || "Seguí la ruta",
+              maneuver: step.maneuver || "",
               distanceMeters: step.distance?.value || 0,
               end: step.end_location
                 ? { lat: step.end_location.lat(), lng: step.end_location.lng() }
