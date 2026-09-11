@@ -66,11 +66,37 @@ function carIcon(g) {
   };
 }
 
+function navCarIcon(g, heading) {
+  return {
+    path: g.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+    scale: 7,
+    fillColor: "#E9B74E",
+    fillOpacity: 1,
+    strokeColor: "#181E2F",
+    strokeWeight: 2,
+    rotation: Number.isFinite(heading) ? heading : 0,
+  };
+}
+
 function stripHtml(value = "") {
   if (!value) return "";
   const node = document.createElement("div");
   node.innerHTML = value;
   return node.textContent || node.innerText || "";
+}
+
+function nearestPointIndex(path, pos) {
+  if (!path || path.length === 0 || !pos) return 0;
+  let minDist = Infinity;
+  let minIdx = 0;
+  for (let i = 0; i < path.length; i++) {
+    const d = (path[i].lat - pos.lat) ** 2 + (path[i].lng - pos.lng) ** 2;
+    if (d < minDist) {
+      minDist = d;
+      minIdx = i;
+    }
+  }
+  return minIdx;
 }
 
 function haversineMeters(a, b) {
@@ -87,7 +113,7 @@ function haversineMeters(a, b) {
 
 function offsetCenter(pos, tilt, heading) {
   if (!tilt) return pos;
-  const offsetDist = 0.004;
+  const offsetDist = 0.0028;
   const headingRad = ((heading || 0) * Math.PI) / 180;
   return {
     lat: pos.lat + offsetDist * Math.cos(headingRad),
@@ -133,6 +159,8 @@ export default function MapView({
   const routeInfoRef = useRef(null);
   const routeStepsRef = useRef([]);
   const currentStepRef = useRef(0);
+  const fullRoutePathRef = useRef([]);
+  const driverPosRef = useRef(null);
 
   const [status, setStatus] = useState("loading");
   const [errorMsg, setErrorMsg] = useState("");
@@ -159,6 +187,10 @@ export default function MapView({
     tiltRef.current = tilt;
     headingRef.current = heading;
   }, [tilt, heading]);
+
+  useEffect(() => {
+    driverPosRef.current = driverPos;
+  }, [driverPos]);
 
   // Initialize map.
   useEffect(() => {
@@ -333,6 +365,13 @@ export default function MapView({
   useEffect(() => {
     const marker = markersRef.current.driver;
     if (!marker || status !== "ready") return;
+
+    // Rotate the car icon to point in the travel direction during GPS navigation.
+    const g = window.google;
+    if (g?.maps) {
+      marker.setIcon(tilt > 0 ? navCarIcon(g, heading) : carIcon(g));
+    }
+
     if (!driverPos) {
       marker.setVisible(false);
       return;
@@ -374,6 +413,17 @@ export default function MapView({
       }
     }
 
+    // Trim the route polyline so it shrinks as the driver advances.
+    const fullPath = fullRoutePathRef.current;
+    if (fullPath && fullPath.length > 1 && polylineRef.current) {
+      const trimIndex = nearestPointIndex(fullPath, driverPos);
+      const trimmed =
+        trimIndex > 0
+          ? [{ lat: driverPos.lat, lng: driverPos.lng }, ...fullPath.slice(trimIndex)]
+          : fullPath;
+      polylineRef.current.setPath(trimmed);
+    }
+
     const routeInfo = routeInfoRef.current;
     const steps = routeStepsRef.current;
     if (routeInfo && steps.length > 0) {
@@ -405,7 +455,9 @@ export default function MapView({
 
     if (path && path.length >= 2) {
       dirRendererRef.current.set("directions", null);
-      polylineRef.current.setPath(path.map((point) => ({ lat: point.lat, lng: point.lng })));
+      const fullPath = path.map((point) => ({ lat: point.lat, lng: point.lng }));
+      fullRoutePathRef.current = fullPath;
+      polylineRef.current.setPath(fullPath);
       polylineRef.current.setVisible(true);
       routeInfoRef.current = null;
       routeStepsRef.current = [];
@@ -420,8 +472,24 @@ export default function MapView({
         { origin, destination, travelMode: g.TravelMode.DRIVING },
         (result, routeStatus) => {
           if (routeStatus === "OK" && result) {
-            dirRendererRef.current.setDirections(result);
+            dirRendererRef.current.set("directions", null);
             const leg = result.routes?.[0]?.legs?.[0];
+            const overviewPath = result.routes?.[0]?.overview_path;
+            const fullPath =
+              overviewPath && overviewPath.length > 0
+                ? overviewPath.map((p) => ({ lat: p.lat(), lng: p.lng() }))
+                : [origin, destination];
+            fullRoutePathRef.current = fullPath;
+
+            // Trim to the driver's current position so the line starts at the car.
+            const currentDriverPos = driverPosRef.current;
+            const trimIndex = currentDriverPos ? nearestPointIndex(fullPath, currentDriverPos) : 0;
+            const trimmed =
+              trimIndex > 0 && currentDriverPos
+                ? [{ lat: currentDriverPos.lat, lng: currentDriverPos.lng }, ...fullPath.slice(trimIndex)]
+                : fullPath;
+            polylineRef.current.setPath(trimmed);
+            polylineRef.current.setVisible(true);
             const steps = (leg?.steps || []).map((step) => ({
               instruction: stripHtml(step.instructions) || "Seguí la ruta",
               maneuver: step.maneuver || "",
@@ -453,6 +521,7 @@ export default function MapView({
             }
           } else {
             dirRendererRef.current.set("directions", null);
+            fullRoutePathRef.current = [origin, destination];
             polylineRef.current.setPath([origin, destination]);
             polylineRef.current.setVisible(true);
             routeInfoRef.current = null;
@@ -466,6 +535,7 @@ export default function MapView({
 
     polylineRef.current.setVisible(false);
     dirRendererRef.current.set("directions", null);
+    fullRoutePathRef.current = [];
     routeInfoRef.current = null;
     routeStepsRef.current = [];
     onRouteInfoRef.current?.(null);
@@ -516,7 +586,7 @@ export default function MapView({
         className="absolute inset-0"
         style={{
           background: "#0e1320",
-          transform: tilt > 0 ? `perspective(1200px) rotateX(${tilt}deg) rotateZ(${-heading}deg) scale(1.25)` : "none",
+          transform: tilt > 0 ? `perspective(1000px) rotateX(${tilt}deg) rotateZ(${-heading}deg) scale(1.2)` : "none",
           transformOrigin: "center center",
           transition: "transform 0.4s ease-out",
           backfaceVisibility: "hidden",
