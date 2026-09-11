@@ -223,6 +223,27 @@ export default function PassengerViajar() {
     }
   }, [selectingTarget, activeRide]);
 
+  // Recalculate quote when category changes (if quote already exists)
+  useEffect(() => {
+    if (!quote || !origin || !destination) return;
+    let cancelled = false;
+    const recalculate = async () => {
+      try {
+        const res = await base44.functions.invoke("calculateQuote", {
+          origin_lat: origin.lat, origin_lng: origin.lng,
+          destination_lat: destination.lat, destination_lng: destination.lng,
+          category,
+        });
+        if (!cancelled) setQuote(res.data.quote);
+      } catch {
+        // keep existing quote on error
+      }
+    };
+    recalculate();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category]);
+
   // Quote
   const handleQuote = async () => {
     if (!origin || !destination) {

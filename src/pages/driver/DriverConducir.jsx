@@ -412,8 +412,16 @@ export default function DriverConducir() {
   };
 
   const handleAcceptRide = async (ride) => {
+    let position = driverPos;
     try {
-      const position = await getCurrentPosition({ enableHighAccuracy: true, maximumAge: 2000 });
+      position = await getCurrentPosition({ enableHighAccuracy: true, maximumAge: 2000 });
+    } catch {
+      if (!driverPos) {
+        toast({ title: "No se pudo obtener tu ubicación", description: "Activá el GPS e intentá nuevamente", variant: "destructive" });
+        return;
+      }
+    }
+    try {
       setDriverPos(position);
       setNavigationStart({ lat: position.lat, lng: position.lng });
       setRouteInfo(null);
