@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">BearDrive - Formosa</string>
-    <string name="title_activity_main">BearDrive - Formosa</string>
+    <string name="app_name">BearDrive</string>
+    <string name="title_activity_main">BearDrive</string>
     <string name="package_name">com.beardrive.formosa</string>
     <string name="custom_url_scheme">com.beardrive.formosa</string>
 </resources>
