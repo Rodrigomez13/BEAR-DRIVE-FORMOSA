@@ -617,15 +617,15 @@ export default function DriverConducir() {
         )}
 
         {cardMinimized && isNavigating && (
-          <div className="absolute inset-x-0 bottom-0 z-10 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+          <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
             <button
               onClick={() => setCardMinimized(false)}
-              className="max-w-md mx-auto flex items-center gap-2 px-4 py-2 rounded-full bg-[#0e1320]/95 border border-white/10 text-white shadow-xl"
+              className="max-w-md mx-auto flex items-center gap-2 px-3 py-2 rounded-full bg-[#0e1320]/90 border border-white/10 text-white shadow-lg backdrop-blur-md"
             >
-              <BearAvatar size={28} />
-              <span className="font-semibold text-sm truncate flex-1 text-left">{activeRide.passenger_name || "Pasajero"}</span>
-              <span className="text-sm font-bold text-accent shrink-0">{formatPrice(activeRide.quoted_fare)}</span>
-              <ChevronUp className="w-4 h-4 text-white/50 shrink-0" />
+              <BearAvatar size={24} />
+              <span className="font-medium text-xs truncate flex-1 text-left">{activeRide.passenger_name || "Pasajero"}</span>
+              <span className="text-xs font-bold text-accent shrink-0">{formatPrice(activeRide.quoted_fare)}</span>
+              <ChevronUp className="w-3.5 h-3.5 text-white/40 shrink-0" />
             </button>
           </div>
         )}
