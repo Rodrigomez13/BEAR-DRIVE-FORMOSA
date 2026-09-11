@@ -1,5 +1,5 @@
-import React, { useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Mail, Lock, Loader2, User, Car, ShieldCheck, X, MapPin } from "lucide-react";
 import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
+import { requestLocationPermission } from "@/lib/geo";
 import Logo from "@/components/bear/Logo";
 import ThemeToggle from "@/components/bear/ThemeToggle";
 
@@ -24,7 +25,6 @@ export default function Login() {
   const [permissionsGranted, setPermissionsGranted] = useState(false);
   const [permissionError, setPermissionError] = useState("");
   const [requestingPermission, setRequestingPermission] = useState(false);
-  const navigate = useNavigate();
   const returnTo = safeReturnTo();
 
   React.useEffect(() => {
@@ -96,23 +96,19 @@ export default function Login() {
     setPermissionError("");
     setRequestingPermission(true);
     try {
-      await new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-          reject(new Error("Geolocalización no disponible"));
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(
-          () => resolve(),
-          (err) => reject(err),
-          { enableHighAccuracy: true, timeout: 10000 }
-        );
-      });
-      if ("Notification" in window) {
+      await requestLocationPermission({ requirePrecise: mode === "driver" });
+
+      // Browser notifications remain a compatibility path for now. Native push
+      // (FCM) will replace this after the E2E vertical slice is stable.
+      if ("Notification" in window && Notification.permission === "default") {
         await Notification.requestPermission();
       }
       setPermissionsGranted(true);
     } catch (err) {
-      setPermissionError("No pudimos obtener tu ubicación. Podés habilitarla más tarde desde la configuración de tu navegador.");
+      setPermissionError(
+        err?.message ||
+        "No pudimos habilitar tu ubicación. Revisá los permisos de BearDrive en la configuración del dispositivo."
+      );
     } finally {
       setRequestingPermission(false);
     }
@@ -224,7 +220,6 @@ export default function Login() {
         )}
       </div>
 
-      {/* Permission modal */}
       {mode && !permissionsGranted && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
           <div className="w-full max-w-sm bg-card rounded-2xl p-6 shadow-2xl">
@@ -240,7 +235,9 @@ export default function Login() {
                 BearDrive usa tu ubicación para {mode === "passenger" ? "conectar con conductores cercanos y mostrar tu viaje en tiempo real" : "recibir solicitudes de pasajeros cercanos y navegar a sus puntos de encuentro"}.
               </p>
               <p className="text-xs text-muted-foreground">
-                También necesitamos permiso para enviarte notificaciones sobre el estado de tus viajes.
+                {mode === "driver"
+                  ? "El modo conductor necesita ubicación precisa. Las notificaciones push se activarán en una etapa posterior del MVP."
+                  : "También necesitamos notificaciones para informarte cambios importantes del viaje."}
               </p>
             </div>
             {permissionError && (
@@ -258,7 +255,6 @@ export default function Login() {
         </div>
       )}
 
-      {/* Hidden admin access modal */}
       {adminModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6" onClick={() => setAdminModal(false)}>
           <div className="w-full max-w-sm bg-card rounded-2xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
