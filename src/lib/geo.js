@@ -1,6 +1,7 @@
-import { Capacitor } from "@capacitor/core";
-import { Geolocation } from "@capacitor/geolocation";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { onMapsSDKReady, getMapsApiKey } from "./mapsConfig";
+
+const Geolocation = registerPlugin("Geolocation");
 
 export const FORMOSA_CENTER = { lat: -26.1849, lng: -58.1731 };
 

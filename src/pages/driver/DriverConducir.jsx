@@ -21,6 +21,8 @@ import {
   Banknote,
   QrCode,
   Bell,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import {
   getCurrentPosition,
@@ -85,6 +87,7 @@ export default function DriverConducir() {
   const [notifAsked, setNotifAsked] = useState(false);
   const [navigationStart, setNavigationStart] = useState(null);
   const [routeInfo, setRouteInfo] = useState(null);
+  const [cardMinimized, setCardMinimized] = useState(false);
 
   const pollRef = useRef(null);
   const positionWatchRef = useRef(null);
@@ -212,6 +215,13 @@ export default function DriverConducir() {
     arrivalHitsRef.current = { pickup: 0, destination: 0 };
     transitionInFlightRef.current = false;
   }, [activeRide?.id, activeRide?.status]);
+
+  // Auto-minimize info card during navigation so the map is fully visible
+  useEffect(() => {
+    const phase = navigationPhase(activeRide?.status);
+    if (phase) setCardMinimized(true);
+    if (!activeRide) setCardMinimized(false);
+  }, [activeRide?.status, activeRide?.id]);
 
   // Un único watcher GPS alimenta la UI, detección de llegada y persistencia del Driver.
   // No hacemos una consulta GPS independiente cada 5/15 segundos.
@@ -598,14 +608,21 @@ export default function DriverConducir() {
         {isNavigating && (
           <div className="absolute inset-x-0 top-0 z-10 p-3 safe-top pointer-events-none">
             <Card className="max-w-md mx-auto rounded-2xl bg-[#181E2F]/95 border-white/10 text-white shadow-xl pointer-events-auto overflow-hidden">
-              <div className="px-4 py-3 flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center shrink-0">
-                  <Navigation className="w-5 h-5 text-accent" />
+              <div className="flex items-stretch">
+                <div className="flex flex-col items-center justify-center px-4 py-3 bg-accent/15 shrink-0 min-w-[88px]">
+                  {Number.isFinite(routeInfo?.nextManeuverDistanceMeters) ? (
+                    <span className="text-2xl font-extrabold text-accent leading-none">
+                      {formatManeuverDistance(routeInfo.nextManeuverDistanceMeters)}
+                    </span>
+                  ) : (
+                    <Navigation className="w-7 h-7 text-accent" />
+                  )}
+                  <span className="text-[10px] text-white/50 mt-1">próxima</span>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-3">
+                <div className="px-4 py-3 flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-1">
                     <p className="text-[11px] uppercase tracking-wide text-white/55 font-semibold">
-                      {navigatingToPickup ? "Ir a buscar al pasajero" : "En viaje"}
+                      {navigatingToPickup ? "Ir a buscar al pasajero" : "En viaje al destino"}
                     </p>
                     {(routeInfo?.durationText || routeInfo?.distanceText) && (
                       <span className="text-xs text-accent font-semibold whitespace-nowrap">
@@ -613,28 +630,38 @@ export default function DriverConducir() {
                       </span>
                     )}
                   </div>
-                  <p className="text-sm font-semibold mt-0.5 truncate">{navigationAddress}</p>
-                  <div className="mt-2 flex items-start gap-2 rounded-xl bg-white/5 px-3 py-2">
-                    <Navigation className="w-4 h-4 mt-0.5 text-accent shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm leading-snug">
-                        {routeInfo?.nextInstruction || "Calculando la mejor ruta..."}
-                      </p>
-                      {Number.isFinite(routeInfo?.nextManeuverDistanceMeters) && (
-                        <p className="text-[11px] text-white/50 mt-0.5">
-                          Próxima indicación en {formatManeuverDistance(routeInfo.nextManeuverDistanceMeters)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                  <p className="text-base font-bold leading-snug">
+                    {routeInfo?.nextInstruction || "Calculando la mejor ruta..."}
+                  </p>
+                  <p className="text-xs text-white/55 mt-1 truncate">{navigationAddress}</p>
                 </div>
               </div>
             </Card>
           </div>
         )}
 
+        {cardMinimized && isNavigating && (
+          <div className="absolute inset-x-0 bottom-0 z-10 p-3">
+            <button
+              onClick={() => setCardMinimized(false)}
+              className="w-full max-w-md mx-auto flex items-center gap-3 p-3 rounded-2xl bg-card shadow-lg border"
+            >
+              <div className="flex-1 text-left min-w-0">
+                <p className="font-semibold text-sm truncate">{activeRide.passenger_name || "Pasajero"}</p>
+                <p className="text-xs text-muted-foreground">{formatPrice(activeRide.quoted_fare)} · Tocá para ver detalles</p>
+              </div>
+              <ChevronUp className="w-5 h-5 text-muted-foreground shrink-0" />
+            </button>
+          </div>
+        )}
+        {!cardMinimized && (
         <div className="absolute inset-x-0 bottom-0 z-10 p-3">
           <Card className="rounded-2xl p-4 max-w-md mx-auto">
+            {isNavigating && (
+              <button onClick={() => setCardMinimized(true)} className="w-full flex items-center justify-center gap-1 text-xs text-muted-foreground mb-3">
+                <ChevronDown className="w-4 h-4" /> Minimizar
+              </button>
+            )}
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent capitalize">
                 {status.replace(/_/g, " ")}
@@ -773,6 +800,7 @@ export default function DriverConducir() {
             )}
           </Card>
         </div>
+        )}
 
         <CancelRideDialog
           open={showCancelDialog}
