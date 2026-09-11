@@ -37,6 +37,25 @@ export default function Login() {
     }
   }, [adminDenied]);
 
+  // Show the location permission modal only once per device:
+  // skip if already seen (localStorage) or if location is already granted.
+  React.useEffect(() => {
+    if (!mode) return;
+    if (localStorage.getItem("bear_location_modal_seen") === "true") {
+      setPermissionsGranted(true);
+      return;
+    }
+    if (navigator.permissions?.query) {
+      navigator.permissions.query({ name: "geolocation" }).then((r) => {
+        if (r.state === "granted") setPermissionsGranted(true);
+      }).catch(() => {});
+    }
+  }, [mode]);
+
+  React.useEffect(() => {
+    if (permissionsGranted) localStorage.setItem("bear_location_modal_seen", "true");
+  }, [permissionsGranted]);
+
   const handleLongPress = () => {
     setAdminModal(true);
     setAdminError("");
