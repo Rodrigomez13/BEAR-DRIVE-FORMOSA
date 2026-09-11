@@ -50,6 +50,7 @@ export default function MapView({
   origin,
   destination,
   driverPos,
+  userPos,
   path,
   onMapClick,
   className = "",
@@ -93,6 +94,7 @@ export default function MapView({
       markersRef.current.origin = new g.maps.Marker({ map, icon: originIcon(g), label: { text: "Origen", color: "#E9B74E", fontSize: "11px", fontWeight: "bold" }, visible: false });
       markersRef.current.destination = new g.maps.Marker({ map, icon: destinationIcon(g), label: { text: "Destino", color: "#E9B74E", fontSize: "11px", fontWeight: "bold" }, visible: false });
       markersRef.current.driver = new g.maps.Marker({ map, icon: carIcon(g), visible: false });
+      markersRef.current.user = new g.maps.Marker({ map, icon: { path: g.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#4285F4", fillOpacity: 1, strokeColor: "#ffffff", strokeWeight: 2 }, visible: false, clickable: false, zIndex: 999 });
       polylineRef.current = new g.maps.Polyline({ map, path: [], strokeColor: "#E9B74E", strokeWeight: 4, strokeOpacity: 0.85, visible: false });
       dirRendererRef.current = new g.maps.DirectionsRenderer({ suppressMarkers: true, polylineOptions: { strokeColor: "#E9B74E", strokeWeight: 4, strokeOpacity: 0.9 } });
       dirRendererRef.current.setMap(map);
@@ -168,14 +170,40 @@ export default function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retryKey]);
 
-  // Update markers
+  // Update markers (origin, destination, user location)
   useEffect(() => {
     const m = markersRef.current;
     if (!m.origin) return;
     if (origin) { m.origin.setPosition(origin); m.origin.setVisible(true); } else m.origin.setVisible(false);
     if (destination) { m.destination.setPosition(destination); m.destination.setVisible(true); } else m.destination.setVisible(false);
-    if (driverPos) { m.driver.setPosition(driverPos); m.driver.setVisible(true); } else m.driver.setVisible(false);
-  }, [origin, destination, driverPos]);
+    if (userPos && m.user) { m.user.setPosition(userPos); m.user.setVisible(true); } else if (m.user) m.user.setVisible(false);
+  }, [origin, destination, userPos]);
+
+  // Smooth driver marker animation — interpolates between polled positions
+  useEffect(() => {
+    const m = markersRef.current.driver;
+    if (!m) return;
+    if (!driverPos) { m.setVisible(false); return; }
+    const startPos = m.getPosition();
+    if (!startPos || !m.getVisible()) {
+      m.setPosition(driverPos);
+      m.setVisible(true);
+      return;
+    }
+    const startLat = startPos.lat(), startLng = startPos.lng();
+    const endLat = driverPos.lat, endLng = driverPos.lng;
+    const duration = 1500, startTime = Date.now();
+    let raf;
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const t = Math.min(elapsed / duration, 1);
+      const easeT = 1 - Math.pow(1 - t, 3);
+      m.setPosition({ lat: startLat + (endLat - startLat) * easeT, lng: startLng + (endLng - startLng) * easeT });
+      if (t < 1) raf = requestAnimationFrame(animate);
+    };
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, [driverPos]);
 
   // Update route (polyline or directions)
   useEffect(() => {
@@ -206,10 +234,10 @@ export default function MapView({
     dirRendererRef.current.set("directions", null);
   }, [origin, destination, path]);
 
-  // Recenter
+  // Recenter — also fires when map becomes ready so initial centering works
   useEffect(() => {
-    if (mapRef.current && recenter) mapRef.current.panTo(recenter);
-  }, [recenter]);
+    if (mapRef.current && recenter && status === "ready") mapRef.current.panTo(recenter);
+  }, [recenter, status]);
 
   // Detect gm_authFailure that fires AFTER the map already loaded
   useEffect(() => {

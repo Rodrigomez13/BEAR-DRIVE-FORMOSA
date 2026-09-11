@@ -49,6 +49,7 @@ export default function PassengerViajar() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [paying, setPaying] = useState(false);
   const [driverPos, setDriverPos] = useState(null);
+  const [userPos, setUserPos] = useState(null);
   const [enableReview, setEnableReview] = useState(true);
   const [originExpanded, setOriginExpanded] = useState(false);
   const [destExpanded, setDestExpanded] = useState(true);
@@ -95,6 +96,7 @@ export default function PassengerViajar() {
           try {
             pos = await getCurrentPosition();
             setOrigin(pos);
+            setUserPos(pos);
           } catch (err) { /* ignore — user can pick origin manually */ }
           setLoading(false);
           // Resolve address now that the MapView is rendering and the SDK is loading.
@@ -139,6 +141,7 @@ export default function PassengerViajar() {
     try {
       const pos = await getCurrentPosition();
       setOrigin(pos);
+      setUserPos(pos);
       const addr = await reverseGeocode(pos.lat, pos.lng);
       setOriginAddress(addr);
     } catch (err) {
@@ -394,11 +397,12 @@ export default function PassengerViajar() {
     return (
       <div className="absolute inset-0">
         <MapView
-          center={origin || FORMOSA_CENTER}
+          center={origin || userPos || FORMOSA_CENTER}
           origin={origin}
           destination={destination}
           driverPos={driverPos}
-          recenter={driverPos || origin}
+          userPos={userPos}
+          recenter={["IN_PROGRESS", "ARRIVED", "PAYMENT_PENDING"].includes(status) ? driverPos : (origin || userPos)}
           interactive={false}
           className="absolute inset-0"
         />
@@ -492,11 +496,12 @@ export default function PassengerViajar() {
   return (
     <div className="absolute inset-0">
       <MapView
-        center={origin || FORMOSA_CENTER}
+        center={origin || userPos || FORMOSA_CENTER}
         origin={origin}
         destination={destination}
+        userPos={userPos}
         onMapClick={handleMapClick}
-        recenter={origin}
+        recenter={origin || userPos}
         className="absolute inset-0"
       />
 
