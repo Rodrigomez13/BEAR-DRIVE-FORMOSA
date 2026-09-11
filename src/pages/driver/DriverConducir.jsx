@@ -23,6 +23,7 @@ import {
   Bell,
   ChevronUp,
   ChevronDown,
+  Map as MapIcon,
 } from "lucide-react";
 import {
   getCurrentPosition,
@@ -71,6 +72,17 @@ function formatManeuverDistance(meters) {
   return `${(meters / 1000).toFixed(1).replace(".", ",")} km`;
 }
 
+function computeBearing(from, to) {
+  const toRad = (v) => (v * Math.PI) / 180;
+  const toDeg = (v) => (v * 180) / Math.PI;
+  const dLng = toRad(to.lng - from.lng);
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
 export default function DriverConducir() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -89,11 +101,14 @@ export default function DriverConducir() {
   const [navigationStart, setNavigationStart] = useState(null);
   const [routeInfo, setRouteInfo] = useState(null);
   const [cardMinimized, setCardMinimized] = useState(false);
+  const [navMode, setNavMode] = useState("gps");
+  const [navHeading, setNavHeading] = useState(0);
 
   const pollRef = useRef(null);
   const positionWatchRef = useRef(null);
   const lastLocationPersistRef = useRef(0);
   const silencedRides = useRef(new Set());
+  const prevPosRef = useRef(null);
   const arrivalHitsRef = useRef({ pickup: 0, destination: 0 });
   const transitionInFlightRef = useRef(false);
   const phaseRef = useRef(null);
@@ -312,6 +327,14 @@ export default function DriverConducir() {
           (position, error) => {
             if (cancelled || error || !position) return;
             setDriverPos(position);
+            if (prevPosRef.current) {
+              const movedKm = haversineKm(prevPosRef.current.lat, prevPosRef.current.lng, position.lat, position.lng);
+              if (movedKm > 0.01) {
+                const bearing = computeBearing(prevPosRef.current, position);
+                if (Number.isFinite(bearing)) setNavHeading(bearing);
+              }
+            }
+            prevPosRef.current = position;
             persistDriverLocation(position);
             evaluateArrival(position);
           },
@@ -609,19 +632,32 @@ export default function DriverConducir() {
           driverPos={driverPos}
           interactive={true}
           followDriver={isNavigating}
-          navigationZoom={15}
+          navigationZoom={navMode === "gps" ? 17 : 15}
           onRouteInfo={setRouteInfo}
+          tilt={navMode === "gps" && isNavigating ? 55 : 0}
+          heading={navMode === "gps" && isNavigating ? navHeading : 0}
           className="absolute inset-0"
         />
 
         {isNavigating && (
-          <TurnByTurnNav
-            routeInfo={routeInfo}
-            phaseLabel={navigatingToPickup ? "Ir a buscar al pasajero" : "En viaje al destino"}
-            targetAddress={navigationAddress}
-            remainingTime={routeInfo?.durationText}
-            remainingDistance={routeInfo?.distanceText}
-          />
+          <>
+            {navMode === "gps" && (
+              <TurnByTurnNav
+                routeInfo={routeInfo}
+                phaseLabel={navigatingToPickup ? "Ir a buscar al pasajero" : "En viaje al destino"}
+                targetAddress={navigationAddress}
+                remainingTime={routeInfo?.durationText}
+                remainingDistance={routeInfo?.distanceText}
+              />
+            )}
+            <button
+              onClick={() => setNavMode(navMode === "gps" ? "normal" : "gps")}
+              className="absolute right-3 top-[calc(env(safe-area-inset-top)+8.5rem)] z-20 flex items-center gap-2 rounded-full bg-[#181E2F]/95 px-3 py-2 text-xs font-semibold text-white shadow-lg border border-white/10 active:scale-95 transition"
+            >
+              {navMode === "gps" ? <MapIcon className="w-4 h-4 text-accent" /> : <Navigation className="w-4 h-4 text-accent" />}
+              {navMode === "gps" ? "Vista normal" : "Modo GPS"}
+            </button>
+          </>
         )}
 
         {cardMinimized && isNavigating && (
