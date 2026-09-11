@@ -1,4 +1,4 @@
-import { onMapsSDKReady } from "./mapsConfig";
+import { onMapsSDKReady, getMapsApiKey } from "./mapsConfig";
 
 export const FORMOSA_CENTER = { lat: -26.1849, lng: -58.1731 };
 
@@ -84,16 +84,16 @@ export async function geocodePlace(placeId) {
 
 export async function reverseGeocode(lat, lng) {
   try {
-    const g = await onMapsSDKReady();
-    const geocoder = new g.maps.Geocoder();
-    const result = await new Promise((resolve) => {
-      geocoder.geocode({ location: { lat, lng } }, (res, status) => {
-        if (status === g.maps.GeocoderStatus.OK && res && res[0]) {
-          resolve(formatAddressFromResult(res[0]) || res[0].formatted_address);
-        } else resolve(null);
-      });
-    });
-    return result || "Ubicación seleccionada";
+    const apiKey = await getMapsApiKey();
+    if (!apiKey) return "Ubicación seleccionada";
+    const res = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${encodeURIComponent(apiKey)}&language=es&region=AR`
+    );
+    const data = await res.json();
+    if (data.status === "OK" && data.results?.[0]) {
+      return formatAddressFromResult(data.results[0]) || data.results[0].formatted_address;
+    }
+    return "Ubicación seleccionada";
   } catch {
     return "Ubicación seleccionada";
   }
