@@ -13,15 +13,15 @@
   },
   "plugins": {
     "SplashScreen": {
-      "launchShowDuration": 1500,
+      "launchShowDuration": 1200,
       "backgroundColor": "#181E2F",
       "showSpinner": false,
-      "androidScaleType": "CENTER_CROP"
+      "androidScaleType": "CENTER_INSIDE"
     },
     "StatusBar": {
-      "style": "DARK",
+      "style": "LIGHT",
       "backgroundColor": "#181E2F",
-      "overlaysWebView": true
+      "overlaysWebView": false
     },
     "Keyboard": {
       "resize": "native",

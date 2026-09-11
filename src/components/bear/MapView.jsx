@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { loadMapsSDK, getAuthFailure, resetSdkPromise } from "@/lib/mapsConfig";
-import { MapPin, AlertTriangle } from "lucide-react";
+import { AlertTriangle, Navigation } from "lucide-react";
 
 const DARK_MAP_STYLES = [
   { elementType: "geometry", stylers: [{ color: "#0e1320" }] },
@@ -31,17 +31,58 @@ const DARK_MAP_STYLES = [
 ];
 
 function originIcon(g) {
-  return { path: g.maps.SymbolPath.CIRCLE, scale: 11, fillColor: "#181E2F", fillOpacity: 1, strokeColor: "#E9B74E", strokeWeight: 3, labelOrigin: new g.maps.Point(0, -16) };
+  return {
+    path: g.maps.SymbolPath.CIRCLE,
+    scale: 11,
+    fillColor: "#181E2F",
+    fillOpacity: 1,
+    strokeColor: "#E9B74E",
+    strokeWeight: 3,
+    labelOrigin: new g.maps.Point(0, -16),
+  };
 }
+
 function destinationIcon(g) {
-  return { path: g.maps.SymbolPath.CIRCLE, scale: 11, fillColor: "#E9B74E", fillOpacity: 1, strokeColor: "#181E2F", strokeWeight: 3, labelOrigin: new g.maps.Point(0, -16) };
+  return {
+    path: g.maps.SymbolPath.CIRCLE,
+    scale: 11,
+    fillColor: "#E9B74E",
+    fillOpacity: 1,
+    strokeColor: "#181E2F",
+    strokeWeight: 3,
+    labelOrigin: new g.maps.Point(0, -16),
+  };
 }
+
 function carIcon(g) {
   return {
     path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z",
-    scale: 1.6, fillColor: "#E9B74E", fillOpacity: 1, strokeColor: "#181E2F", strokeWeight: 1.5,
+    scale: 1.6,
+    fillColor: "#E9B74E",
+    fillOpacity: 1,
+    strokeColor: "#181E2F",
+    strokeWeight: 1.5,
     anchor: new g.maps.Point(12, 22),
   };
+}
+
+function stripHtml(value = "") {
+  if (!value) return "";
+  const node = document.createElement("div");
+  node.innerHTML = value;
+  return node.textContent || node.innerText || "";
+}
+
+function haversineMeters(a, b) {
+  if (!a || !b) return Number.POSITIVE_INFINITY;
+  const R = 6371000;
+  const toRad = (value) => (value * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
 }
 
 export default function MapView({
@@ -49,6 +90,10 @@ export default function MapView({
   zoom = 15,
   origin,
   destination,
+  originLabel = "Origen",
+  destinationLabel = "Destino",
+  showOriginMarker = true,
+  showDestinationMarker = true,
   driverPos,
   userPos,
   path,
@@ -56,6 +101,9 @@ export default function MapView({
   className = "",
   recenter,
   interactive = true,
+  followDriver = false,
+  navigationZoom = 17,
+  onRouteInfo,
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -64,46 +112,104 @@ export default function MapView({
   const dirRendererRef = useRef(null);
   const dirServiceRef = useRef(null);
   const resizeObserverRef = useRef(null);
+  const mapListenersRef = useRef([]);
+  const followDriverRef = useRef(followDriver);
+  const onRouteInfoRef = useRef(onRouteInfo);
+  const routeInfoRef = useRef(null);
+  const routeStepsRef = useRef([]);
+  const currentStepRef = useRef(0);
+
   const [status, setStatus] = useState("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [debugInfo, setDebugInfo] = useState("Iniciando...");
   const [retryKey, setRetryKey] = useState(0);
   const [showDebug, setShowDebug] = useState(false);
+  const [followSuspended, setFollowSuspended] = useState(false);
 
-  // Initialize map
+  const pathKey = useMemo(
+    () => (path || []).map((point) => `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`).join("|"),
+    [path]
+  );
+
+  useEffect(() => {
+    followDriverRef.current = followDriver;
+    if (!followDriver) setFollowSuspended(false);
+  }, [followDriver]);
+
+  useEffect(() => {
+    onRouteInfoRef.current = onRouteInfo;
+  }, [onRouteInfo]);
+
+  // Initialize map.
   useEffect(() => {
     let cancelled = false;
     let dimObserver = null;
     setDebugInfo("Solicitando SDK de Google Maps...");
-    console.log("[MapView] Iniciando carga del mapa, intento:", retryKey);
 
     const createMapInstance = (g) => {
       if (cancelled || !containerRef.current) return;
       setDebugInfo("SDK cargado, creando instancia del mapa...");
-      console.log("[MapView] Creando instancia de google.maps.Map");
+
       const map = new g.maps.Map(containerRef.current, {
         center,
         zoom,
         styles: DARK_MAP_STYLES,
         backgroundColor: "#0e1320",
-        gestureHandling: interactive ? "auto" : "none",
+        gestureHandling: interactive ? "greedy" : "none",
         disableDefaultUI: true,
         clickableIcons: false,
       });
+
       mapRef.current = map;
-      markersRef.current.origin = new g.maps.Marker({ map, icon: originIcon(g), label: { text: "Origen", color: "#E9B74E", fontSize: "11px", fontWeight: "bold" }, visible: false });
-      markersRef.current.destination = new g.maps.Marker({ map, icon: destinationIcon(g), label: { text: "Destino", color: "#E9B74E", fontSize: "11px", fontWeight: "bold" }, visible: false });
-      markersRef.current.driver = new g.maps.Marker({ map, icon: carIcon(g), visible: false });
-      markersRef.current.user = new g.maps.Marker({ map, icon: { path: g.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#4285F4", fillOpacity: 1, strokeColor: "#ffffff", strokeWeight: 2 }, visible: false, clickable: false, zIndex: 999 });
-      polylineRef.current = new g.maps.Polyline({ map, path: [], strokeColor: "#E9B74E", strokeWeight: 4, strokeOpacity: 0.85, visible: false });
-      dirRendererRef.current = new g.maps.DirectionsRenderer({ suppressMarkers: true, polylineOptions: { strokeColor: "#E9B74E", strokeWeight: 4, strokeOpacity: 0.9 } });
+      markersRef.current.origin = new g.maps.Marker({
+        map,
+        icon: originIcon(g),
+        label: { text: originLabel, color: "#E9B74E", fontSize: "11px", fontWeight: "bold" },
+        visible: false,
+      });
+      markersRef.current.destination = new g.maps.Marker({
+        map,
+        icon: destinationIcon(g),
+        label: { text: destinationLabel, color: "#E9B74E", fontSize: "11px", fontWeight: "bold" },
+        visible: false,
+      });
+      markersRef.current.driver = new g.maps.Marker({ map, icon: carIcon(g), visible: false, zIndex: 1000 });
+      markersRef.current.user = new g.maps.Marker({
+        map,
+        icon: {
+          path: g.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: "#4285F4",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 2,
+        },
+        visible: false,
+        clickable: false,
+        zIndex: 999,
+      });
+      polylineRef.current = new g.maps.Polyline({
+        map,
+        path: [],
+        strokeColor: "#E9B74E",
+        strokeWeight: 4,
+        strokeOpacity: 0.85,
+        visible: false,
+      });
+      dirRendererRef.current = new g.maps.DirectionsRenderer({
+        suppressMarkers: true,
+        preserveViewport: followDriverRef.current,
+        polylineOptions: { strokeColor: "#E9B74E", strokeWeight: 5, strokeOpacity: 0.95 },
+      });
       dirRendererRef.current.setMap(map);
       dirServiceRef.current = new g.maps.DirectionsService();
-      console.log("[MapView] Mapa inicializado correctamente");
-      setDebugInfo("Mapa listo");
-      setStatus("ready");
 
-      // ResizeObserver persistente: redibuja el mapa ante cualquier cambio de tamaño del contenedor
+      mapListenersRef.current.push(
+        g.maps.event.addListener(map, "dragstart", () => {
+          if (followDriverRef.current) setFollowSuspended(true);
+        })
+      );
+
       resizeObserverRef.current = new ResizeObserver(() => {
         if (mapRef.current && window.google?.maps) {
           window.google.maps.event.trigger(mapRef.current, "resize");
@@ -111,7 +217,6 @@ export default function MapView({
       });
       resizeObserverRef.current.observe(containerRef.current);
 
-      // Forzar redibujado inicial tras el primer frame + fallback con timeout
       const triggerResize = () => {
         if (mapRef.current && window.google?.maps) {
           window.google.maps.event.trigger(mapRef.current, "resize");
@@ -120,6 +225,9 @@ export default function MapView({
       };
       requestAnimationFrame(triggerResize);
       setTimeout(triggerResize, 300);
+
+      setDebugInfo("Mapa listo");
+      setStatus("ready");
     };
 
     const initWhenReady = (g) => {
@@ -129,13 +237,12 @@ export default function MapView({
         createMapInstance(g);
         return;
       }
-      // El contenedor aún no tiene dimensiones — esperar vía ResizeObserver
+
       setDebugInfo("Esperando dimensiones del contenedor...");
-      console.log("[MapView] Contenedor sin dimensiones, esperando...");
       dimObserver = new ResizeObserver(() => {
         if (cancelled || !containerRef.current) return;
-        const r = containerRef.current.getBoundingClientRect();
-        if (r.width > 0 && r.height > 0) {
+        const rectNow = containerRef.current.getBoundingClientRect();
+        if (rectNow.width > 0 && rectNow.height > 0) {
           dimObserver.disconnect();
           dimObserver = null;
           createMapInstance(g);
@@ -146,12 +253,10 @@ export default function MapView({
 
     loadMapsSDK()
       .then((g) => {
-        if (cancelled) return;
-        initWhenReady(g);
+        if (!cancelled) initWhenReady(g);
       })
       .catch((err) => {
         if (cancelled) return;
-        console.error("[MapView] Error al cargar el mapa:", err);
         const authFail = getAuthFailure();
         setErrorMsg(authFail || err?.message || "Error desconocido");
         setStatus("error");
@@ -159,93 +264,199 @@ export default function MapView({
 
     return () => {
       cancelled = true;
-      if (dimObserver) { dimObserver.disconnect(); dimObserver = null; }
-      if (resizeObserverRef.current) { resizeObserverRef.current.disconnect(); resizeObserverRef.current = null; }
-      Object.values(markersRef.current).forEach((m) => m && m.setMap(null));
+      if (dimObserver) dimObserver.disconnect();
+      if (resizeObserverRef.current) resizeObserverRef.current.disconnect();
+      mapListenersRef.current.forEach((listener) => listener?.remove?.());
+      mapListenersRef.current = [];
+      Object.values(markersRef.current).forEach((marker) => marker?.setMap(null));
       if (polylineRef.current) polylineRef.current.setMap(null);
       if (dirRendererRef.current) dirRendererRef.current.setMap(null);
       markersRef.current = {};
+      routeInfoRef.current = null;
+      routeStepsRef.current = [];
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retryKey]);
 
-  // Update markers (origin, destination, user location)
+  // Update markers.
   useEffect(() => {
-    const m = markersRef.current;
-    if (!m.origin) return;
-    if (origin) { m.origin.setPosition(origin); m.origin.setVisible(true); } else m.origin.setVisible(false);
-    if (destination) { m.destination.setPosition(destination); m.destination.setVisible(true); } else m.destination.setVisible(false);
-    if (userPos && m.user) { m.user.setPosition(userPos); m.user.setVisible(true); } else if (m.user) m.user.setVisible(false);
-  }, [origin, destination, userPos]);
+    const markers = markersRef.current;
+    if (!markers.origin || status !== "ready") return;
 
-  // Smooth driver marker animation — interpolates between polled positions
+    markers.origin.setLabel({ text: originLabel, color: "#E9B74E", fontSize: "11px", fontWeight: "bold" });
+    markers.destination.setLabel({ text: destinationLabel, color: "#E9B74E", fontSize: "11px", fontWeight: "bold" });
+
+    if (origin && showOriginMarker) {
+      markers.origin.setPosition(origin);
+      markers.origin.setVisible(true);
+    } else {
+      markers.origin.setVisible(false);
+    }
+
+    if (destination && showDestinationMarker) {
+      markers.destination.setPosition(destination);
+      markers.destination.setVisible(true);
+    } else {
+      markers.destination.setVisible(false);
+    }
+
+    if (userPos && markers.user) {
+      markers.user.setPosition(userPos);
+      markers.user.setVisible(true);
+    } else if (markers.user) {
+      markers.user.setVisible(false);
+    }
+  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, originLabel, destinationLabel, showOriginMarker, showDestinationMarker, userPos?.lat, userPos?.lng, status]);
+
+  // Smooth driver marker, follow camera and advance maneuver guidance without new route API calls.
   useEffect(() => {
-    const m = markersRef.current.driver;
-    if (!m) return;
-    if (!driverPos) { m.setVisible(false); return; }
-    const startPos = m.getPosition();
-    if (!startPos || !m.getVisible()) {
-      m.setPosition(driverPos);
-      m.setVisible(true);
+    const marker = markersRef.current.driver;
+    if (!marker || status !== "ready") return;
+    if (!driverPos) {
+      marker.setVisible(false);
       return;
     }
-    const startLat = startPos.lat(), startLng = startPos.lng();
-    const endLat = driverPos.lat, endLng = driverPos.lng;
-    const duration = 1500, startTime = Date.now();
-    let raf;
-    const animate = () => {
-      const elapsed = Date.now() - startTime;
-      const t = Math.min(elapsed / duration, 1);
-      const easeT = 1 - Math.pow(1 - t, 3);
-      m.setPosition({ lat: startLat + (endLat - startLat) * easeT, lng: startLng + (endLng - startLng) * easeT });
-      if (t < 1) raf = requestAnimationFrame(animate);
-    };
-    raf = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(raf);
-  }, [driverPos]);
 
-  // Update route (polyline or directions)
+    const startPos = marker.getPosition();
+    if (!startPos || !marker.getVisible()) {
+      marker.setPosition(driverPos);
+      marker.setVisible(true);
+    } else {
+      const startLat = startPos.lat();
+      const startLng = startPos.lng();
+      const endLat = driverPos.lat;
+      const endLng = driverPos.lng;
+      const duration = 900;
+      const startTime = Date.now();
+      let raf;
+
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const t = Math.min(elapsed / duration, 1);
+        const easeT = 1 - Math.pow(1 - t, 3);
+        marker.setPosition({
+          lat: startLat + (endLat - startLat) * easeT,
+          lng: startLng + (endLng - startLng) * easeT,
+        });
+        if (t < 1) raf = requestAnimationFrame(animate);
+      };
+
+      raf = requestAnimationFrame(animate);
+      setTimeout(() => cancelAnimationFrame(raf), duration + 150);
+    }
+
+    if (followDriver && !followSuspended && mapRef.current) {
+      mapRef.current.panTo({ lat: driverPos.lat, lng: driverPos.lng });
+      const currentZoom = mapRef.current.getZoom() || 0;
+      if (currentZoom < navigationZoom - 1 || currentZoom > navigationZoom + 2) {
+        mapRef.current.setZoom(navigationZoom);
+      }
+    }
+
+    const routeInfo = routeInfoRef.current;
+    const steps = routeStepsRef.current;
+    if (routeInfo && steps.length > 0) {
+      let stepIndex = Math.min(currentStepRef.current, steps.length - 1);
+      let distanceToManeuver = haversineMeters(driverPos, steps[stepIndex].end);
+
+      while (stepIndex < steps.length - 1 && distanceToManeuver < 35) {
+        stepIndex += 1;
+        distanceToManeuver = haversineMeters(driverPos, steps[stepIndex].end);
+      }
+
+      currentStepRef.current = stepIndex;
+      onRouteInfoRef.current?.({
+        ...routeInfo,
+        currentStepIndex: stepIndex,
+        nextInstruction: steps[stepIndex]?.instruction || "Seguí la ruta",
+        nextManeuverDistanceMeters: Math.round(distanceToManeuver),
+      });
+    }
+  }, [driverPos?.lat, driverPos?.lng, driverPos?.heading, followDriver, followSuspended, navigationZoom, status]);
+
+  // Update route only when endpoints/path actually change. Driver GPS updates do not trigger route API calls.
   useEffect(() => {
     const g = window.google?.maps;
-    if (!g || !mapRef.current || !dirServiceRef.current) return;
+    if (!g || !mapRef.current || !dirServiceRef.current || status !== "ready") return;
+
     if (path && path.length >= 2) {
       dirRendererRef.current.set("directions", null);
-      polylineRef.current.setPath(path.map((p) => ({ lat: p.lat, lng: p.lng })));
+      polylineRef.current.setPath(path.map((point) => ({ lat: point.lat, lng: point.lng })));
       polylineRef.current.setVisible(true);
+      routeInfoRef.current = null;
+      routeStepsRef.current = [];
+      onRouteInfoRef.current?.(null);
       return;
     }
+
     if (origin && destination) {
       polylineRef.current.setVisible(false);
+      dirRendererRef.current.setOptions({ preserveViewport: followDriverRef.current });
       dirServiceRef.current.route(
         { origin, destination, travelMode: g.TravelMode.DRIVING },
-        (res, stat) => {
-          if (stat === "OK" && res) dirRendererRef.current.setDirections(res);
-          else {
+        (result, routeStatus) => {
+          if (routeStatus === "OK" && result) {
+            dirRendererRef.current.setDirections(result);
+            const leg = result.routes?.[0]?.legs?.[0];
+            const steps = (leg?.steps || []).map((step) => ({
+              instruction: stripHtml(step.instructions) || "Seguí la ruta",
+              distanceMeters: step.distance?.value || 0,
+              end: step.end_location
+                ? { lat: step.end_location.lat(), lng: step.end_location.lng() }
+                : destination,
+            }));
+
+            routeStepsRef.current = steps;
+            currentStepRef.current = 0;
+            routeInfoRef.current = {
+              distanceMeters: leg?.distance?.value || null,
+              distanceText: leg?.distance?.text || "",
+              durationSeconds: leg?.duration?.value || null,
+              durationText: leg?.duration?.text || "",
+              nextInstruction: steps[0]?.instruction || "Seguí la ruta",
+              nextManeuverDistanceMeters: steps[0]?.distanceMeters || null,
+              currentStepIndex: 0,
+            };
+            onRouteInfoRef.current?.(routeInfoRef.current);
+
+            if (followDriverRef.current && driverPos && mapRef.current) {
+              mapRef.current.panTo({ lat: driverPos.lat, lng: driverPos.lng });
+              mapRef.current.setZoom(navigationZoom);
+            }
+          } else {
             dirRendererRef.current.set("directions", null);
             polylineRef.current.setPath([origin, destination]);
             polylineRef.current.setVisible(true);
+            routeInfoRef.current = null;
+            routeStepsRef.current = [];
+            onRouteInfoRef.current?.(null);
           }
         }
       );
       return;
     }
+
     polylineRef.current.setVisible(false);
     dirRendererRef.current.set("directions", null);
-  }, [origin, destination, path]);
+    routeInfoRef.current = null;
+    routeStepsRef.current = [];
+    onRouteInfoRef.current?.(null);
+  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, pathKey, status, navigationZoom]);
 
-  // Recenter — also fires when map becomes ready so initial centering works
+  // Explicit recenter for non-navigation maps.
   useEffect(() => {
-    if (mapRef.current && recenter && status === "ready") mapRef.current.panTo(recenter);
-  }, [recenter, status]);
+    if (mapRef.current && recenter && status === "ready" && !followDriver) {
+      mapRef.current.panTo(recenter);
+    }
+  }, [recenter?.lat, recenter?.lng, status, followDriver]);
 
-  // Detect gm_authFailure that fires AFTER the map already loaded
+  // Detect gm_authFailure that fires after map load.
   useEffect(() => {
     if (status !== "ready") return;
     const check = setInterval(() => {
       const authFail = getAuthFailure();
       if (authFail) {
-        console.error("[MapView] gm_authFailure detectado post-carga:", authFail);
         setErrorMsg(authFail);
         setStatus("error");
       }
@@ -253,39 +464,56 @@ export default function MapView({
     return () => clearInterval(check);
   }, [status]);
 
-  // Click handler
+  // Click handler.
   useEffect(() => {
     const g = window.google?.maps;
-    if (!g || !mapRef.current || !interactive || !onMapClick) return;
-    const handler = (e) => onMapClick({ lat: e.latLng.lat(), lng: e.latLng.lng() });
-    const listener = g.event.addListener(mapRef.current, "click", handler);
+    if (!g || !mapRef.current || !interactive || !onMapClick || status !== "ready") return;
+    const listener = g.event.addListener(mapRef.current, "click", (event) => {
+      onMapClick({ lat: event.latLng.lat(), lng: event.latLng.lng() });
+    });
     return () => g.event.removeListener(listener);
-  }, [onMapClick, interactive]);
+  }, [onMapClick, interactive, status]);
+
+  const resumeFollow = () => {
+    setFollowSuspended(false);
+    if (driverPos && mapRef.current) {
+      mapRef.current.panTo({ lat: driverPos.lat, lng: driverPos.lng });
+      mapRef.current.setZoom(navigationZoom);
+    }
+  };
 
   return (
     <div className={className} style={{ background: "#0e1320" }}>
-      {/* Contenedor del mapa siempre presente en el DOM */}
-      <div
-        ref={containerRef}
-        className="absolute inset-0"
-        style={{ background: "#0e1320" }}
-      />
+      <div ref={containerRef} className="absolute inset-0" style={{ background: "#0e1320" }} />
 
-      {/* Overlay de loading */}
+      {followDriver && followSuspended && status === "ready" && (
+        <button
+          type="button"
+          onClick={resumeFollow}
+          className="absolute right-3 top-[calc(env(safe-area-inset-top)+5rem)] z-20 flex items-center gap-2 rounded-full bg-[#181E2F]/95 px-3 py-2 text-xs font-semibold text-white shadow-lg border border-white/10 active:scale-95 transition"
+          aria-label="Volver a seguir mi ubicación"
+        >
+          <Navigation className="w-4 h-4 text-accent" />
+          Recentrar
+        </button>
+      )}
+
       {status === "loading" && (
         <div className="absolute inset-0 z-10 bg-[#0e1320] flex flex-col items-center justify-center gap-3">
           <div className="w-8 h-8 border-4 border-secondary border-t-accent rounded-full animate-spin" />
           <p className="text-xs text-white/50">{debugInfo}</p>
           <button
-            onClick={() => { resetSdkPromise(); setDebugInfo("Reintentando desde cero..."); setStatus("loading"); setRetryKey((k) => k + 1); }}
+            onClick={() => {
+              resetSdkPromise();
+              setDebugInfo("Reintentando desde cero...");
+              setStatus("loading");
+              setRetryKey((key) => key + 1);
+            }}
             className="text-xs text-accent underline font-medium mt-2"
           >
             Forzar reintentar
           </button>
-          <button
-            onClick={() => setShowDebug(!showDebug)}
-            className="text-[10px] text-white/30 underline"
-          >
+          <button onClick={() => setShowDebug(!showDebug)} className="text-[10px] text-white/30 underline">
             {showDebug ? "Ocultar debug" : "Ver debug"}
           </button>
           {showDebug && (
@@ -299,24 +527,24 @@ export default function MapView({
         </div>
       )}
 
-      {/* Overlay de error */}
       {status === "error" && (
         <div className="absolute inset-0 z-10 bg-[#0e1320] flex flex-col items-center justify-center gap-3 p-6 text-center">
           <AlertTriangle className="w-10 h-10 text-red-400/70" />
           <p className="text-sm text-white/70 font-medium">No pudimos cargar el mapa</p>
-          {errorMsg && (
-            <p className="text-xs text-white/50 max-w-xs leading-relaxed">{errorMsg}</p>
-          )}
+          {errorMsg && <p className="text-xs text-white/50 max-w-xs leading-relaxed">{errorMsg}</p>}
           <button
-            onClick={() => { resetSdkPromise(); setErrorMsg(""); setDebugInfo("Reintentando desde cero..."); setStatus("loading"); setRetryKey((k) => k + 1); }}
+            onClick={() => {
+              resetSdkPromise();
+              setErrorMsg("");
+              setDebugInfo("Reintentando desde cero...");
+              setStatus("loading");
+              setRetryKey((key) => key + 1);
+            }}
             className="text-xs text-accent underline mt-1 font-medium"
           >
             Reintentar
           </button>
-          <button
-            onClick={() => setShowDebug(!showDebug)}
-            className="text-[10px] text-white/30 underline"
-          >
+          <button onClick={() => setShowDebug(!showDebug)} className="text-[10px] text-white/30 underline">
             {showDebug ? "Ocultar debug" : "Ver debug"}
           </button>
           {showDebug && (
@@ -329,8 +557,6 @@ export default function MapView({
           )}
         </div>
       )}
-
-
     </div>
   );
 }

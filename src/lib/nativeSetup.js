@@ -9,15 +9,18 @@ export async function initNative() {
   if (!Capacitor.isNativePlatform()) return;
 
   try {
-    await StatusBar.setStyle({ style: Style.Dark });
+    // El WebView queda debajo de las barras del sistema para evitar que contenido,
+    // botones o mapas queden ocultos bajo la barra de estado en distintos equipos.
+    await StatusBar.setOverlaysWebView({ overlay: false });
+    await StatusBar.setStyle({ style: Style.Light });
     await StatusBar.setBackgroundColor({ color: "#181E2F" });
   } catch (e) {
     console.warn("[nativeSetup] StatusBar no disponible:", e);
   }
 
   try {
-    // Oculta la splash screen una vez que React terminó de montar
-    await SplashScreen.hide({ fadeOutDuration: 300 });
+    // Oculta la splash screen una vez que React terminó de montar.
+    await SplashScreen.hide({ fadeOutDuration: 250 });
   } catch (e) {
     console.warn("[nativeSetup] SplashScreen no disponible:", e);
   }

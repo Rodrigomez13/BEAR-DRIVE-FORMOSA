@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#181E2F</color>
+    <color name="beardrive_navy">#181E2F</color>
+    <color name="beardrive_gold">#E9B74E</color>
+    <color name="beardrive_gold_dark">#C7963C</color>
+    <color name="beardrive_gold_light">#EECD84</color>
+</resources>
