@@ -31,16 +31,16 @@ const DARK_MAP_STYLES = [
 ];
 
 function originIcon(g) {
-  return { path: g.SymbolPath.CIRCLE, scale: 11, fillColor: "#181E2F", fillOpacity: 1, strokeColor: "#E9B74E", strokeWeight: 3, labelOrigin: new g.Point(0, -16) };
+  return { path: g.maps.SymbolPath.CIRCLE, scale: 11, fillColor: "#181E2F", fillOpacity: 1, strokeColor: "#E9B74E", strokeWeight: 3, labelOrigin: new g.maps.Point(0, -16) };
 }
 function destinationIcon(g) {
-  return { path: g.SymbolPath.CIRCLE, scale: 11, fillColor: "#E9B74E", fillOpacity: 1, strokeColor: "#181E2F", strokeWeight: 3, labelOrigin: new g.Point(0, -16) };
+  return { path: g.maps.SymbolPath.CIRCLE, scale: 11, fillColor: "#E9B74E", fillOpacity: 1, strokeColor: "#181E2F", strokeWeight: 3, labelOrigin: new g.maps.Point(0, -16) };
 }
 function carIcon(g) {
   return {
     path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z",
     scale: 1.6, fillColor: "#E9B74E", fillOpacity: 1, strokeColor: "#181E2F", strokeWeight: 1.5,
-    anchor: new g.Point(12, 22),
+    anchor: new g.maps.Point(12, 22),
   };
 }
 
