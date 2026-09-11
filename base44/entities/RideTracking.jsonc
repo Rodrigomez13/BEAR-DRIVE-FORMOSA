@@ -1,0 +1,117 @@
+{
+  "name": "RideTracking",
+  "type": "object",
+  "properties": {
+    "ride_id": {
+      "type": "string"
+    },
+    "driver_id": {
+      "type": "string"
+    },
+    "passenger_id": {
+      "type": "string"
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["pickup", "destination"]
+    },
+    "lat": {
+      "type": "number"
+    },
+    "lng": {
+      "type": "number"
+    },
+    "heading": {
+      "type": "number"
+    },
+    "speed": {
+      "type": "number"
+    },
+    "accuracy": {
+      "type": "number"
+    },
+    "eta_seconds": {
+      "type": "integer"
+    },
+    "distance_meters": {
+      "type": "integer"
+    },
+    "route_polyline": {
+      "type": "string",
+      "description": "Polyline/ruta vigente serializada. Sólo cambia cuando Navigation SDK recalcula la ruta."
+    },
+    "route_version": {
+      "type": "integer",
+      "default": 0
+    },
+    "sequence": {
+      "type": "integer",
+      "default": 0
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "ride_id",
+    "driver_id",
+    "passenger_id",
+    "phase",
+    "lat",
+    "lng"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "data.driver_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "data.driver_id": "{{user.id}}"
+        },
+        {
+          "data.passenger_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.driver_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.driver_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
