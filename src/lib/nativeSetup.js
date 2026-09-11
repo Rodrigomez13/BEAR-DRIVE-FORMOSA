@@ -1,14 +1,19 @@
 // Inicialización de plugins nativos de Capacitor.
-// En web (navegador) los plugins no hacen nada (no-op), así que esto es seguro
-// tanto en el preview web como dentro del APK Android.
-import { Capacitor } from "@capacitor/core";
-import { StatusBar, Style } from "@capacitor/status-bar";
-import { SplashScreen } from "@capacitor/splash-screen";
-
+// Usa imports dinámicos con @vite-ignore para que el build web no falle
+// cuando los paquetes nativos no están instalados. En el APK (donde sí lo están)
+// los imports se resuelven en runtime y los plugins se aplican normalmente.
 export async function initNative() {
-  if (!Capacitor.isNativePlatform()) return;
+  let Capacitor;
+  try {
+    Capacitor = await import(/* @vite-ignore */ "@capacitor/core");
+  } catch {
+    return; // Capacitor no disponible (web) — no-op
+  }
+
+  if (!Capacitor?.isNativePlatform?.()) return;
 
   try {
+    const { StatusBar, Style } = await import(/* @vite-ignore */ "@capacitor/status-bar");
     await StatusBar.setStyle({ style: Style.Dark });
     await StatusBar.setBackgroundColor({ color: "#181E2F" });
   } catch (e) {
@@ -16,7 +21,7 @@ export async function initNative() {
   }
 
   try {
-    // Oculta la splash screen una vez que React terminó de montar
+    const { SplashScreen } = await import(/* @vite-ignore */ "@capacitor/splash-screen");
     await SplashScreen.hide({ fadeOutDuration: 300 });
   } catch (e) {
     console.warn("[nativeSetup] SplashScreen no disponible:", e);

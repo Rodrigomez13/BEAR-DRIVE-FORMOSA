@@ -17,6 +17,7 @@ import BearAvatar from "@/components/bear/BearAvatar";
 import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown } from "lucide-react";
 import { Image } from "@/components/ui/image";
 import { BEAR_LOGO_MARK } from "@/lib/brandAssets";
+import { motion } from "framer-motion";
 
 const CATEGORIES = [
   { code: "basic", name: "BearDrive", desc: "Servicio estándar" },
@@ -348,7 +349,7 @@ export default function PassengerViajar() {
         <>
           <div className="max-w-md mx-auto px-4 pt-6 pb-8">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4 animate-pop-in">
                 <CheckCircle2 className="w-8 h-8 text-green-600" />
               </div>
               <h1 className="text-2xl font-bold">¡Viaje completado!</h1>
@@ -406,8 +407,8 @@ export default function PassengerViajar() {
           interactive={false}
           className="absolute inset-0"
         />
-        <div className="absolute inset-x-0 bottom-0 z-10 p-3">
-          <Card className="rounded-2xl p-4 max-w-md mx-auto">
+        <div className="absolute inset-x-0 bottom-0 z-10 p-3 animate-slide-up">
+          <Card className="rounded-2xl p-4 max-w-md mx-auto shadow-xl shadow-black/20 ring-1 ring-black/5">
             {status === "SEARCHING" && (
               <div className="text-center py-2">
                 <Loader2 className="w-10 h-10 animate-spin text-accent mx-auto mb-3" />
@@ -445,7 +446,7 @@ export default function PassengerViajar() {
                   </div>
                 </div>
                 {status === "DRIVER_ARRIVED" && (
-                  <div className="bg-accent/10 rounded-xl p-4 text-center mb-3">
+                  <div className="bg-accent/10 rounded-xl p-4 text-center mb-3 animate-pop-in ring-1 ring-accent/20">
                     <p className="text-sm text-muted-foreground mb-1">Tu conductor llegó. Compartile este PIN:</p>
                     <p className="text-3xl font-extrabold tracking-[0.5em] text-accent">{activeRide.start_pin}</p>
                   </div>
@@ -506,59 +507,77 @@ export default function PassengerViajar() {
       />
 
       {/* Top header */}
-      <div className="absolute inset-x-0 top-0 z-10 p-3 safe-top">
-        <div className="max-w-md mx-auto flex items-center gap-3 px-4 py-2.5 rounded-2xl glass-navy">
-          <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0">
+      <motion.div
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="absolute inset-x-0 top-0 z-10 p-3 safe-top"
+      >
+        <div className="max-w-md mx-auto flex items-center gap-3 px-4 py-2.5 rounded-2xl glass-navy ring-1 ring-accent/10 shadow-lg shadow-black/20">
+          <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 ring-1 ring-accent/20">
             <Image src={BEAR_LOGO_MARK} fittingType="fit" className="block w-full h-full" />
           </div>
           <div className="leading-none">
-            <p className="text-sm font-bold text-white">Bear<span className="text-accent">Drive</span></p>
-            <p className="text-[10px] text-white/60 mt-0.5">Formosa</p>
+            <p className="text-sm font-bold text-white tracking-tight">Bear<span className="text-accent">Drive</span></p>
+            <p className="text-[10px] text-white/60 mt-0.5 tracking-wide">Formosa</p>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* GPS button */}
-      <button onClick={handleGPS} className="absolute right-4 bottom-[420px] z-10 w-11 h-11 rounded-full bg-card shadow-lg flex items-center justify-center hover:bg-secondary">
+      <motion.button
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.2, type: "spring", stiffness: 300, damping: 20 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={handleGPS}
+        className="absolute right-4 bottom-[420px] z-10 w-11 h-11 rounded-full bg-card shadow-lg shadow-black/30 ring-1 ring-accent/20 flex items-center justify-center hover:bg-secondary transition-colors"
+      >
         <Crosshair className="w-5 h-5 text-accent" />
-      </button>
+      </motion.button>
 
       {/* Bottom panel with search + collapsibles + quote */}
-      <div className="absolute inset-x-0 bottom-0 z-10 p-3">
-        <Card className="rounded-2xl p-4 max-w-md mx-auto">
+      <div className="absolute inset-x-0 bottom-0 z-10 p-3 animate-slide-up">
+        <Card className="rounded-2xl p-4 max-w-md mx-auto shadow-xl shadow-black/20 ring-1 ring-black/5">
           {quote ? (
             <div>
               <div className="text-center mb-4">
                 <p className="text-sm text-muted-foreground">Precio del viaje</p>
-                <p className="text-4xl font-extrabold text-accent">{formatPrice(quote.price)}</p>
+                <p className="text-4xl font-extrabold gold-text-gradient">{formatPrice(quote.price)}</p>
                 <p className="text-xs text-muted-foreground mt-1">{quote.distance_km} km · {quote.duration_min} min</p>
               </div>
               <div className="flex gap-2 mb-3">
-                {CATEGORIES.map((c) => (
-                  <button
+                {CATEGORIES.map((c, i) => (
+                  <motion.button
                     key={c.code}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 * i }}
+                    whileTap={{ scale: 0.96 }}
                     onClick={() => setCategory(c.code)}
-                    className={`flex-1 p-2.5 rounded-xl text-center transition-colors ${category === c.code ? "bear-gradient text-white" : "bg-secondary text-muted-foreground"}`}
+                    className={`flex-1 p-2.5 rounded-xl text-center transition-colors ${category === c.code ? "bear-gradient text-white shadow-md shadow-accent/20" : "bg-secondary text-muted-foreground"}`}
                   >
                     <p className="text-xs font-semibold">{c.name}</p>
                     <p className="text-[10px] opacity-70">{c.desc}</p>
-                  </button>
+                  </motion.button>
                 ))}
               </div>
               <div className="flex gap-2 mb-4">
-                <button onClick={() => setPaymentMethod("cash")} className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${paymentMethod === "cash" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+                <motion.button whileTap={{ scale: 0.96 }} onClick={() => setPaymentMethod("cash")} className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${paymentMethod === "cash" ? "bear-gold-gradient text-foreground shadow-md shadow-accent/20" : "bg-secondary text-muted-foreground"}`}>
                   <Banknote className="w-4 h-4" />Efectivo
-                </button>
-                <button onClick={() => setPaymentMethod("qr")} className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${paymentMethod === "qr" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+                </motion.button>
+                <motion.button whileTap={{ scale: 0.96 }} onClick={() => setPaymentMethod("qr")} className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${paymentMethod === "qr" ? "bear-gold-gradient text-foreground shadow-md shadow-accent/20" : "bg-secondary text-muted-foreground"}`}>
                   <QrCode className="w-4 h-4" />QR
-                </button>
-                <button onClick={() => setPaymentMethod("card")} className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${paymentMethod === "card" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+                </motion.button>
+                <motion.button whileTap={{ scale: 0.96 }} onClick={() => setPaymentMethod("card")} className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${paymentMethod === "card" ? "bear-gold-gradient text-foreground shadow-md shadow-accent/20" : "bg-secondary text-muted-foreground"}`}>
                   <CreditCard className="w-4 h-4" />Tarjeta
-                </button>
+                </motion.button>
               </div>
-              <Button onClick={handleRequestRide} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold">
-                Solicitar viaje
-              </Button>
+              <motion.div whileTap={{ scale: 0.98 }}>
+                <Button onClick={handleRequestRide} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold animate-pulse-glow">
+                  Solicitar viaje
+                </Button>
+              </motion.div>
               <Button variant="ghost" onClick={() => setQuote(null)} className="w-full text-sm mt-1">Cambiar destino</Button>
             </div>
           ) : (
@@ -655,9 +674,11 @@ export default function PassengerViajar() {
               </div>
 
               {origin && destination && (
-                <Button onClick={handleQuote} disabled={quoteLoading} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold">
-                  {quoteLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cotizando...</> : "Cotizar viaje"}
-                </Button>
+                <motion.div whileTap={{ scale: 0.98 }}>
+                  <Button onClick={handleQuote} disabled={quoteLoading} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold animate-pulse-glow">
+                    {quoteLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cotizando...</> : "Cotizar viaje"}
+                  </Button>
+                </motion.div>
               )}
                 </>
               )}
