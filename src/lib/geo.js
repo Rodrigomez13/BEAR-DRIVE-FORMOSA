@@ -9,7 +9,10 @@ function formatAddressFromResult(result) {
   for (const c of comps) {
     if (c.types.includes("route")) street = c.short_name || c.long_name;
     if (c.types.includes("street_number")) number = c.long_name;
-    if (c.types.includes("locality")) city = c.long_name;
+    if (c.types.includes("locality")) {
+      // Skip Argentine postal codes that Google sometimes returns as locality (e.g. P3600ACI)
+      if (!/^[A-Z]\d{4}/.test(c.long_name)) city = c.long_name;
+    }
     if (!city && c.types.includes("administrative_area_level_2")) city = c.long_name;
     if (!city && c.types.includes("administrative_area_level_3")) city = c.long_name;
     if (!city && c.types.includes("sublocality")) city = c.long_name;
