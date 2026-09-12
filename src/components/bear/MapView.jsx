@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { loadMapsSDK, getAuthFailure, resetSdkPromise } from "@/lib/mapsConfig";
+import { getCachedRoute, setCachedRoute } from "@/lib/routeCache";
 import { AlertTriangle, Navigation } from "lucide-react";
 
 const DARK_MAP_STYLES = [
@@ -489,6 +490,39 @@ export default function MapView({
     if (effectiveOrigin && destination) {
       polylineRef.current.setVisible(false);
       dirRendererRef.current.setOptions({ preserveViewport: followDriverRef.current });
+
+      // Apply extracted route data (from cache or API) to refs + polyline + camera.
+      const applyRouteData = (fullPath, steps, routePolylinePoints, info) => {
+        fullRoutePathRef.current = fullPath;
+        const currentDriverPos = driverPosRef.current;
+        const trimIndex = currentDriverPos ? nearestPointIndex(fullPath, currentDriverPos) : 0;
+        const trimmed =
+          trimIndex > 0 && currentDriverPos
+            ? [{ lat: currentDriverPos.lat, lng: currentDriverPos.lng }, ...fullPath.slice(trimIndex)]
+            : fullPath;
+        polylineRef.current.setPath(trimmed);
+        polylineRef.current.setVisible(true);
+        routePolylineRef.current = routePolylinePoints;
+        recalculatingRef.current = false;
+        routeStepsRef.current = steps;
+        currentStepRef.current = 0;
+        routeInfoRef.current = info;
+        onRouteInfoRef.current?.(info);
+        if (followDriverRef.current && driverPos && mapRef.current) {
+          mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, tiltRef.current, headingRef.current));
+          mapRef.current.setZoom(navigationZoom);
+        }
+      };
+
+      // 1. Check local cache before hitting the Directions API.
+      const cached = getCachedRoute(effectiveOrigin, destination);
+      if (cached) {
+        dirRendererRef.current.set("directions", null);
+        applyRouteData(cached.fullPath, cached.steps, cached.routePolyline, cached.routeInfo);
+        return;
+      }
+
+      // 2. Cache miss — call Google Directions API and store the result.
       dirServiceRef.current.route(
         { origin: effectiveOrigin, destination, travelMode: g.TravelMode.DRIVING },
         (result, routeStatus) => {
@@ -499,18 +533,7 @@ export default function MapView({
             const fullPath =
               overviewPath && overviewPath.length > 0
                 ? overviewPath.map((p) => ({ lat: p.lat(), lng: p.lng() }))
-                : [origin, destination];
-            fullRoutePathRef.current = fullPath;
-
-            // Trim to the driver's current position so the line starts at the car.
-            const currentDriverPos = driverPosRef.current;
-            const trimIndex = currentDriverPos ? nearestPointIndex(fullPath, currentDriverPos) : 0;
-            const trimmed =
-              trimIndex > 0 && currentDriverPos
-                ? [{ lat: currentDriverPos.lat, lng: currentDriverPos.lng }, ...fullPath.slice(trimIndex)]
-                : fullPath;
-            polylineRef.current.setPath(trimmed);
-            polylineRef.current.setVisible(true);
+                : [effectiveOrigin, destination];
             const steps = (leg?.steps || []).map((step) => ({
               instruction: stripHtml(step.instructions) || "Seguí la ruta",
               maneuver: step.maneuver || "",
@@ -521,17 +544,15 @@ export default function MapView({
             }));
 
             const overviewPolyline = result.routes?.[0]?.overview_polyline;
+            let routePolylinePoints;
             if (overviewPolyline && g.geometry?.encoding) {
-              routePolylineRef.current = g.geometry.encoding
+              routePolylinePoints = g.geometry.encoding
                 .decodePath(overviewPolyline)
                 .map((p) => ({ lat: p.lat(), lng: p.lng() }));
             } else {
-              routePolylineRef.current = steps.map((s) => s.end);
+              routePolylinePoints = steps.map((s) => s.end);
             }
-            recalculatingRef.current = false;
-            routeStepsRef.current = steps;
-            currentStepRef.current = 0;
-            routeInfoRef.current = {
+            const info = {
               distanceMeters: leg?.distance?.value || null,
               distanceText: leg?.distance?.text || "",
               durationSeconds: leg?.duration?.value || null,
@@ -543,11 +564,16 @@ export default function MapView({
               afterNextInstruction: steps[1]?.instruction || "",
               afterNextManeuver: steps[1]?.maneuver || "",
             };
-            onRouteInfoRef.current?.(routeInfoRef.current);
-
-            if (followDriverRef.current && driverPos && mapRef.current) {
-              mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, tiltRef.current, headingRef.current));
-              mapRef.current.setZoom(navigationZoom);
+            applyRouteData(fullPath, steps, routePolylinePoints, info);
+            // Only cache original OD pairs — deviated recalculation positions are
+            // arbitrary and would pollute the cache with low-value entries.
+            if (!deviatedOrigin) {
+              setCachedRoute(effectiveOrigin, destination, {
+                fullPath,
+                steps,
+                routePolyline: routePolylinePoints,
+                routeInfo: info,
+              });
             }
           } else {
             recalculatingRef.current = false;
