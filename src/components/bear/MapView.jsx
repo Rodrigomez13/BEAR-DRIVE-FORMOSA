@@ -161,6 +161,10 @@ export default function MapView({
   const currentStepRef = useRef(0);
   const fullRoutePathRef = useRef([]);
   const driverPosRef = useRef(null);
+  const routePolylineRef = useRef([]);
+  const lastRecalcRef = useRef(0);
+  const recalculatingRef = useRef(false);
+  const [deviatedOrigin, setDeviatedOrigin] = useState(null);
 
   const [status, setStatus] = useState("loading");
   const [errorMsg, setErrorMsg] = useState("");
@@ -446,12 +450,28 @@ export default function MapView({
         afterNextManeuver: steps[stepIndex + 1]?.maneuver || "",
       });
     }
+
+    // Event-driven route recalculation: only when the driver deviates >50m from
+    // the route polyline (Gemini recommendation: no timer-based recalculation).
+    if (followDriver && routePolylineRef.current.length > 2 && !recalculatingRef.current) {
+      const minDist = routePolylineRef.current.reduce(
+        (min, p) => Math.min(min, haversineMeters(driverPos, p)),
+        Infinity
+      );
+      if (minDist > 50 && Date.now() - lastRecalcRef.current > 10000) {
+        lastRecalcRef.current = Date.now();
+        recalculatingRef.current = true;
+        setDeviatedOrigin({ lat: driverPos.lat, lng: driverPos.lng });
+      }
+    }
   }, [driverPos?.lat, driverPos?.lng, driverPos?.heading, followDriver, followSuspended, navigationZoom, tilt, heading, status, markerAnimationDuration]);
 
   // Update route only when endpoints/path actually change. Driver GPS updates do not trigger route API calls.
   useEffect(() => {
     const g = window.google?.maps;
     if (!g || !mapRef.current || !dirServiceRef.current || status !== "ready") return;
+
+    const effectiveOrigin = deviatedOrigin || origin;
 
     if (path && path.length >= 2) {
       dirRendererRef.current.set("directions", null);
@@ -461,15 +481,16 @@ export default function MapView({
       polylineRef.current.setVisible(true);
       routeInfoRef.current = null;
       routeStepsRef.current = [];
+      routePolylineRef.current = [];
       onRouteInfoRef.current?.(null);
       return;
     }
 
-    if (origin && destination) {
+    if (effectiveOrigin && destination) {
       polylineRef.current.setVisible(false);
       dirRendererRef.current.setOptions({ preserveViewport: followDriverRef.current });
       dirServiceRef.current.route(
-        { origin, destination, travelMode: g.TravelMode.DRIVING },
+        { origin: effectiveOrigin, destination, travelMode: g.TravelMode.DRIVING },
         (result, routeStatus) => {
           if (routeStatus === "OK" && result) {
             dirRendererRef.current.set("directions", null);
@@ -499,6 +520,15 @@ export default function MapView({
                 : destination,
             }));
 
+            const overviewPolyline = result.routes?.[0]?.overview_polyline;
+            if (overviewPolyline && g.geometry?.encoding) {
+              routePolylineRef.current = g.geometry.encoding
+                .decodePath(overviewPolyline)
+                .map((p) => ({ lat: p.lat(), lng: p.lng() }));
+            } else {
+              routePolylineRef.current = steps.map((s) => s.end);
+            }
+            recalculatingRef.current = false;
             routeStepsRef.current = steps;
             currentStepRef.current = 0;
             routeInfoRef.current = {
@@ -520,9 +550,10 @@ export default function MapView({
               mapRef.current.setZoom(navigationZoom);
             }
           } else {
+            recalculatingRef.current = false;
             dirRendererRef.current.set("directions", null);
-            fullRoutePathRef.current = [origin, destination];
-            polylineRef.current.setPath([origin, destination]);
+            fullRoutePathRef.current = [effectiveOrigin, destination];
+            polylineRef.current.setPath([effectiveOrigin, destination]);
             polylineRef.current.setVisible(true);
             routeInfoRef.current = null;
             routeStepsRef.current = [];
@@ -538,8 +569,15 @@ export default function MapView({
     fullRoutePathRef.current = [];
     routeInfoRef.current = null;
     routeStepsRef.current = [];
+    routePolylineRef.current = [];
     onRouteInfoRef.current?.(null);
-  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, pathKey, status, navigationZoom]);
+  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, deviatedOrigin?.lat, deviatedOrigin?.lng, pathKey, status, navigationZoom]);
+
+  // Reset deviation tracking when endpoints change (new phase or new route).
+  useEffect(() => {
+    setDeviatedOrigin(null);
+    recalculatingRef.current = false;
+  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng]);
 
   // Explicit recenter for non-navigation maps.
   useEffect(() => {
