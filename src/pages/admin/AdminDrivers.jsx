@@ -7,13 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import StarRating from "@/components/bear/StarRating";
-import { CheckCircle2, XCircle, Loader2, FileText, Car, User, Clock, MoreHorizontal, Search } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, FileText, Car, User, Clock, MoreHorizontal, Search, Pause, Play } from "lucide-react";
 import { businessDaysUntil } from "@/lib/businessDays";
 import LoadingScreen from "@/components/bear/LoadingScreen";
 
 const STATUS_LABELS = {
   DRAFT: "Borrador", SUBMITTED: "Enviada", UNDER_REVIEW: "En revisión",
-  APPROVED: "Aprobada", REJECTED: "Rechazada", MORE_INFO_REQUIRED: "Más info",
+  APPROVED: "Activa", REJECTED: "Rechazada", MORE_INFO_REQUIRED: "Más info", SUSPENDED: "Suspendida",
 };
 
 export default function AdminDrivers() {
@@ -90,6 +90,20 @@ export default function AdminDrivers() {
     }
   };
 
+  // One-click suspend / reactivate from the list
+  const handleStatusToggle = async (app, action) => {
+    try {
+      await base44.functions.invoke("reviewDriverApplication", {
+        application_id: app.id, action,
+      });
+      toast({ title: action === "suspend" ? "Conductor suspendido" : "Conductor reactivado" });
+      const data = await base44.entities.DriverApplication.filter({}, "-created_date", 100);
+      setApplications(data);
+    } catch (err) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
   const matchesSearch = (a) => !searchQuery ||
     `${a.first_name} ${a.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (a.applicant_email || "").toLowerCase().includes(searchQuery.toLowerCase());
@@ -100,7 +114,8 @@ export default function AdminDrivers() {
     if (!matchesSearch(a)) return false;
     if (statusFilter === "all") return true;
     if (statusFilter === "pending") return ["SUBMITTED", "UNDER_REVIEW"].includes(a.status);
-    if (statusFilter === "approved") return a.status === "APPROVED";
+    if (statusFilter === "active") return a.status === "APPROVED";
+    if (statusFilter === "suspended") return a.status === "SUSPENDED";
     if (statusFilter === "rejected") return a.status === "REJECTED";
     return true;
   });
@@ -224,7 +239,8 @@ export default function AdminDrivers() {
           {[
             { key: "all", label: "Todos" },
             { key: "pending", label: "Pendientes" },
-            { key: "approved", label: "Aprobados" },
+            { key: "active", label: "Activos" },
+            { key: "suspended", label: "Suspendidos" },
             { key: "rejected", label: "Rechazados" },
           ].map(tab => (
             <button
@@ -281,9 +297,21 @@ export default function AdminDrivers() {
                 <p className="text-sm font-medium">{app.first_name} {app.last_name}</p>
                 <p className="text-[14px] text-muted-foreground">{app.applicant_email}</p>
               </div>
-              <span className={`text-[14px] font-semibold px-2 py-1 rounded-full ${app.status === "APPROVED" ? "bg-green-100 text-green-700" : app.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-secondary text-muted-foreground"}`}>
-                {STATUS_LABELS[app.status] || app.status}
-              </span>
+              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                <span className={`text-[14px] font-semibold px-2 py-1 rounded-full ${app.status === "APPROVED" ? "bg-green-100 text-green-700" : app.status === "SUSPENDED" ? "bg-orange-100 text-orange-700" : app.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-secondary text-muted-foreground"}`}>
+                  {STATUS_LABELS[app.status] || app.status}
+                </span>
+                {app.status === "APPROVED" && (
+                  <button onClick={() => handleStatusToggle(app, "suspend")} className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600 shrink-0 no-select" title="Suspender">
+                    <Pause className="w-4 h-4" />
+                  </button>
+                )}
+                {app.status === "SUSPENDED" && (
+                  <button onClick={() => handleStatusToggle(app, "reactivate")} className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center hover:bg-green-700 shrink-0 no-select" title="Reactivar">
+                    <Play className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </Card>
           ))}
         </div>

@@ -1,6 +1,6 @@
 {
   "name": "Ride Search Timeout",
-  "description": "Notifica conductores cercanos y mueve viajes en SEARCHING a NO_DRIVERS tras 90s sin conductor",
+  "description": "Notifica conductores cercanos en 3 rondas expansivas (5km, 10km, 15km) y mueve viajes en SEARCHING a NO_DRIVERS tras 90s sin conductor",
   "trigger": {
     "config": {
       "trigger_type": "entity",
@@ -21,28 +21,83 @@
     },
     "do": [
       {
-        "notify_nearby": {
+        "round_1_notify": {
           "call": "invoke_backend_function",
           "with": {
             "function_name": "notifyNearbyDrivers",
             "args": {
-              "ride_id": "${ .trigger.entity_id }"
+              "ride_id": "${ .trigger.entity_id }",
+              "round": 1
             }
           },
-          "then": "wait_timeout",
+          "then": "wait_round_1",
           "x-base44": {
-            "title": "Notificar conductores",
-            "description": "Push a conductores cercanos"
+            "title": "Ronda 1 \u2014 5 km",
+            "description": "Push a los 5 conductores m\u00e1s cercanos"
           }
         }
       },
       {
-        "wait_timeout": {
-          "wait": "PT90S",
+        "wait_round_1": {
+          "wait": "PT30S",
+          "then": "round_2_notify",
+          "x-base44": {
+            "title": "Esperar 30s",
+            "description": "Dar tiempo a que un conductor cercano acepte"
+          }
+        }
+      },
+      {
+        "round_2_notify": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "notifyNearbyDrivers",
+            "args": {
+              "ride_id": "${ .trigger.entity_id }",
+              "round": 2
+            }
+          },
+          "then": "wait_round_2",
+          "x-base44": {
+            "title": "Ronda 2 \u2014 10 km",
+            "description": "Expandir a conductores entre 5 y 10 km"
+          }
+        }
+      },
+      {
+        "wait_round_2": {
+          "wait": "PT30S",
+          "then": "round_3_notify",
+          "x-base44": {
+            "title": "Esperar 30s",
+            "description": "Dar tiempo a que un conductor intermedio acepte"
+          }
+        }
+      },
+      {
+        "round_3_notify": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "notifyNearbyDrivers",
+            "args": {
+              "ride_id": "${ .trigger.entity_id }",
+              "round": 3
+            }
+          },
+          "then": "wait_round_3",
+          "x-base44": {
+            "title": "Ronda 3 \u2014 15 km",
+            "description": "Expandir a todos los conductores restantes hasta 15 km"
+          }
+        }
+      },
+      {
+        "wait_round_3": {
+          "wait": "PT30S",
           "then": "check_and_timeout",
           "x-base44": {
-            "title": "Esperar 90s",
-            "description": "Dar tiempo a que un conductor acepte"
+            "title": "Esperar 30s",
+            "description": "Dar tiempo a la \u00faltima ronda"
           }
         }
       },

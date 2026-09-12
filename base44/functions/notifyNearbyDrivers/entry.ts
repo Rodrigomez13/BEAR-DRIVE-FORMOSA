@@ -11,15 +11,32 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-// System function invoked by the "Ride Search Timeout" workflow when a ride enters SEARCHING.
-// Best-effort push to nearby online drivers. Polling (getNearbyRideRequests) is the fallback
-// if push credentials aren't configured — failures are caught and logged, never thrown.
+// Matching rounds — each round targets a distinct distance band so no driver
+// receives duplicate pushes. Closest drivers are notified first; the search
+// expands outward only if earlier rounds don't produce an acceptance.
+//
+// Round 1 (0–5 km, max 5 drivers):  immediate, closest matches
+// Round 2 (5–10 km, max 10 drivers): first expansion after 30s
+// Round 3 (10–15 km, all):           final expansion after 60s
+const ROUND_CONFIG = {
+  1: { minKm: 0, maxKm: 5, limit: 5 },
+  2: { minKm: 5, maxKm: 10, limit: 10 },
+  3: { minKm: 10, maxKm: 15, limit: null },
+};
+
+// System function invoked by the "Ride Search Timeout" workflow when a ride
+// enters SEARCHING. Best-effort push to nearby online drivers in expanding
+// rounds. Polling (getNearbyRideRequests) is the fallback if push credentials
+// aren't configured — failures are caught and logged, never thrown.
 export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
-    const { ride_id } = body;
+    const { ride_id, round } = body;
     if (!ride_id) return Response.json({ error: "ride_id es obligatorio" }, { status: 400 });
+
+    const roundNum = [1, 2, 3].includes(round) ? round : 1;
+    const config = ROUND_CONFIG[roundNum];
 
     let ride;
     try {
@@ -27,6 +44,7 @@ export default async function(req) {
     } catch {
       return Response.json({ skipped: true, reason: "ride_not_found" });
     }
+    // Skip if a driver already accepted — later rounds are no-ops.
     if (!ride || ride.status !== "SEARCHING") {
       return Response.json({ skipped: true, reason: "not_searching" });
     }
@@ -35,16 +53,21 @@ export default async function(req) {
     }
 
     const onlineDrivers = await base44.asServiceRole.entities.DriverLocation.filter({ online: true });
-    const radius = 15;
 
-    const nearby = onlineDrivers.filter((dl) => {
-      if (dl.lat == null || dl.lng == null) return false;
-      if (dl.driver_id === ride.passenger_id) return false;
-      return haversineKm(ride.origin_lat, ride.origin_lng, dl.lat, dl.lng) <= radius;
-    });
+    // Filter by this round's distance band, sort closest-first.
+    const candidates = onlineDrivers
+      .filter((dl) => dl.lat != null && dl.lng != null && dl.driver_id !== ride.passenger_id)
+      .map((dl) => ({
+        ...dl,
+        _dist: haversineKm(ride.origin_lat, ride.origin_lng, dl.lat, dl.lng),
+      }))
+      .filter((dl) => dl._dist >= config.minKm && dl._dist <= config.maxKm)
+      .sort((a, b) => a._dist - b._dist);
+
+    const toNotify = config.limit ? candidates.slice(0, config.limit) : candidates;
 
     let notified = 0;
-    for (const dl of nearby) {
+    for (const dl of toNotify) {
       try {
         await base44.asServiceRole.integrations.Core.SendPushNotification({
           user_id: dl.driver_id,
@@ -59,7 +82,7 @@ export default async function(req) {
       }
     }
 
-    return Response.json({ notified, considered: nearby.length });
+    return Response.json({ round: roundNum, notified, considered: toNotify.length });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

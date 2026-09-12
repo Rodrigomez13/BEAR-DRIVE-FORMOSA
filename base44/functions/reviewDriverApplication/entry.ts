@@ -14,7 +14,7 @@ export default async function(req) {
     const { application_id, action, reason } = body;
 
     if (!application_id) return Response.json({ error: "application_id es obligatorio" }, { status: 400 });
-    if (!["approve", "reject", "more_info"].includes(action)) {
+    if (!["approve", "reject", "more_info", "suspend", "reactivate"].includes(action)) {
       return Response.json({ error: "Acción inválida" }, { status: 400 });
     }
 
@@ -34,6 +34,16 @@ export default async function(req) {
       driverStatus = "REJECTED";
       capability = "NO_DRIVER";
       logAction = "driver_rejected";
+    } else if (action === "suspend") {
+      newStatus = "SUSPENDED";
+      driverStatus = "SUSPENDED";
+      capability = "SUSPENDED";
+      logAction = "driver_suspended";
+    } else if (action === "reactivate") {
+      newStatus = "APPROVED";
+      driverStatus = "APPROVED";
+      capability = "APPROVED_ELIGIBLE";
+      logAction = "driver_reactivated";
     } else {
       newStatus = "MORE_INFO_REQUIRED";
       driverStatus = "MORE_INFO_REQUIRED";
@@ -47,7 +57,8 @@ export default async function(req) {
       reviewed_by: user.id,
       review_date: now,
       rejection_reason: action === "reject" ? reason : null,
-      more_info_reason: action === "more_info" ? reason : null
+      more_info_reason: action === "more_info" ? reason : null,
+      suspend_reason: action === "suspend" ? (reason || "Suspensión administrativa") : null
     });
 
     // Update user driver status + capability
