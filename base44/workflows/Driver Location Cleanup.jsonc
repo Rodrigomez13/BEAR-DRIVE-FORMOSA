@@ -16,14 +16,14 @@
           "then": "end",
           "x-base44": {
             "title": "Limpiar ubicaciones obsoletas",
-            "description": "Marca offline conductores inactivos"
+            "description": "Marca offline conductores inactivos >5 min y borra registros con >1 hora de inactividad"
           }
         }
       }
     ]
   },
   "name": "Driver Location Cleanup",
-  "description": "Marca offline los conductores que no reportan ubicaci\u00f3n hace m\u00e1s de 5 minutos",
+  "description": "Marca offline conductores inactivos >5 min y elimina registros con >1 hora sin actualizar",
   "trigger": {
     "condition": null,
     "config": {
