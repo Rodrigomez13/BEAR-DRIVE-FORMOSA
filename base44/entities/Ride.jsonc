@@ -130,11 +130,19 @@
     },
     "stripe_session_id": {
       "type": "string",
-      "description": "Stripe Checkout session ID for QR payments"
+      "description": "Stripe Checkout session ID (legacy QR rides)"
     },
     "stripe_payment_intent_id": {
       "type": "string",
       "description": "Stripe PaymentIntent ID for card auto-charges"
+    },
+    "mp_preference_id": {
+      "type": "string",
+      "description": "Mercado Pago preference ID for QR payments"
+    },
+    "payment_checkout_url": {
+      "type": "string",
+      "description": "Checkout URL for QR payments (MP init_point or Stripe URL)"
     },
     "idempotency_key": {
       "type": "string"

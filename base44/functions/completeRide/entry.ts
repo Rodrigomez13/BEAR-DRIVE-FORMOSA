@@ -140,51 +140,64 @@ export default async function(req) {
       });
     }
 
-    // --- QR: create Checkout Session for passenger to pay ---
+    // --- QR: create Mercado Pago preference for passenger to pay ---
     if (ride.payment_method === "qr") {
       const origin = new URL(req.url).origin;
-      const amountInCents = Math.round(fare * 100);
-
-      const params = new URLSearchParams();
-      params.append("mode", "payment");
-      params.append("success_url", `${origin}/passenger?payment=success&ride=${ride_id}`);
-      params.append("cancel_url", `${origin}/passenger?payment=cancelled&ride=${ride_id}`);
-      params.append("line_items[0][quantity]", "1");
-      params.append("line_items[0][price_data][currency]", "ars");
-      params.append("line_items[0][price_data][unit_amount]", String(amountInCents));
-      params.append("line_items[0][price_data][product_data][name]", "Viaje BearDrive");
-      params.append("line_items[0][price_data][product_data][description]", `${ride.origin_address || ""} → ${ride.destination_address || ""}`);
-      params.append("metadata[ride_id]", ride_id);
-      params.append("metadata[base44_app_id]", secrets.get("BASE44_APP_ID") || "");
-      params.append("payment_intent_data[metadata][ride_id]", ride_id);
-      params.append("payment_intent_data[metadata][base44_app_id]", secrets.get("BASE44_APP_ID") || "");
-
-      const sessionRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${secrets.get("STRIPE_SECRET_KEY")}`,
-          "Stripe-Version": "2025-10-29.clover",
-          "Content-Type": "application/x-www-form-urlencoded",
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: params,
-      });
-
-      if (!sessionRes.ok) {
-        const err = await sessionRes.json();
-        console.error("Stripe error creating QR session:", JSON.stringify(err));
-        return Response.json({ error: err.error?.message }, { status: 500 });
+      const mpToken = secrets.get("MERCADO_PAGO_ACCESS_TOKEN");
+      if (!mpToken) {
+        return Response.json({ error: "Mercado Pago no configurado" }, { status: 500 });
       }
 
-      const session = await sessionRes.json();
+      const preference = {
+        items: [{
+          title: "Viaje BearDrive",
+          description: `${ride.origin_address || ""} → ${ride.destination_address || ""}`,
+          quantity: 1,
+          unit_price: fare,
+          currency_id: "ARS",
+        }],
+        metadata: {
+          ride_id: ride_id,
+          base44_app_id: secrets.get("BASE44_APP_ID") || "",
+        },
+        back_urls: {
+          success: `${origin}/passenger?payment=success&ride=${ride_id}`,
+          failure: `${origin}/passenger?payment=cancelled&ride=${ride_id}`,
+          pending: `${origin}/passenger?payment=pending&ride=${ride_id}`,
+        },
+        auto_return: "approved",
+        statement_descriptor: "BEARDRIVE",
+        payment_methods: {
+          installments: 1,
+        },
+      };
+
+      const mpRes = await fetch("https://api.mercadopago.com/checkout/preferences", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${mpToken}`,
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: JSON.stringify(preference),
+      });
+
+      if (!mpRes.ok) {
+        const err = await mpRes.json();
+        console.error("MP error creating preference:", JSON.stringify(err));
+        return Response.json({ error: err.message || "Error al crear preferencia de Mercado Pago" }, { status: 500 });
+      }
+
+      const mpData = await mpRes.json();
       await base44.asServiceRole.entities.Ride.update(ride_id, {
-        stripe_session_id: session.id,
+        mp_preference_id: mpData.id,
+        payment_checkout_url: mpData.init_point,
       });
 
       return Response.json({
         payment_status: "qr_pending",
-        checkout_url: session.url,
-        session_id: session.id,
+        checkout_url: mpData.init_point,
+        preference_id: mpData.id,
       });
     }
 

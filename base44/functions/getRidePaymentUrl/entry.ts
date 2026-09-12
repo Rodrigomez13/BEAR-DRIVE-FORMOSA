@@ -1,9 +1,10 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { secrets } from 'base44:runtime';
 
-// Retrieves the Stripe Checkout URL for a ride with a pending QR payment.
-// The driver generated the QR (via completeRide), and the passenger uses
-// this URL to pay via Stripe Checkout. The webhook confirms completion.
+// Retrieves the checkout URL for a ride with a pending QR payment.
+// For Mercado Pago rides, the URL is stored directly on the ride
+// (payment_checkout_url) when the preference was created.
+// For legacy Stripe rides, retrieves it from the Stripe Checkout Session.
 export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
@@ -21,28 +22,34 @@ export default async function(req) {
       return Response.json({ error: "No autorizado" }, { status: 403 });
     }
 
-    if (!ride.stripe_session_id) {
-      return Response.json({ error: "No hay sesión de pago generada" }, { status: 400 });
+    // Mercado Pago — URL stored on the ride
+    if (ride.payment_checkout_url) {
+      return Response.json({ checkout_url: ride.payment_checkout_url });
     }
 
-    const sessionRes = await fetch(
-      `https://api.stripe.com/v1/checkout/sessions/${ride.stripe_session_id}`,
-      {
-        headers: {
-          "Authorization": `Bearer ${secrets.get("STRIPE_SECRET_KEY")}`,
-          "Stripe-Version": "2025-10-29.clover",
-        },
+    // Legacy Stripe rides — retrieve from session
+    if (ride.stripe_session_id) {
+      const sessionRes = await fetch(
+        `https://api.stripe.com/v1/checkout/sessions/${ride.stripe_session_id}`,
+        {
+          headers: {
+            "Authorization": `Bearer ${secrets.get("STRIPE_SECRET_KEY")}`,
+            "Stripe-Version": "2025-10-29.clover",
+          },
+        }
+      );
+
+      if (!sessionRes.ok) {
+        const err = await sessionRes.json();
+        console.error("Stripe error retrieving session:", JSON.stringify(err));
+        return Response.json({ error: err.error?.message }, { status: 500 });
       }
-    );
 
-    if (!sessionRes.ok) {
-      const err = await sessionRes.json();
-      console.error("Stripe error retrieving session:", JSON.stringify(err));
-      return Response.json({ error: err.error?.message }, { status: 500 });
+      const session = await sessionRes.json();
+      return Response.json({ checkout_url: session.url });
     }
 
-    const session = await sessionRes.json();
-    return Response.json({ checkout_url: session.url });
+    return Response.json({ error: "No hay sesión de pago generada" }, { status: 400 });
   } catch (error) {
     console.error("getRidePaymentUrl error:", error.message);
     return Response.json({ error: error.message }, { status: 500 });
