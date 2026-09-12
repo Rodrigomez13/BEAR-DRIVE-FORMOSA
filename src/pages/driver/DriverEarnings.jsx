@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
-import { DollarSign, TrendingUp, Car, AlertCircle, Receipt, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { AlertCircle, Receipt, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { displayAddress } from "@/lib/geo";
 import LoadingScreen from "@/components/bear/LoadingScreen";
 import PullToRefresh from "@/components/bear/PullToRefresh";

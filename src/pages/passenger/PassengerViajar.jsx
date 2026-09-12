@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -9,15 +9,14 @@ import MapView from "@/components/bear/MapView";
 import StarRating from "@/components/bear/StarRating";
 import FavoriteModal from "@/components/bear/FavoriteModal";
 import FavoritesBar from "@/components/bear/FavoritesBar";
-import { searchPlaces, geocodePlace, reverseGeocode, getCurrentPosition, FORMOSA_CENTER, displayAddress } from "@/lib/geo";
+import { searchPlaces, geocodePlace, reverseGeocode, getCurrentPosition, watchCurrentPosition, clearPositionWatch, FORMOSA_CENTER, displayAddress } from "@/lib/geo";
 import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import SosDialog from "@/components/bear/SosDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
-import { useBackoffPoll } from "@/hooks/useBackoffPoll";
 import { useRideSubscription } from "@/hooks/useRideSubscription";
 import { sanitizeString } from "@/lib/sanitize";
 import BearAvatar from "@/components/bear/BearAvatar";
-import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown, Share2, MessageCircle } from "lucide-react";
+import { MapPin, Search, Crosshair, Loader2, Car, Star, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown, Share2, MessageCircle } from "lucide-react";
 import { Image } from "@/components/ui/image";
 import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
 import LoadingScreen from "@/components/bear/LoadingScreen";
@@ -147,6 +146,26 @@ export default function PassengerViajar() {
     recover();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  // Foreground tracking updates only our marker, never the quoted pickup or route.
+  useEffect(() => {
+    if (!user?.id || loading) return;
+    let cancelled = false;
+    let handle;
+    let lastTimestamp = 0;
+    const stop = (watch) => clearPositionWatch(watch).catch(() => {});
+    watchCurrentPosition((position, error) => {
+      if (cancelled || error || !position) return;
+      if (!Number.isFinite(position.lat) || !Number.isFinite(position.lng)) return;
+      if (Number.isFinite(position.accuracy) && position.accuracy > 100) return;
+      if (position.timestamp && position.timestamp <= lastTimestamp) return;
+      lastTimestamp = position.timestamp || lastTimestamp;
+      setUserPos(position);
+    }, { enableHighAccuracy: false, maximumAge: 1000, minimumUpdateInterval: 1000 })
+      .then((watch) => { if (cancelled) stop(watch); else handle = watch; })
+      .catch(() => { /* Manual pickup remains available when permission is denied. */ });
+    return () => { cancelled = true; if (handle) stop(handle); };
+  }, [user?.id, loading]);
 
   // Realtime ride status subscription — primary sync mechanism (replaces 3s polling).
   // A 15s fallback poll inside the hook covers recovery if a realtime event is missed.

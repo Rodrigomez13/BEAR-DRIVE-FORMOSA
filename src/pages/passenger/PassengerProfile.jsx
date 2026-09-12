@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import StarRating from "@/components/bear/StarRating";
 import BearAvatar from "@/components/bear/BearAvatar";
 import ThemeToggle from "@/components/bear/ThemeToggle";
 import ModeSwitcher from "@/components/bear/ModeSwitcher";
-import { Phone, MapPin, Camera, LogOut, Car, ChevronRight, Shield, HelpCircle, Bell, Loader2, Trash2 } from "lucide-react";
+import { Phone, MapPin, Camera, LogOut, Car, ChevronRight, Shield, HelpCircle, Loader2, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import DeleteAccountDialog from "@/components/bear/DeleteAccountDialog";
 

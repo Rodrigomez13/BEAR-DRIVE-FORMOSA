@@ -1,7 +1,7 @@
 import React from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Star, MapPin, Clock, DollarSign, X, BellOff, Check, Navigation } from "lucide-react";
+import { Star, MapPin, Clock, DollarSign, X, BellOff, Check } from "lucide-react";
 import { displayAddress } from "@/lib/geo";
 import BearAvatar from "@/components/bear/BearAvatar";
 

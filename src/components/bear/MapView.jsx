@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { animateMarker } from "@/lib/animateMarker";
 import { loadMapsSDK, getAuthFailure, resetSdkPromise } from "@/lib/mapsConfig";
 import { getCachedRoute, setCachedRoute } from "@/lib/routeCache";
 import { AlertTriangle, Navigation } from "lucide-react";
@@ -380,13 +381,15 @@ export default function MapView({
       markers.destination.setVisible(false);
     }
 
-    if (userPos && markers.user && !(origin && showOriginMarker)) {
-      markers.user.setPosition(userPos);
-      markers.user.setVisible(true);
-    } else if (markers.user) {
-      markers.user.setVisible(false);
-    }
-  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, originLabel, destinationLabel, showOriginMarker, showDestinationMarker, userPos?.lat, userPos?.lng, status]);
+  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, originLabel, destinationLabel, showOriginMarker, showDestinationMarker, status]);
+
+  // Keep the live passenger marker separate from the agreed pickup point.
+  useEffect(() => {
+    const marker = markersRef.current.user;
+    if (!marker || status !== "ready") return;
+    if (!userPos) { marker.setVisible(false); return; }
+    return animateMarker(marker, userPos, 900);
+  }, [userPos?.lat, userPos?.lng, status]);
 
   // Smooth driver marker, follow camera and advance maneuver guidance without new route API calls.
   useEffect(() => {
@@ -404,33 +407,7 @@ export default function MapView({
       return;
     }
 
-    const startPos = marker.getPosition();
-    if (!startPos || !marker.getVisible()) {
-      marker.setPosition(driverPos);
-      marker.setVisible(true);
-    } else {
-      const startLat = startPos.lat();
-      const startLng = startPos.lng();
-      const endLat = driverPos.lat;
-      const endLng = driverPos.lng;
-      const duration = markerAnimationDuration;
-      const startTime = Date.now();
-      let raf;
-
-      const animate = () => {
-        const elapsed = Date.now() - startTime;
-        const t = Math.min(elapsed / duration, 1);
-        const easeT = 1 - Math.pow(1 - t, 3);
-        marker.setPosition({
-          lat: startLat + (endLat - startLat) * easeT,
-          lng: startLng + (endLng - startLng) * easeT,
-        });
-        if (t < 1) raf = requestAnimationFrame(animate);
-      };
-
-      raf = requestAnimationFrame(animate);
-      setTimeout(() => cancelAnimationFrame(raf), duration + 150);
-    }
+    const stopAnimation = animateMarker(marker, driverPos, markerAnimationDuration);
 
     if (followDriver && !followSuspended && mapRef.current) {
       mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, tilt, heading));
@@ -487,6 +464,7 @@ export default function MapView({
         setDeviatedOrigin({ lat: driverPos.lat, lng: driverPos.lng });
       }
     }
+    return stopAnimation;
   }, [driverPos?.lat, driverPos?.lng, driverPos?.heading, followDriver, followSuspended, navigationZoom, tilt, heading, status, markerAnimationDuration]);
 
   // Update route only when endpoints/path actually change. Driver GPS updates do not trigger route API calls.

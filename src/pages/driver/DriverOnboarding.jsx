@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-import { Upload, Car, FileText, CheckCircle2, Loader2, ArrowLeft, ArrowRight, User, Shield, X, AlertTriangle, Clock } from "lucide-react";
+import { Upload, Car, CheckCircle2, Loader2, ArrowLeft, ArrowRight, Shield, X, AlertTriangle, Clock } from "lucide-react";
 import { sanitizeString, sanitizePhone, sanitizeDNI, sanitizePlate, sanitizeInt } from "@/lib/sanitize";
 import { validateFile, optimizeForWeb } from "@/lib/imageUtils";
 import { businessDaysUntil } from "@/lib/businessDays";

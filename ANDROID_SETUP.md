@@ -1,179 +1,73 @@
-# BearDrive - Formosa · Guía de build Android (APK) con Capacitor
+# BearDrive Formosa — Android con Capacitor 8
 
-Este proyecto está preparado para compilarse como app nativa Android usando **Capacitor 6**.
-El frontend se construye con Vite y se empaqueta dentro de un proyecto Android que generás con Android Studio.
+El proyecto android/ está versionado. No lo regeneres con cap add android.
+Trabajá en feat/mobile-functional-mvp y conservá las personalizaciones nativas.
 
----
+## Entorno
 
-## 1. Requisitos previos
+- Node.js 22 o superior compatible con Vite instalado.
+- Android Studio actualizado, SDK Android 36 y JDK 21.
+- JAVA_HOME apuntando al JDK; android/local.properties apuntando al SDK.
+- Instalá dependencias con npm ci.
 
-- **Node.js 18+** y npm.
-- **Android Studio** (descargar de https://developer.android.com/studio).
-- **JDK 17** (Android Studio lo incluye; si lo instalás aparte, configurá `JAVA_HOME`).
-- Un dispositivo físico o un emulador AVD (API 24+ recomendado).
+Comprobá node --version y java -version desde la terminal que usará Gradle.
 
-Verificá que Android Studio tenga instalado el **Android SDK Platform** y **SDK Build-Tools** desde *Tools → SDK Manager*.
+## Configuración del APK
 
----
+Copiá .env.example a .env.local solamente si este último no existe. Completá:
 
-## 2. Paquetes ya instalados en este proyecto
+- VITE_BASE44_APP_ID: identificador de la aplicación Base44.
+- VITE_BASE44_APP_BASE_URL: URL real de la aplicación publicada.
+- VITE_GOOGLE_MAPS_CLIENT_KEY: clave pública restringida de Maps JavaScript/Places.
 
-```
-@capacitor/core
-@capacitor/cli
-@capacitor/android
-@capacitor/geolocation   (GPS / permisos de ubicación)
-@capacitor/status-bar     (barra de estado oscura)
-@capacitor/splash-screen  (pantalla de inicio)
-@capacitor/app            (ciclo de vida nativo)
-@capacitor/keyboard       (teclado nativo)
-@capacitor/preferences    (almacenamiento nativo)
-```
+Todo VITE_* es público y se empaqueta en el APK. Las claves privadas de pagos,
+webhooks y servicios permanecen en backend. No uses una URL de Vite local como
+backend del APK. Verificá autenticación y acceso desde el dispositivo.
+Para desarrollo local con backend seguí README.md y base44 dev.
+Un build que advierte que falta configuración Base44 no es un APK funcional.
 
-La configuración vive en `capacitor.config.json`:
-- `appId`: `com.beardrive.formosa` (identificador único del paquete Android).
-- `appName`: `BearDrive - Formosa`.
-- `webDir`: `dist` (salida de `vite build`).
-- `androidScheme: https` → origen `https://localhost` (contexto seguro, necesario para Geolocation y Google Maps).
-- StatusBar y SplashScreen con el color Navy de la marca (`#181E2F`).
+## Verificar y generar APK de prueba
 
-`vite.config.js` ya tiene `base: './'` para que los assets carguen con rutas relativas dentro del WebView.
+Desde la raíz, en PowerShell:
 
----
-
-## 3. Generar el proyecto Android (una sola vez)
-
-Desde la raíz del proyecto:
-
-```bash
-npm install
-npm run build
-npx cap add android
-npx cap sync android
+```powershell
+npm run lint
+npm run typecheck
+npm run cap:sync
+$env:JAVA_HOME = 'C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot'
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+Set-Location android
+.\gradlew.bat assembleDebug
 ```
 
-Esto crea la carpeta `android/` con el proyecto nativo. **No la borres**; es la que abrírs en Android Studio.
+cap:sync construye el frontend y copia assets/configuración al proyecto nativo.
+Repetilo después de cambiar frontend, plugins o capacitor.config.json.
+APK: android/app/build/outputs/apk/debug/app-debug.apk.
 
-> Si modificás `capacitor.config.json` después de crear `android/`, ejecutá `npx cap sync android` para aplicar los cambios.
+La ruta de JDK anterior corresponde al equipo validado; ajustala en otros equipos.
+En Android, el cliente Base44 usa VITE_BASE44_APP_BASE_URL como servidor de API,
+porque el origen local del WebView no incluye el proxy de desarrollo de Vite.
 
----
+## Ubicación y pruebas físicas
 
-## 4. Compilar el APK
+Los permisos coarse/fine están declarados en el Manifest. Usá src/lib/geo.js,
+que solicita permisos mediante Capacitor en Android. La primera validación cubre
+GPS en primer plano; no garantiza seguimiento en segundo plano.
 
-### Opción A — Desde Android Studio (recomendado para probar)
+Probá en dos dispositivos: login, permiso denegado/aproximado/preciso, búsqueda,
+solicitud, aceptación, PIN, finalización, pago y recuperación al reconectar.
+Verificá teclado, barras del sistema, botón Atrás y retorno desde el checkout.
+Los pagos y la unicidad del cargo diario todavía requieren las correcciones
+de dominio identificadas en la auditoría; compilar no valida esos comportamientos.
 
-```bash
-npx cap open android
-```
+## Release
 
-Se abre Android Studio. Luego:
-1. Esperá a que termine *Gradle Sync*.
-2. Menú **Build → Build Bundle(s) / APK(s) → Build APK(s)**.
-3. Cuando termine, hacé clic en *locate* para encontrar el archivo:
-   `android/app/build/outputs/apk/debug/app-debug.apk`
+webContentsDebuggingEnabled está desactivado en la configuración fuente.
+Sincronizá antes del build para aplicar este cambio al APK.
+La firma release aún debe configurarse: guardá keystore y contraseñas fuera del
+código y proporcioná secretos mediante entorno o propiedades locales ignoradas.
+No escribas contraseñas en build.gradle. Conservá una copia segura de la clave.
 
-Instalá ese APK en un dispositivo (copiándolo o con `adb install app-debug.apk`).
-
-### Opción B — Por línea de comandos
-
-```bash
-# APK de debug (para pruebas, firmado con clave de debug)
-npx cap sync android
-cd android
-./gradlew assembleDebug
-# → android/app/build/outputs/apk/debug/app-debug.apk
-
-# APK de release (requiere configurar firma, ver sección 6)
-./gradlew assembleRelease
-```
-
----
-
-## 5. Permisos Android
-
-El plugin `@capacitor/geolocation` ya agrega automáticamente al `AndroidManifest.xml`:
-- `ACCESS_FINE_LOCATION`
-- `ACCESS_COARSE_LOCATION`
-
-La app usa Google Maps y GPS, por lo que esos permisos son obligatorios. No hace falta editarlos a mano.
-
-Si en el futuro necesitás más permisos (cámara, notificaciones push, etc.), agregalos en `android/app/src/main/AndroidManifest.xml`.
-
----
-
-## 6. Firmar el APK de release (para distribución)
-
-Para distribuir el APK fuera de Google Play necesitás firmarlo con una keystore propia:
-
-1. Generá una keystore (una sola vez):
-   ```bash
-   keytool -genkey -v -keystore beardrive.keystore -alias beardrive -keyalg RSA -keysize 2048 -validity 10000
-   ```
-   Guardá este archivo y las contraseñas en un lugar seguro.
-
-2. En `android/app/build.gradle`, dentro de `android { ... }`, agregá:
-   ```gradle
-   signingConfigs {
-     release {
-       storeFile file('../../beardrive.keystore')
-       storePassword 'TU_STORE_PASSWORD'
-       keyAlias 'beardrive'
-       keyPassword 'TU_KEY_PASSWORD'
-     }
-   }
-   buildTypes {
-     release {
-       signingConfig signingConfigs.release
-       minifyEnabled false
-       proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-     }
-   }
-   ```
-   Colocá el archivo `beardrive.keystore` en la raíz del proyecto (o ajustá la ruta).
-
-3. Compilá:
-   ```bash
-   cd android && ./gradlew assembleRelease
-   ```
-   → `android/app/build/outputs/apk/release/app-release.apk`
-
----
-
-## 7. Flujo de trabajo tras cambios en el código
-
-Cada vez que cambies el frontend:
-
-```bash
-npm run build
-npx cap sync android
-npx cap open android   # o ./gradlew assembleDebug desde android/
-```
-
-El script helper `npm run android` hace build + sync + abre Android Studio:
-
-```bash
-npm run android
-```
-
----
-
-## 8. Notas importantes
-
-- **Google Maps**: la API key configurada en Base44 (`GOOGLE_MAPS_API_KEY`) se obtiene desde el backend (`getGoogleMapsKey`). La app la pide en runtime, así que el APK necesita conexión a internet para mostrar el mapa. Asegurate de que la key tenga habilitada *Maps JavaScript API*, *Places API* y *Geocoding API* y que no tenga restricciones que bloqueen el origen `https://localhost`.
-- **Geolocalización**: el WebView usa el esquema `https://localhost` (contexto seguro), por lo que `navigator.geolocation` funciona y dispara el diálogo nativo de permiso de Android.
-- **Stripe / pagos**: Stripe Checkout abre una página externa. Si los pagos con tarjeta fallan dentro del WebView, integrá `@capacitor/browser` para abrir el checkout en el navegador del sistema. Hoy el checkout ya bloquea ejecución dentro de un iframe; en Capacitor no es iframe, pero conviene probarlo.
-- **Backend**: las funciones, entidades y autenticación siguen alojadas en Base44. El APK solo empaqueta el frontend; las llamadas a la API de Base44 funcionan igual que en la web (requieren internet).
-- **No subas la carpeta `android/` al repo** salvo que quieras versionarla; suele ignorarse con `.gitignore` y regenerarse con `npx cap add android`.
-
----
-
-## 9. Generar un AAB para Google Play (opcional)
-
-Si querés publicar en Google Play Store, generá un Android App Bundle:
-
-```bash
-cd android && ./gradlew bundleRelease
-```
-→ `android/app/build/outputs/bundle/release/app-release.aab`
-
-> Base44 también ofrece build nativo AAB desde *Publish → Mobile app* (plan Builder+). Esta guía de Capacitor es para generar el APK vos mismo.
+Incrementá versionCode y actualizá versionName para cada distribución.
+Con firma configurada, assembleRelease genera APK y bundleRelease genera AAB.
+Antes de distribuir, verificá el artefacto firmado y el flujo en dispositivos.

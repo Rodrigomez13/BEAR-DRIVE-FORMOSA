@@ -41,7 +41,7 @@ export function useBackoffPoll(fn, { enabled = true, baseDelay = 3000, maxDelay 
       } catch {
         if (cancelled) return;
         attempt += 1;
-        const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
+        const delay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
         timerRef.current = setTimeout(tick, delay);
       }
     };

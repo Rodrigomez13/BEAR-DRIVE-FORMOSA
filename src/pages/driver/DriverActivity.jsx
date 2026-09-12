@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import StarRating from "@/components/bear/StarRating";
 import EmptyState from "@/components/bear/EmptyState";
 import { SkeletonList } from "@/components/bear/SkeletonCard";
-import { MapPin, Clock, DollarSign, Star, Car } from "lucide-react";
+import { MapPin, Car } from "lucide-react";
 import { displayAddress } from "@/lib/geo";
 import PullToRefresh from "@/components/bear/PullToRefresh";
 

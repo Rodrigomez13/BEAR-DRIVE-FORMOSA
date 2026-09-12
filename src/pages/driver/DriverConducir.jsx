@@ -170,11 +170,12 @@ export default function DriverConducir() {
         });
         const rides = res.data?.rides || [];
         setAvailableRides(rides.filter((ride) => !silencedRides.current.has(ride.id)));
-      } catch {
-        // Se mantiene la lista anterior ante errores transitorios de red.
+      } catch (error) {
+        // Conservamos la lista y propagamos el error para activar el backoff.
+        throw error;
       }
     },
-    { enabled: online && !activeRide, baseDelay: 4000, maxDelay: 30000 }
+    { enabled: online && !activeRide && !!driverPos, baseDelay: 4000, maxDelay: 30000 }
   );
 
   // Realtime ride status subscription — primary sync mechanism (replaces 3s polling).

@@ -237,6 +237,7 @@ export async function watchCurrentPosition(callback, options = {}) {
         timeout: positionOptions.timeout,
         maximumAge: positionOptions.maximumAge,
         minimumUpdateInterval: options.minimumUpdateInterval ?? 3000,
+        interval: options.interval ?? options.minimumUpdateInterval ?? 3000,
         enableLocationFallback: true,
       },
       (pos, err) => {
