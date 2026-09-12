@@ -10,6 +10,7 @@ import ScrollToTop from './components/ScrollToTop';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { AnimatePresence, motion } from 'framer-motion';
 import Splash from '@/components/bear/Splash';
+import PwaInstallPrompt from '@/components/bear/PwaInstallPrompt';
 // Auth pages
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -84,6 +85,7 @@ const AuthenticatedApp = () => {
             <Route path="*" element={<PageNotFound />} />
           </Routes>
           </Suspense>
+          <PwaInstallPrompt />
         </motion.div>
       )}
     </AnimatePresence>
