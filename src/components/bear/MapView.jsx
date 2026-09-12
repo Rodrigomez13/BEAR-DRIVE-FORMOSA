@@ -152,9 +152,9 @@ function haversineMeters(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-function offsetCenter(pos, tilt, heading) {
-  if (!tilt) return pos;
-  const offsetDist = 0.0028;
+function offsetCenter(pos, isRotating, heading) {
+  if (!isRotating) return pos;
+  const offsetDist = 0.0022;
   const headingRad = ((heading || 0) * Math.PI) / 180;
   return {
     lat: pos.lat + offsetDist * Math.cos(headingRad),
@@ -181,6 +181,7 @@ export default function MapView({
   followDriver = false,
   navigationZoom = 17,
   onRouteInfo,
+  rotateHeading = false,
   tilt = 0,
   heading = 0,
   markerAnimationDuration = 900,
@@ -189,6 +190,9 @@ export default function MapView({
   const themeContext = useTheme();
   const effectiveTheme = mapTheme || themeContext?.theme || "dark";
   const isDark = effectiveTheme === "dark";
+
+  const isRotating = rotateHeading || (tilt > 0);
+  const isRotatingRef = useRef(isRotating);
 
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -234,9 +238,10 @@ export default function MapView({
   }, [onRouteInfo]);
 
   useEffect(() => {
+    isRotatingRef.current = isRotating;
     tiltRef.current = tilt;
     headingRef.current = heading;
-  }, [tilt, heading]);
+  }, [isRotating, tilt, heading]);
 
   useEffect(() => {
     driverPosRef.current = driverPos;
@@ -447,7 +452,7 @@ export default function MapView({
     // Rotate the car icon to point in the travel direction during GPS navigation.
     const g = window.google;
     if (g?.maps) {
-      marker.setIcon(tilt > 0 ? navCarIcon(g, heading) : carIcon(g));
+      marker.setIcon(isRotating ? navCarIcon(g, heading) : (Number.isFinite(heading) && heading > 0 ? navCarIcon(g, heading) : carIcon(g)));
     }
 
     if (!driverPos) {
@@ -484,7 +489,7 @@ export default function MapView({
     }
 
     if (followDriver && !followSuspended && mapRef.current) {
-      mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, tilt, heading));
+      mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, isRotating, heading));
       const currentZoom = mapRef.current.getZoom() || 0;
       if (currentZoom < navigationZoom - 1 || currentZoom > navigationZoom + 2) {
         mapRef.current.setZoom(navigationZoom);
@@ -514,6 +519,18 @@ export default function MapView({
       }
 
       currentStepRef.current = stepIndex;
+
+      // Calcular dinámicamente distancia y tiempo restantes hasta el destino
+      let remainingMeters = Math.max(0, Math.round(distanceToManeuver));
+      for (let i = stepIndex + 1; i < steps.length; i++) {
+        remainingMeters += steps[i].distanceMeters || 0;
+      }
+      const remainingDistanceText = remainingMeters < 1000
+        ? `${remainingMeters} m`
+        : `${(remainingMeters / 1000).toFixed(1).replace(".", ",")} km`;
+      const remainingMinutes = Math.max(1, Math.round(remainingMeters / 450));
+      const remainingDurationText = `${remainingMinutes} min`;
+
       onRouteInfoRef.current?.({
         ...routeInfo,
         currentStepIndex: stepIndex,
@@ -522,6 +539,9 @@ export default function MapView({
         nextManeuverDistanceMeters: Math.round(distanceToManeuver),
         afterNextInstruction: steps[stepIndex + 1]?.instruction || "",
         afterNextManeuver: steps[stepIndex + 1]?.maneuver || "",
+        distanceText: remainingDistanceText,
+        durationText: remainingDurationText,
+        distanceMeters: remainingMeters,
       });
     }
 
@@ -538,7 +558,7 @@ export default function MapView({
         setDeviatedOrigin({ lat: driverPos.lat, lng: driverPos.lng });
       }
     }
-  }, [driverPos?.lat, driverPos?.lng, driverPos?.heading, followDriver, followSuspended, navigationZoom, tilt, heading, status, markerAnimationDuration]);
+  }, [driverPos?.lat, driverPos?.lng, driverPos?.heading, followDriver, followSuspended, navigationZoom, isRotating, heading, status, markerAnimationDuration]);
 
   // Update route only when endpoints/path actually change. Driver GPS updates do not trigger route API calls.
   useEffect(() => {
@@ -582,7 +602,7 @@ export default function MapView({
         routeInfoRef.current = info;
         onRouteInfoRef.current?.(info);
         if (followDriverRef.current && driverPos && mapRef.current) {
-          mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, tiltRef.current, headingRef.current));
+          mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, isRotatingRef.current, headingRef.current));
           mapRef.current.setZoom(navigationZoom);
         }
       };
