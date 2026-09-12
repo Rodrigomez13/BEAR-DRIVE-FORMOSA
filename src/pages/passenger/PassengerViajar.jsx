@@ -449,7 +449,7 @@ export default function PassengerViajar() {
       <div className="absolute inset-0">
         <MapView
           center={origin || userPos || FORMOSA_CENTER}
-          origin={approachPhase ? (driverPos || routeOrigin || origin) : origin}
+          origin={approachPhase ? routeOrigin : origin}
           destination={approachPhase ? origin : destination}
           showOriginMarker={!approachPhase}
           showDestinationMarker={true}

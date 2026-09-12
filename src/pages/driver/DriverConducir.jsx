@@ -207,11 +207,16 @@ export default function DriverConducir() {
     transitionInFlightRef.current = false;
   }, [activeRide?.id, activeRide?.status]);
 
-  // Auto-minimize info card during navigation so the map is fully visible
+  // Auto-minimize info card during navigation so the map is fully visible.
+  // Expand it again when navigation ends (DRIVER_ARRIVED, ARRIVED, PAYMENT_PENDING)
+  // so the PIN input and payment actions are immediately visible.
   useEffect(() => {
     const phase = navigationPhase(activeRide?.status);
-    if (phase) setCardMinimized(true);
-    if (!activeRide) setCardMinimized(false);
+    if (phase) {
+      setCardMinimized(true);
+    } else if (activeRide) {
+      setCardMinimized(false);
+    }
   }, [activeRide?.status, activeRide?.id]);
 
   // Un único watcher GPS alimenta la UI, detección de llegada y persistencia del Driver.
@@ -317,10 +322,12 @@ export default function DriverConducir() {
 
             if (prevPosRef.current) {
               const movedKm = haversineKm(prevPosRef.current.lat, prevPosRef.current.lng, position.lat, position.lng);
-              // Solo calcular rumbo si el movimiento supera el radio de exactitud
-              // (evita rotaciones erráticas por ruido del GPS).
               const movedM = movedKm * 1000;
-              if (isAccurate && movedM > Math.max(10, accuracy)) {
+              // Prefer the device GPS heading when valid; fall back to computed bearing
+              // from position deltas once the driver moves enough to be reliable.
+              if (Number.isFinite(position.heading) && position.heading >= 0 && movedM > 3) {
+                setNavHeading(position.heading);
+              } else if (isAccurate && movedM > 10) {
                 const bearing = computeBearing(prevPosRef.current, position);
                 if (Number.isFinite(bearing)) setNavHeading(bearing);
               }
@@ -623,9 +630,9 @@ export default function DriverConducir() {
           driverPos={driverPos}
           interactive={true}
           followDriver={isNavigating}
-          navigationZoom={navMode === "gps" ? 17 : 15}
+          navigationZoom={navMode === "gps" ? 16 : 15}
           onRouteInfo={setRouteInfo}
-          tilt={navMode === "gps" && isNavigating ? 55 : 0}
+          tilt={navMode === "gps" && isNavigating ? 42 : 0}
           heading={navMode === "gps" && isNavigating ? navHeading : 0}
           className="absolute inset-0"
         />
