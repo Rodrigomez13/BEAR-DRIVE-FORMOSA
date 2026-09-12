@@ -59,6 +59,8 @@ export default function PassengerViajar() {
   const [cardMinimized, setCardMinimized] = useState(false);
   const [routeOrigin, setRouteOrigin] = useState(null);
   const [enableReview, setEnableReview] = useState(true);
+  const [ratingTags, setRatingTags] = useState([]);
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const [originExpanded, setOriginExpanded] = useState(false);
   const [destExpanded, setDestExpanded] = useState(true);
   const [paymentExpanded, setPaymentExpanded] = useState(false);
@@ -342,7 +344,7 @@ export default function PassengerViajar() {
       return;
     }
     try {
-      await base44.entities.Ride.update(activeRide.id, { status: "CANCELLED", cancelled_date: new Date().toISOString(), cancel_reason: "passenger_cancelled" });
+      await base44.functions.invoke("passengerCancelRide", { ride_id: activeRide.id });
       setActiveRide(null);
       setOrigin(null);
       setDestination(null);
@@ -361,7 +363,7 @@ export default function PassengerViajar() {
   const handleRate = async () => {
     if (rating === 0) return;
     try {
-      await base44.functions.invoke("rateRide", { ride_id: activeRide.id, score: rating, comment: ratingComment });
+      await base44.functions.invoke("rateRide", { ride_id: activeRide.id, score: rating, comment: ratingComment, tags: ratingTags.join(",") });
       toast({ title: "¡Gracias por tu calificación!" });
       setShowFavoriteModal(true);
     } catch (err) {
@@ -379,6 +381,7 @@ export default function PassengerViajar() {
     setActiveRide(null);
     setRating(0);
     setRatingComment("");
+    setRatingTags([]);
     setEnableReview(true);
     setDriverPos(null);
   };
@@ -387,6 +390,7 @@ export default function PassengerViajar() {
     setActiveRide(null);
     setRating(0);
     setRatingComment("");
+    setRatingTags([]);
     setEnableReview(true);
     setDriverPos(null);
   };
@@ -481,6 +485,17 @@ export default function PassengerViajar() {
               {enableReview ? (
                 <>
                   <div className="flex justify-center mb-4"><StarRating value={rating} onChange={setRating} size={32} /></div>
+                  <div className="flex flex-wrap gap-2 mb-3 justify-center">
+                    {["Puntual", "Conductor amable", "Viaje seguro", "Vehículo limpio", "Conducción suave", "Buena conversación"].map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={() => setRatingTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${ratingTags.includes(tag) ? "bg-accent text-accent-foreground border-accent" : "bg-secondary text-muted-foreground border-border"}`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
                   <Input value={ratingComment} onChange={(e) => setRatingComment(e.target.value)} placeholder="Comentario (opcional)" className="mb-3" />
                   <Button onClick={handleRate} disabled={rating === 0} className="w-full bear-gold-gradient text-foreground border-0">Enviar calificación</Button>
                 </>
@@ -682,11 +697,26 @@ export default function PassengerViajar() {
         <Card className="rounded-2xl p-4">
           {quote ? (
             <div>
-              <div className="text-center mb-4">
+              <div className="text-center mb-3">
                 <p className="text-sm text-muted-foreground">Precio del viaje</p>
-                <p className="text-4xl font-extrabold text-accent">{formatPrice(quote.price)}</p>
+                <button onClick={() => setShowBreakdown(!showBreakdown)} className="text-4xl font-extrabold text-accent inline-flex items-center gap-1">
+                  {formatPrice(quote.price)}
+                  <ChevronDown className={`w-5 h-5 transition-transform ${showBreakdown ? "rotate-180" : ""}`} />
+                </button>
                 <p className="text-xs text-muted-foreground mt-1">{quote.distance_km} km · {quote.duration_min} min</p>
               </div>
+              {showBreakdown && quote.breakdown && (
+                <div className="mb-4 p-3 rounded-xl bg-secondary/50 space-y-1.5 text-sm">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Tarifa base</span><span>{formatPrice(quote.breakdown.base)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Distancia</span><span>{formatPrice(quote.breakdown.distance)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Tiempo</span><span>{formatPrice(quote.breakdown.time)}</span></div>
+                  {Math.abs(quote.breakdown.category_adjustment) > 0 && (
+                    <div className="flex justify-between"><span className="text-muted-foreground">Ajuste de categoría</span><span>{formatPrice(quote.breakdown.category_adjustment)}</span></div>
+                  )}
+                  <div className="h-px bg-border" />
+                  <div className="flex justify-between font-bold"><span>Total</span><span className="text-accent">{formatPrice(quote.price)}</span></div>
+                </div>
+              )}
               <div className="flex gap-2 mb-3">
                 {CATEGORIES.map((c) => (
                   <button

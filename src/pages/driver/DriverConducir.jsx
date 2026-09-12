@@ -391,31 +391,24 @@ export default function DriverConducir() {
       const position = await getCurrentPosition({ enableHighAccuracy: true, maximumAge: 1000 });
       setDriverPos(position);
 
-      const locations = await base44.entities.DriverLocation.filter({ driver_id: user.id });
-      if (locations.length > 0) {
-        await base44.entities.DriverLocation.update(locations[0].id, {
-          lat: position.lat,
-          lng: position.lng,
-          online: true,
-          vehicle_id: selectedVehicle.id,
-        });
-        setDriverLocationId(locations[0].id);
-      } else {
-        const created = await base44.entities.DriverLocation.create({
-          driver_id: user.id,
-          lat: position.lat,
-          lng: position.lng,
-          online: true,
-          vehicle_id: selectedVehicle.id,
-        });
-        setDriverLocationId(created.id);
-      }
+      const res = await base44.functions.invoke("driverGoOnline", {
+        lat: position.lat,
+        lng: position.lng,
+        vehicle_id: selectedVehicle.id,
+      });
 
+      setDriverLocationId(res.data.driver_location.id);
       lastLocationPersistRef.current = Date.now();
       toast({ title: "Estás online", description: "Buscando viajes..." });
     } catch (error) {
       setOnline(false);
-      toast({ title: "No pudimos activar el modo conductor", description: error.message, variant: "destructive" });
+      const msg = error?.response?.data?.error || error.message;
+      const reason = error?.response?.data?.reason;
+      if (reason === "blocking_debt") {
+        toast({ title: msg, description: "Regularizá tu deuda para conducir", variant: "destructive" });
+      } else {
+        toast({ title: "No pudimos activar el modo conductor", description: msg, variant: "destructive" });
+      }
     }
   };
 
