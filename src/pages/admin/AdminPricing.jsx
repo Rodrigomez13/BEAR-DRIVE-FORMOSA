@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { Save, Loader2, DollarSign } from "lucide-react";
+import LoadingScreen from "@/components/bear/LoadingScreen";
 
 export default function AdminPricing() {
   const [config, setConfig] = useState(null);
@@ -41,7 +42,7 @@ export default function AdminPricing() {
     }
   };
 
-  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
+  if (loading) return <LoadingScreen className="h-64" label="Cargando..." />;
   if (!config) return <Card className="p-8 text-center"><p className="text-sm text-muted-foreground">No hay configuración de tarifas</p></Card>;
 
   return (

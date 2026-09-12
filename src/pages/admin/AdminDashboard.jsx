@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import { Users, Car, CheckCircle2, XCircle, Clock, DollarSign, TrendingUp, FileText, AlertTriangle, Activity } from "lucide-react";
 import { Link } from "react-router-dom";
+import LoadingScreen from "@/components/bear/LoadingScreen";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -49,7 +50,7 @@ export default function AdminDashboard() {
     return () => clearInterval(refreshInterval);
   }, []);
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-secondary border-t-accent rounded-full animate-spin" /></div>;
+  if (loading) return <LoadingScreen className="h-64" label="Cargando..." />;
 
   const cards = [
     { label: "Solicitudes pendientes", value: stats.pendingApps, icon: FileText, color: "text-accent" },

@@ -9,6 +9,7 @@ import { toast } from "@/components/ui/use-toast";
 import StarRating from "@/components/bear/StarRating";
 import { CheckCircle2, XCircle, Loader2, FileText, Car, User, Clock, MoreHorizontal } from "lucide-react";
 import { businessDaysUntil } from "@/lib/businessDays";
+import LoadingScreen from "@/components/bear/LoadingScreen";
 
 const STATUS_LABELS = {
   DRAFT: "Borrador", SUBMITTED: "Enviada", UNDER_REVIEW: "En revisión",
@@ -71,7 +72,7 @@ export default function AdminDrivers() {
   const pendingApps = applications.filter(a => a.status === "SUBMITTED" || a.status === "UNDER_REVIEW");
   const reviewedApps = applications.filter(a => ["APPROVED", "REJECTED", "MORE_INFO_REQUIRED"].includes(a.status));
 
-  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
+  if (loading) return <LoadingScreen className="h-64" label="Cargando..." />;
 
   if (selected) {
     return (

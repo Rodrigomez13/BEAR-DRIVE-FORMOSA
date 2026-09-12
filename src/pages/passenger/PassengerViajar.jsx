@@ -18,6 +18,7 @@ import BearAvatar from "@/components/bear/BearAvatar";
 import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown } from "lucide-react";
 import { Image } from "@/components/ui/image";
 import { BEAR_LOGO_LIGHT } from "@/lib/brandAssets";
+import LoadingScreen from "@/components/bear/LoadingScreen";
 
 const CATEGORIES = [
   { code: "basic", name: "BearDrive", desc: "Servicio estándar" },
@@ -386,7 +387,7 @@ export default function PassengerViajar() {
   // ---- RENDER STATES ----
 
   if (loading) {
-    return <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
+    return <LoadingScreen className="h-full" label="Preparando tu mapa..." />;
   }
 
   // Active ride view

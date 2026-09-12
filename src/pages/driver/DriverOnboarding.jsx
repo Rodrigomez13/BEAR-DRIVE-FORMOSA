@@ -11,6 +11,7 @@ import { Upload, Car, FileText, CheckCircle2, Loader2, ArrowLeft, ArrowRight, Us
 import { sanitizeString, sanitizePhone, sanitizeDNI, sanitizePlate, sanitizeInt } from "@/lib/sanitize";
 import { validateFile, optimizeForWeb } from "@/lib/imageUtils";
 import { businessDaysUntil } from "@/lib/businessDays";
+import LoadingScreen from "@/components/bear/LoadingScreen";
 
 const STEPS = [
   { key: "intro", label: "Introducción" },
@@ -187,7 +188,7 @@ export default function DriverOnboarding() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center h-[100dvh]"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
+    return <LoadingScreen className="h-[100dvh]" label="Cargando..." />;
   }
 
   // Auto-review processing

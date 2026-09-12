@@ -37,6 +37,7 @@ import { useBackoffPoll } from "@/hooks/useBackoffPoll";
 import BearAvatar from "@/components/bear/BearAvatar";
 import RideRequestModal from "@/components/bear/RideRequestModal";
 import TurnByTurnNav from "@/components/bear/TurnByTurnNav";
+import LoadingScreen from "@/components/bear/LoadingScreen";
 
 const PICKUP_STATUSES = ["ASSIGNED", "DRIVER_APPROACHING"];
 const ACTIVE_RIDE_STATUSES = [
@@ -567,11 +568,7 @@ export default function DriverConducir() {
   const formatPrice = (value) => `$${(value || 0).toLocaleString("es-AR")}`;
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center absolute inset-0">
-        <Loader2 className="w-8 h-8 animate-spin text-accent" />
-      </div>
-    );
+    return <LoadingScreen className="absolute inset-0" label="Preparando..." />;
   }
 
   if (!eligible) {

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import { DollarSign, TrendingUp, Car, AlertCircle, Receipt, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { displayAddress } from "@/lib/geo";
+import LoadingScreen from "@/components/bear/LoadingScreen";
 
 export default function DriverEarnings() {
   const { user } = useAuth();
@@ -59,7 +60,7 @@ export default function DriverEarnings() {
     }
   };
 
-  if (loading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-secondary border-t-accent rounded-full animate-spin" /></div>;
+  if (loading) return <LoadingScreen className="h-full" label="Cargando..." />;
 
   return (
     <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in h-full overflow-y-auto scrollbar-hide">
