@@ -27,7 +27,7 @@ export default function PassengerBenefits() {
   }, []);
 
   return (
-    <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in h-full overflow-y-auto scrollbar-hide">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8 h-full overflow-y-auto scrollbar-hide">
       <h1 className="text-2xl font-bold mb-2">Beneficios</h1>
       <p className="text-sm text-muted-foreground mb-6">Acumulá BearPoints y canjealos por descuentos</p>
 

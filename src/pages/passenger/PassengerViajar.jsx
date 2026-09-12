@@ -471,7 +471,7 @@ export default function PassengerViajar() {
             >
               <BearAvatar size={40} />
               <div className="flex-1 text-left min-w-0">
-                <p className="font-semibold text-sm truncate">{activeRide.driver_name || "Conductor"}</p>
+                <p className="font-bold text-sm truncate">{activeRide.driver_name || "Conductor"}</p>
                 <p className="text-xs text-muted-foreground">
                   {status === "DRIVER_APPROACHING" ? "En camino a tu ubicación" : status === "DRIVER_ARRIVED" ? "Llegó al punto de encuentro" : "Conductor asignado"}
                 </p>
@@ -487,6 +487,17 @@ export default function PassengerViajar() {
               <button onClick={() => setCardMinimized(true)} className="w-full flex items-center justify-center gap-1 text-xs text-muted-foreground mb-2">
                 <ChevronDown className="w-4 h-4" /> Minimizar
               </button>
+            )}
+            {activeRide.destination_address && (
+              <div className="flex items-center gap-2.5 pb-3 mb-3 border-b border-border">
+                <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
+                  <MapPin className="w-4 h-4 text-accent" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">Destino</p>
+                  <p className="text-sm font-bold truncate leading-tight">{displayAddress(activeRide.destination_address)}</p>
+                </div>
+              </div>
             )}
             {status === "SEARCHING" && (
               <div className="text-center py-2">
@@ -509,7 +520,7 @@ export default function PassengerViajar() {
                 <div className="flex items-center gap-3 mb-4">
                   <BearAvatar size={48} />
                   <div className="flex-1">
-                    <p className="font-semibold">{activeRide.driver_name || "Conductor"}</p>
+                    <p className="font-bold text-base">{activeRide.driver_name || "Conductor"}</p>
                     <div className="flex items-center gap-2 text-sm">
                       <Star className="w-3.5 h-3.5 fill-accent text-accent" />
                       <span>{user?.rating_avg || "5.0"}</span>

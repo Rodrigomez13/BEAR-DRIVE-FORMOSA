@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { loadMapsSDK, getAuthFailure, resetSdkPromise } from "@/lib/mapsConfig";
 import { getCachedRoute, setCachedRoute } from "@/lib/routeCache";
 import { AlertTriangle, Navigation } from "lucide-react";
+import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
 
 const DARK_MAP_STYLES = [
   { elementType: "geometry", stylers: [{ color: "#0e1320" }] },
@@ -31,15 +32,24 @@ const DARK_MAP_STYLES = [
   { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#121828" }] },
 ];
 
-function originIcon(g) {
+function originPinBackground(g) {
+  const size = 44;
+  const svg =
+    "<svg xmlns='http://www.w3.org/2000/svg' width='" + size + "' height='" + size + "' viewBox='0 0 " + size + " " + size + "'>" +
+    "<circle cx='22' cy='22' r='20' fill='#181E2F' stroke='#E9B74E' stroke-width='3'/>" +
+    "</svg>";
   return {
-    path: g.maps.SymbolPath.CIRCLE,
-    scale: 11,
-    fillColor: "#181E2F",
-    fillOpacity: 1,
-    strokeColor: "#E9B74E",
-    strokeWeight: 3,
-    labelOrigin: new g.maps.Point(0, -16),
+    url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
+    scaledSize: new g.maps.Size(size, size),
+    anchor: new g.maps.Point(22, 22),
+  };
+}
+
+function originPinLogo(g) {
+  return {
+    url: BEAR_LOGO_SVG,
+    scaledSize: new g.maps.Size(30, 30),
+    anchor: new g.maps.Point(15, 15),
   };
 }
 
@@ -218,11 +228,19 @@ export default function MapView({
       });
 
       mapRef.current = map;
+      markersRef.current.originBg = new g.maps.Marker({
+        map,
+        icon: originPinBackground(g),
+        visible: false,
+        clickable: false,
+        zIndex: 500,
+      });
       markersRef.current.origin = new g.maps.Marker({
         map,
-        icon: originIcon(g),
-        label: { text: originLabel, color: "#E9B74E", fontSize: "11px", fontWeight: "bold" },
+        icon: originPinLogo(g),
         visible: false,
+        clickable: false,
+        zIndex: 501,
       });
       markersRef.current.destination = new g.maps.Marker({
         map,
@@ -341,14 +359,18 @@ export default function MapView({
     const markers = markersRef.current;
     if (!markers.origin || status !== "ready") return;
 
-    markers.origin.setLabel({ text: originLabel, color: "#E9B74E", fontSize: "11px", fontWeight: "bold" });
     markers.destination.setLabel({ text: destinationLabel, color: "#E9B74E", fontSize: "11px", fontWeight: "bold" });
 
     if (origin && showOriginMarker) {
       markers.origin.setPosition(origin);
       markers.origin.setVisible(true);
+      if (markers.originBg) {
+        markers.originBg.setPosition(origin);
+        markers.originBg.setVisible(true);
+      }
     } else {
       markers.origin.setVisible(false);
+      if (markers.originBg) markers.originBg.setVisible(false);
     }
 
     if (destination && showDestinationMarker) {
@@ -358,7 +380,7 @@ export default function MapView({
       markers.destination.setVisible(false);
     }
 
-    if (userPos && markers.user) {
+    if (userPos && markers.user && !(origin && showOriginMarker)) {
       markers.user.setPosition(userPos);
       markers.user.setVisible(true);
     } else if (markers.user) {

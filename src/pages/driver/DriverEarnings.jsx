@@ -63,7 +63,7 @@ export default function DriverEarnings() {
   if (loading) return <LoadingScreen className="h-full" label="Cargando..." />;
 
   return (
-    <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in h-full overflow-y-auto scrollbar-hide">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8 h-full overflow-y-auto scrollbar-hide">
       <h1 className="text-2xl font-bold mb-6">Ganancias</h1>
 
       {/* Debt alert */}
