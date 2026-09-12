@@ -33,6 +33,7 @@ import {
 } from "@/lib/geo";
 import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
+import { useBackoffPoll } from "@/hooks/useBackoffPoll";
 import BearAvatar from "@/components/bear/BearAvatar";
 import RideRequestModal from "@/components/bear/RideRequestModal";
 import TurnByTurnNav from "@/components/bear/TurnByTurnNav";
@@ -104,7 +105,6 @@ export default function DriverConducir() {
   const [navMode, setNavMode] = useState("gps");
   const [navHeading, setNavHeading] = useState(0);
 
-  const pollRef = useRef(null);
   const positionWatchRef = useRef(null);
   const lastLocationPersistRef = useRef(0);
   const silencedRides = useRef(new Set());
@@ -149,48 +149,23 @@ export default function DriverConducir() {
     load();
   }, [user?.id]);
 
-  // Poll temporal de solicitudes. Se reemplazará por Realtime en el siguiente checkpoint.
-  useEffect(() => {
-    if (!online || activeRide) {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-      return;
-    }
+  // Poll de solicitudes con backoff exponencial ante fallos de red.
+  useBackoffPoll(
+    async () => {
+      const rides = await base44.entities.Ride.filter({ status: "SEARCHING" }, "-created_date", 10);
+      setAvailableRides(rides.filter((ride) => !silencedRides.current.has(ride.id)));
+    },
+    { enabled: online && !activeRide, baseDelay: 4000, maxDelay: 30000 }
+  );
 
-    const poll = async () => {
-      try {
-        const rides = await base44.entities.Ride.filter({ status: "SEARCHING" }, "-created_date", 10);
-        setAvailableRides(rides.filter((ride) => !silencedRides.current.has(ride.id)));
-      } catch {
-        // Realtime reemplazará este fallback.
-      }
-    };
-
-    poll();
-    pollRef.current = setInterval(poll, 4000);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [online, activeRide]);
-
-  // Poll temporal del estado del viaje para reflejar cambios del pasajero/pago.
-  useEffect(() => {
-    if (!activeRide) return;
-
-    const poll = async () => {
-      try {
-        const updated = await base44.entities.Ride.get(activeRide.id);
-        if (updated) setActiveRide(updated);
-      } catch {
-        // Realtime reemplazará este fallback.
-      }
-    };
-
-    const interval = setInterval(poll, 3000);
-    return () => clearInterval(interval);
-  }, [activeRide?.id]);
+  // Poll del estado del viaje con backoff exponencial ante fallos de red.
+  useBackoffPoll(
+    async () => {
+      const updated = await base44.entities.Ride.get(activeRide.id);
+      if (updated) setActiveRide(updated);
+    },
+    { enabled: !!activeRide, baseDelay: 3000, maxDelay: 30000 }
+  );
 
   useActiveRideGuard(!!activeRide);
 

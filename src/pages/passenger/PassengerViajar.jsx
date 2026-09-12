@@ -12,6 +12,7 @@ import FavoritesBar from "@/components/bear/FavoritesBar";
 import { searchPlaces, geocodePlace, reverseGeocode, getCurrentPosition, FORMOSA_CENTER, displayAddress } from "@/lib/geo";
 import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
+import { useBackoffPoll } from "@/hooks/useBackoffPoll";
 import { sanitizeString } from "@/lib/sanitize";
 import BearAvatar from "@/components/bear/BearAvatar";
 import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown } from "lucide-react";
@@ -57,8 +58,6 @@ export default function PassengerViajar() {
   const [destExpanded, setDestExpanded] = useState(true);
   const [paymentExpanded, setPaymentExpanded] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(true);
-  const pollRef = useRef(null);
-
   // Handle Stripe redirect return
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -116,20 +115,14 @@ export default function PassengerViajar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Poll ride status (location updates arrive in real-time via subscription)
-  useEffect(() => {
-    if (!activeRide) return;
-    const poll = async () => {
-      try {
-        const updated = await base44.entities.Ride.get(activeRide.id);
-        if (updated) setActiveRide(updated);
-      } catch (err) {
-        // ignore
-      }
-    };
-    pollRef.current = setInterval(poll, 3000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [activeRide?.id]);
+  // Poll ride status with exponential backoff (location updates arrive in real-time via subscription)
+  useBackoffPoll(
+    async () => {
+      const updated = await base44.entities.Ride.get(activeRide.id);
+      if (updated) setActiveRide(updated);
+    },
+    { enabled: !!activeRide, baseDelay: 3000, maxDelay: 30000 }
+  );
 
   // Real-time driver location subscription — no polling delay
   useEffect(() => {
