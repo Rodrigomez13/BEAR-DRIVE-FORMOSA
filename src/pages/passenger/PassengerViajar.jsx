@@ -14,6 +14,7 @@ import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import SosDialog from "@/components/bear/SosDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
 import { useBackoffPoll } from "@/hooks/useBackoffPoll";
+import { useRideSubscription } from "@/hooks/useRideSubscription";
 import { sanitizeString } from "@/lib/sanitize";
 import BearAvatar from "@/components/bear/BearAvatar";
 import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown, Share2 } from "lucide-react";
@@ -119,14 +120,11 @@ export default function PassengerViajar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Poll ride status with exponential backoff (location updates arrive in real-time via subscription)
-  useBackoffPoll(
-    async () => {
-      const updated = await base44.entities.Ride.get(activeRide.id);
-      if (updated) setActiveRide(updated);
-    },
-    { enabled: !!activeRide?.id, baseDelay: 3000, maxDelay: 30000 }
-  );
+  // Realtime ride status subscription — primary sync mechanism (replaces 3s polling).
+  // A 15s fallback poll inside the hook covers recovery if a realtime event is missed.
+  useRideSubscription(activeRide?.id, (updated) => {
+    if (updated) setActiveRide(updated);
+  });
 
   // Real-time driver location subscription — no polling delay
   useEffect(() => {

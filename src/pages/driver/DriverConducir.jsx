@@ -34,6 +34,7 @@ import {
 import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
 import { useBackoffPoll } from "@/hooks/useBackoffPoll";
+import { useRideSubscription } from "@/hooks/useRideSubscription";
 import BearAvatar from "@/components/bear/BearAvatar";
 import RideRequestModal from "@/components/bear/RideRequestModal";
 import TurnByTurnNav from "@/components/bear/TurnByTurnNav";
@@ -171,14 +172,11 @@ export default function DriverConducir() {
     { enabled: online && !activeRide, baseDelay: 4000, maxDelay: 30000 }
   );
 
-  // Poll del estado del viaje con backoff exponencial ante fallos de red.
-  useBackoffPoll(
-    async () => {
-      const updated = await base44.entities.Ride.get(activeRide.id);
-      if (updated) setActiveRide(updated);
-    },
-    { enabled: !!activeRide, baseDelay: 3000, maxDelay: 30000 }
-  );
+  // Realtime ride status subscription — primary sync mechanism (replaces 3s polling).
+  // A 15s fallback poll inside the hook covers recovery if a realtime event is missed.
+  useRideSubscription(activeRide?.id, (updated) => {
+    if (updated) setActiveRide(updated);
+  });
 
   useActiveRideGuard(!!activeRide);
 
@@ -276,7 +274,9 @@ export default function DriverConducir() {
         if (arrivalHitsRef.current.pickup >= 2) {
           transitionInFlightRef.current = true;
           try {
-            await base44.entities.Ride.update(activeRide.id, { status: "DRIVER_ARRIVED" });
+            await base44.functions.invoke("transitionRideStatus", {
+              ride_id: activeRide.id, target_status: "DRIVER_ARRIVED",
+            });
             setActiveRide((previous) => previous ? { ...previous, status: "DRIVER_ARRIVED" } : previous);
             setRouteInfo(null);
             toast({
@@ -302,7 +302,9 @@ export default function DriverConducir() {
         if (arrivalHitsRef.current.destination >= 2) {
           transitionInFlightRef.current = true;
           try {
-            await base44.entities.Ride.update(activeRide.id, { status: "ARRIVED" });
+            await base44.functions.invoke("transitionRideStatus", {
+              ride_id: activeRide.id, target_status: "ARRIVED",
+            });
             setActiveRide((previous) => previous ? { ...previous, status: "ARRIVED" } : previous);
             setRouteInfo(null);
             toast({
@@ -462,10 +464,8 @@ export default function DriverConducir() {
       setNavigationStart({ lat: position.lat, lng: position.lng });
       setRouteInfo(null);
 
-      const updated = await base44.entities.Ride.update(ride.id, {
-        status: "DRIVER_APPROACHING",
-        driver_id: user.id,
-        driver_name: user.full_name || user.email,
+      const res = await base44.functions.invoke("acceptRide", {
+        ride_id: ride.id,
         vehicle_id: selectedVehicle.id,
         vehicle_plate: selectedVehicle.plate,
         vehicle_model: `${selectedVehicle.make} ${selectedVehicle.model}`,
@@ -473,38 +473,37 @@ export default function DriverConducir() {
       });
 
       phaseRef.current = `${ride.id}:pickup`;
-      setActiveRide(updated);
+      setActiveRide(res.data.ride);
       setAvailableRides([]);
       toast({
         title: "Viaje aceptado",
         description: "Te guiamos hasta el punto de encuentro.",
       });
     } catch (error) {
-      toast({ title: "No se pudo aceptar", description: error.message, variant: "destructive" });
+      const msg = error?.response?.data?.error || error.message;
+      toast({ title: "No se pudo aceptar", description: msg, variant: "destructive" });
     }
   };
 
   const handleArrived = async () => {
     if (!activeRide) return;
     try {
-      await base44.entities.Ride.update(activeRide.id, { status: "DRIVER_ARRIVED" });
-      setActiveRide({ ...activeRide, status: "DRIVER_ARRIVED" });
+      const res = await base44.functions.invoke("transitionRideStatus", {
+        ride_id: activeRide.id, target_status: "DRIVER_ARRIVED",
+      });
+      setActiveRide(res.data.ride);
       setRouteInfo(null);
-    } catch {
-      toast({ title: "Error", variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Error", description: error?.message, variant: "destructive" });
     }
   };
 
   const handleValidatePin = async () => {
-    if (pinInput !== activeRide.start_pin) {
-      toast({ title: "PIN incorrecto", variant: "destructive" });
-      return;
-    }
-
     try {
-      await base44.entities.Ride.update(activeRide.id, { status: "IN_PROGRESS" });
-      const nextRide = { ...activeRide, status: "IN_PROGRESS" };
-      setActiveRide(nextRide);
+      const res = await base44.functions.invoke("validateRidePin", {
+        ride_id: activeRide.id, pin: pinInput,
+      });
+      setActiveRide(res.data.ride);
       setNavigationStart(driverPos ? { lat: driverPos.lat, lng: driverPos.lng } : null);
       setRouteInfo(null);
       phaseRef.current = `${activeRide.id}:destination`;
@@ -513,29 +512,34 @@ export default function DriverConducir() {
         title: "Viaje iniciado",
         description: "Ahora te guiamos hasta el destino.",
       });
-    } catch {
-      toast({ title: "Error", variant: "destructive" });
+    } catch (error) {
+      const msg = error?.response?.data?.error || error.message;
+      toast({ title: msg, variant: "destructive" });
     }
   };
 
   const handleDestinationArrived = async () => {
     if (!activeRide) return;
     try {
-      await base44.entities.Ride.update(activeRide.id, { status: "ARRIVED" });
-      setActiveRide({ ...activeRide, status: "ARRIVED" });
+      const res = await base44.functions.invoke("transitionRideStatus", {
+        ride_id: activeRide.id, target_status: "ARRIVED",
+      });
+      setActiveRide(res.data.ride);
       setRouteInfo(null);
-    } catch {
-      toast({ title: "No se pudo confirmar la llegada", variant: "destructive" });
+    } catch (error) {
+      toast({ title: "No se pudo confirmar la llegada", description: error?.message, variant: "destructive" });
     }
   };
 
   const handleProceedToPayment = async () => {
     if (!activeRide) return;
     try {
-      await base44.entities.Ride.update(activeRide.id, { status: "PAYMENT_PENDING" });
-      setActiveRide({ ...activeRide, status: "PAYMENT_PENDING" });
-    } catch {
-      toast({ title: "No se pudo iniciar el cobro", variant: "destructive" });
+      const res = await base44.functions.invoke("transitionRideStatus", {
+        ride_id: activeRide.id, target_status: "PAYMENT_PENDING",
+      });
+      setActiveRide(res.data.ride);
+    } catch (error) {
+      toast({ title: "No se pudo iniciar el cobro", description: error?.message, variant: "destructive" });
     }
   };
 
