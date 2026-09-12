@@ -146,7 +146,7 @@ export default function Login() {
           
           {/* Mascota 3D con Aura Dorada */}
           <div className="relative mb-3 group">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-accent/30 to-amber-500/15 p-1.5 shadow-xl shadow-accent/15 flex items-center justify-center border-2 border-accent/40 group-hover:scale-105 transition-transform duration-300">
+            <div className="w-25 h-25 rounded-full bg-gradient-to-tr from-accent/30 to-amber-500/15 p-1.5 shadow-xl shadow-accent/15 flex items-center justify-center border-2 border-accent/40 group-hover:scale-105 transition-transform duration-300">
               <img src="https://media.base44.com/images/public/6aa1902bd90ac5b66092d80d/6caa7b214_logo-beardrive.svg"
 
               alt="Mascota BearDrive"
