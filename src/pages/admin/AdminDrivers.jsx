@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import StarRating from "@/components/bear/StarRating";
-import { CheckCircle2, XCircle, Loader2, FileText, Car, User, Clock, MoreHorizontal } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, FileText, Car, User, Clock, MoreHorizontal, Search } from "lucide-react";
 import { businessDaysUntil } from "@/lib/businessDays";
 import LoadingScreen from "@/components/bear/LoadingScreen";
 
@@ -25,6 +25,8 @@ export default function AdminDrivers() {
   const [vehicles, setVehicles] = useState([]);
   const [reason, setReason] = useState("");
   const [acting, setActing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     const load = async () => {
@@ -88,8 +90,20 @@ export default function AdminDrivers() {
     }
   };
 
-  const pendingApps = applications.filter(a => a.status === "SUBMITTED" || a.status === "UNDER_REVIEW");
-  const reviewedApps = applications.filter(a => ["APPROVED", "REJECTED", "MORE_INFO_REQUIRED"].includes(a.status));
+  const matchesSearch = (a) => !searchQuery ||
+    `${a.first_name} ${a.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (a.applicant_email || "").toLowerCase().includes(searchQuery.toLowerCase());
+
+  const pendingApps = applications.filter(a => (a.status === "SUBMITTED" || a.status === "UNDER_REVIEW") && matchesSearch(a));
+
+  const filteredApps = applications.filter(a => {
+    if (!matchesSearch(a)) return false;
+    if (statusFilter === "all") return true;
+    if (statusFilter === "pending") return ["SUBMITTED", "UNDER_REVIEW"].includes(a.status);
+    if (statusFilter === "approved") return a.status === "APPROVED";
+    if (statusFilter === "rejected") return a.status === "REJECTED";
+    return true;
+  });
 
   if (loading) return <LoadingScreen className="h-64" label="Cargando..." />;
 
@@ -194,7 +208,37 @@ export default function AdminDrivers() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Conductores</h1>
+      <h1 className="text-2xl font-bold mb-4">Conductores</h1>
+
+      <div className="mb-6 space-y-3">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre o email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { key: "all", label: "Todos" },
+            { key: "pending", label: "Pendientes" },
+            { key: "approved", label: "Aprobados" },
+            { key: "rejected", label: "Rechazados" },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setStatusFilter(tab.key)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors no-select ${
+                statusFilter === tab.key ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground hover:bg-secondary/80"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {pendingApps.length > 0 && (
         <>
@@ -226,12 +270,12 @@ export default function AdminDrivers() {
         </>
       )}
 
-      <h2 className="font-semibold text-sm mb-3">Todas las solicitudes</h2>
-      {applications.length === 0 ? (
-        <Card className="p-8 text-center"><p className="text-sm text-muted-foreground">No hay solicitudes de conductores</p></Card>
+      <h2 className="font-semibold text-sm mb-3">Todas las solicitudes ({filteredApps.length})</h2>
+      {filteredApps.length === 0 ? (
+        <Card className="p-8 text-center"><p className="text-sm text-muted-foreground">{searchQuery ? "Sin resultados para tu búsqueda" : "No hay solicitudes de conductores"}</p></Card>
       ) : (
         <div className="space-y-2">
-          {applications.map(app => (
+          {filteredApps.map(app => (
             <Card key={app.id} className="p-3 flex items-center justify-between cursor-pointer hover:border-accent" onClick={() => loadDetail(app)}>
               <div>
                 <p className="text-sm font-medium">{app.first_name} {app.last_name}</p>

@@ -81,17 +81,32 @@ export default function AdminPricing() {
           </div>
         </div>
 
-        <div className="bg-secondary/30 rounded-xl p-4 text-sm text-muted-foreground">
-          <p className="font-medium text-foreground mb-1">Ejemplo de cálculo</p>
-          <p>Para un viaje de 5 km y 12 min (Básico):</p>
-          <p className="font-semibold text-accent mt-1">
-            ${Math.round((parseFloat(config.base_fare) + 5 * parseFloat(config.per_km) + 12 * parseFloat(config.per_min))).toLocaleString("es-AR")}
-          </p>
+        <div className="bg-secondary/30 rounded-xl p-4">
+          <p className="font-medium text-foreground mb-3 text-sm">Ejemplo de cálculo (5 km · 12 min)</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="text-center p-3 rounded-lg bg-background">
+              <p className="text-[14px] text-muted-foreground mb-1">Básico</p>
+              <p className="font-bold text-accent">${Math.round(parseFloat(config.base_fare) + 5 * parseFloat(config.per_km) + 12 * parseFloat(config.per_min)).toLocaleString("es-AR")}</p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-background">
+              <p className="text-[14px] text-muted-foreground mb-1">Flash</p>
+              <p className="font-bold text-accent">${Math.round(parseFloat(config.base_fare) + 5 * parseFloat(config.per_km) + 12 * parseFloat(config.per_min) + parseFloat(config.flash_supplement)).toLocaleString("es-AR")}</p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-background">
+              <p className="text-[14px] text-muted-foreground mb-1">Premium</p>
+              <p className="font-bold text-accent">${Math.round((parseFloat(config.base_fare) + 5 * parseFloat(config.per_km) + 12 * parseFloat(config.per_min)) * parseFloat(config.premium_multiplier)).toLocaleString("es-AR")}</p>
+            </div>
+          </div>
         </div>
 
         <Button onClick={handleSave} disabled={saving} className="w-full bear-gold-gradient text-foreground border-0">
           {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</> : <><Save className="w-4 h-4 mr-2" />Guardar tarifas</>}
         </Button>
+        {config.updated_date && (
+          <p className="text-[14px] text-muted-foreground text-center mt-3">
+            Última actualización: {new Date(config.updated_date).toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+          </p>
+        )}
       </Card>
     </div>
   );
