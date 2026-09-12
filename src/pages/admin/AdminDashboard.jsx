@@ -46,7 +46,9 @@ export default function AdminDashboard() {
       } catch (err) {} finally { setLoading(false); }
     };
     load();
-    const refreshInterval = setInterval(load, 30000);
+    const refreshInterval = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 30000);
     return () => clearInterval(refreshInterval);
   }, []);
 

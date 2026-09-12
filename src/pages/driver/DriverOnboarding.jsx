@@ -32,6 +32,11 @@ export default function DriverOnboarding() {
   const [submitting, setSubmitting] = useState(false);
   const [autoReviewing, setAutoReviewing] = useState(false);
 
+  const handleBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/passenger");
+  };
+
   // Form data
   const [personal, setPersonal] = useState({
     first_name: "", last_name: "", dni_number: "", birth_date: "", phone: user?.phone || "", address: "",
@@ -275,13 +280,16 @@ export default function DriverOnboarding() {
 
   return (
     <div className="max-w-md mx-auto px-5 pt-8 pb-10">
+      <button onClick={handleBack} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
+        <ArrowLeft className="w-4 h-4" />Volver
+      </button>
       {/* Progress */}
       <div className="flex items-center gap-1 mb-6">
         {STEPS.map((s, i) => (
           <div key={s.key} className={`flex-1 h-1.5 rounded-full ${i <= step ? "bg-accent" : "bg-secondary"}`} />
         ))}
       </div>
-      <p className="text-xs text-muted-foreground mb-4 text-center">Paso {step + 1} de {STEPS.length}: {STEPS[step].label}</p>
+      <p className="text-[14px] text-muted-foreground mb-4 text-center">Paso {step + 1} de {STEPS.length}: {STEPS[step].label}</p>
 
       {step === 0 && (
         <div className="text-center py-6">
@@ -400,12 +408,12 @@ function DocUploadStep({ title, requirements, documents, onUpload, onUpdate, onB
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-semibold text-sm">{req.label}</p>
-                {req.required && <span className="text-xs text-destructive">Obligatorio</span>}
+                {req.required && <span className="text-[14px] text-destructive">Obligatorio</span>}
               </div>
               {doc.file_url && <CheckCircle2 className="w-5 h-5 text-green-500" />}
             </div>
             {doc.file_url ? (
-              <p className="text-xs text-green-600">Documento cargado ✓</p>
+              <p className="text-[14px] text-green-600">Documento cargado ✓</p>
             ) : (
               <label className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-accent transition-colors">
                 <Upload className="w-4 h-4 text-muted-foreground" />
@@ -415,12 +423,12 @@ function DocUploadStep({ title, requirements, documents, onUpload, onUpdate, onB
             )}
             {req.requires_expiration && (
               <div className="space-y-1.5">
-                <Label className="text-xs">Vencimiento</Label>
+                <Label className="text-[14px]">Vencimiento</Label>
                 <Input type="date" value={doc.expires_at || ""} onChange={e => onUpdate(req.code, "expires_at", e.target.value)} className="h-9" />
               </div>
             )}
             <div className="space-y-1.5">
-              <Label className="text-xs">Número (opcional)</Label>
+              <Label className="text-[14px]">Número (opcional)</Label>
               <Input value={doc.document_number || ""} onChange={e => onUpdate(req.code, "document_number", e.target.value)} className="h-9" placeholder="N° de documento" />
             </div>
           </Card>

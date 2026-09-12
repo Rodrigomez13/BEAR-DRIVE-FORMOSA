@@ -10,8 +10,9 @@ import StarRating from "@/components/bear/StarRating";
 import BearAvatar from "@/components/bear/BearAvatar";
 import ThemeToggle from "@/components/bear/ThemeToggle";
 import ModeSwitcher from "@/components/bear/ModeSwitcher";
-import { Phone, MapPin, Camera, LogOut, Car, ChevronRight, Shield, HelpCircle, Bell, Loader2 } from "lucide-react";
+import { Phone, MapPin, Camera, LogOut, Car, ChevronRight, Shield, HelpCircle, Bell, Loader2, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import DeleteAccountDialog from "@/components/bear/DeleteAccountDialog";
 
 export default function PassengerProfile() {
   const { user, logout, checkUserAuth } = useAuth();
@@ -21,6 +22,7 @@ export default function PassengerProfile() {
   const [saving, setSaving] = useState(false);
   const [photoUrl, setPhotoUrl] = useState(user?.profile_photo_url || "");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
@@ -69,8 +71,8 @@ export default function PassengerProfile() {
         <div className="flex items-center gap-4">
           <div className="relative">
             <BearAvatar photoUrl={photoUrl} size={64} />
-            <label className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-accent flex items-center justify-center cursor-pointer shadow-lg">
-              {uploadingPhoto ? <Loader2 className="w-3.5 h-3.5 text-foreground animate-spin" /> : <Camera className="w-3.5 h-3.5 text-foreground" />}
+            <label className="absolute bottom-0 right-0 w-11 h-11 rounded-full bg-accent flex items-center justify-center cursor-pointer shadow-lg">
+              {uploadingPhoto ? <Loader2 className="w-5 h-5 text-foreground animate-spin" /> : <Camera className="w-5 h-5 text-foreground" />}
               <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
             </label>
           </div>
@@ -134,6 +136,16 @@ export default function PassengerProfile() {
       <Button variant="outline" onClick={handleLogout} className="w-full text-destructive border-destructive/30 hover:bg-destructive/5">
         <LogOut className="w-4 h-4 mr-2" />Cerrar sesión
       </Button>
+
+      <button
+        onClick={() => setShowDeleteDialog(true)}
+        className="w-full flex items-center gap-3 px-4 py-3.5 mt-3 rounded-xl border border-destructive/20 text-destructive hover:bg-destructive/5 transition-colors text-sm font-medium"
+      >
+        <Trash2 className="w-4 h-4" />
+        Eliminar cuenta
+      </button>
+
+      <DeleteAccountDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog} />
     </div>
   );
 }

@@ -69,6 +69,25 @@ export default function AdminDrivers() {
     }
   };
 
+  // Quick approve/reject directly from the list without opening the detail view
+  const handleQuickAction = async (app, action) => {
+    let reasonText = "";
+    if (action === "reject") {
+      reasonText = window.prompt("Motivo del rechazo (obligatorio):") || "";
+      if (!reasonText.trim()) return;
+    }
+    try {
+      await base44.functions.invoke("reviewDriverApplication", {
+        application_id: app.id, action, reason: reasonText,
+      });
+      toast({ title: action === "approve" ? "Conductor aprobado" : "Solicitud rechazada" });
+      const data = await base44.entities.DriverApplication.filter({}, "-created_date", 100);
+      setApplications(data);
+    } catch (err) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
   const pendingApps = applications.filter(a => a.status === "SUBMITTED" || a.status === "UNDER_REVIEW");
   const reviewedApps = applications.filter(a => ["APPROVED", "REJECTED", "MORE_INFO_REQUIRED"].includes(a.status));
 
@@ -110,11 +129,11 @@ export default function AdminDrivers() {
               <div key={d.id} className="flex items-center justify-between p-2 rounded-lg bg-secondary/30">
                 <div>
                   <p className="text-sm font-medium">{d.label}</p>
-                  {d.expires_at && <p className="text-xs text-muted-foreground">Vence: {d.expires_at}</p>}
+                  {d.expires_at && <p className="text-[14px] text-muted-foreground">Vence: {d.expires_at}</p>}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${d.status === "APPROVED" ? "bg-green-100 text-green-700" : d.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-accent/10 text-accent"}`}>{d.status}</span>
-                  {d.file_url && <a href={d.file_url} target="_blank" rel="noreferrer" className="text-xs text-accent hover:underline">Ver archivo</a>}
+                  <span className={`text-[14px] px-2 py-0.5 rounded-full ${d.status === "APPROVED" ? "bg-green-100 text-green-700" : d.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-accent/10 text-accent"}`}>{d.status}</span>
+                  {d.file_url && <a href={d.file_url} target="_blank" rel="noreferrer" className="text-[14px] text-accent hover:underline">Ver archivo</a>}
                 </div>
               </div>
             ))}
@@ -130,14 +149,14 @@ export default function AdminDrivers() {
                 <div>
                   <p className="font-semibold text-sm">Cuenta regresiva de revisión</p>
                   <p className="text-2xl font-bold text-accent">{businessDaysUntil(selected.review_deadline)} días hábiles restantes</p>
-                  <p className="text-xs text-white/60">Vence: {new Date(selected.review_deadline).toLocaleDateString("es-AR")}</p>
+                  <p className="text-[14px] text-white/60">Vence: {new Date(selected.review_deadline).toLocaleDateString("es-AR")}</p>
                 </div>
               </div>
             </Card>
           )}
           {selected.auto_review_notes && (
             <Card className="p-4 mb-4 bg-accent/5">
-              <p className="text-xs font-semibold text-muted-foreground mb-1">Verificación automática</p>
+              <p className="text-[14px] font-semibold text-muted-foreground mb-1">Verificación automática</p>
               <p className="text-sm">{selected.auto_review_notes}</p>
             </Card>
           )}
@@ -145,7 +164,7 @@ export default function AdminDrivers() {
             <p className="font-semibold text-sm mb-3">Acciones</p>
             <div className="space-y-3">
               <div>
-                <Label className="text-xs">Motivo (obligatorio para rechazar / solicitar info)</Label>
+                <Label className="text-[14px]">Motivo (obligatorio para rechazar / solicitar info)</Label>
                 <Input value={reason} onChange={e => setReason(e.target.value)} placeholder="Ej: Documento ilegible, falta información..." className="mt-1" />
               </div>
               <div className="flex gap-2">
@@ -186,14 +205,20 @@ export default function AdminDrivers() {
                 <div>
                   <p className="font-semibold">{app.first_name} {app.last_name}</p>
                   <p className="text-sm text-muted-foreground">{app.applicant_email}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Enviada: {new Date(app.submitted_date || app.created_date).toLocaleDateString("es-AR")}</p>
+                  <p className="text-[14px] text-muted-foreground mt-1">Enviada: {new Date(app.submitted_date || app.created_date).toLocaleDateString("es-AR")}</p>
                   {app.status === "UNDER_REVIEW" && app.review_deadline && (
-                    <p className="text-xs text-accent mt-1 flex items-center gap-1"><Clock className="w-3 h-3" />{businessDaysUntil(app.review_deadline)} días hábiles restantes</p>
+                    <p className="text-[14px] text-accent mt-1 flex items-center gap-1"><Clock className="w-3 h-3" />{businessDaysUntil(app.review_deadline)} días hábiles restantes</p>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent">{STATUS_LABELS[app.status]}</span>
-                  <Button size="sm" className="bear-gold-gradient text-foreground border-0">Revisar</Button>
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <span className="text-[14px] font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent">{STATUS_LABELS[app.status]}</span>
+                  <button onClick={() => handleQuickAction(app, "approve")} className="w-9 h-9 rounded-full bg-green-600 text-white flex items-center justify-center hover:bg-green-700 shrink-0 no-select" title="Aprobar rápido">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleQuickAction(app, "reject")} className="w-9 h-9 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/90 shrink-0 no-select" title="Rechazar rápido">
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                  <Button size="sm" variant="outline" onClick={() => loadDetail(app)} className="shrink-0">Revisar</Button>
                 </div>
               </Card>
             ))}
@@ -210,9 +235,9 @@ export default function AdminDrivers() {
             <Card key={app.id} className="p-3 flex items-center justify-between cursor-pointer hover:border-accent" onClick={() => loadDetail(app)}>
               <div>
                 <p className="text-sm font-medium">{app.first_name} {app.last_name}</p>
-                <p className="text-xs text-muted-foreground">{app.applicant_email}</p>
+                <p className="text-[14px] text-muted-foreground">{app.applicant_email}</p>
               </div>
-              <span className={`text-xs font-semibold px-2 py-1 rounded-full ${app.status === "APPROVED" ? "bg-green-100 text-green-700" : app.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-secondary text-muted-foreground"}`}>
+              <span className={`text-[14px] font-semibold px-2 py-1 rounded-full ${app.status === "APPROVED" ? "bg-green-100 text-green-700" : app.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-secondary text-muted-foreground"}`}>
                 {STATUS_LABELS[app.status] || app.status}
               </span>
             </Card>

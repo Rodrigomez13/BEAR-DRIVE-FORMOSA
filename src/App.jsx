@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -26,11 +27,11 @@ import DriverConducir from '@/pages/driver/DriverConducir';
 import DriverActivity from '@/pages/driver/DriverActivity';
 import DriverEarnings from '@/pages/driver/DriverEarnings';
 import DriverProfile from '@/pages/driver/DriverProfile';
-import DriverOnboarding from '@/pages/driver/DriverOnboarding';
-import AdminShell from '@/pages/admin/AdminShell';
-import AdminDashboard from '@/pages/admin/AdminDashboard';
-import AdminDrivers from '@/pages/admin/AdminDrivers';
-import AdminPricing from '@/pages/admin/AdminPricing';
+const DriverOnboarding = lazy(() => import('@/pages/driver/DriverOnboarding'));
+const AdminShell = lazy(() => import('@/pages/admin/AdminShell'));
+const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'));
+const AdminDrivers = lazy(() => import('@/pages/admin/AdminDrivers'));
+const AdminPricing = lazy(() => import('@/pages/admin/AdminPricing'));
 import SecurityPrivacy from '@/pages/shared/SecurityPrivacy';
 import HelpSupport from '@/pages/shared/HelpSupport';
 
@@ -51,6 +52,7 @@ const AuthenticatedApp = () => {
         </motion.div>
       ) : (
         <motion.div key="app" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4, ease: "easeInOut" }}>
+          <Suspense fallback={<Splash />}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -81,6 +83,7 @@ const AuthenticatedApp = () => {
             </Route>
             <Route path="*" element={<PageNotFound />} />
           </Routes>
+          </Suspense>
         </motion.div>
       )}
     </AnimatePresence>

@@ -93,7 +93,7 @@ export default function TurnByTurnNav({
             <div className="px-4 py-3 flex-1 min-w-0 flex flex-col justify-center">
               <div className="flex items-center gap-2 mb-1">
                 <span
-                  className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${
+                  className={`text-[14px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${
                     isUrgent
                       ? "bg-accent-foreground/15 text-accent-foreground"
                       : "bg-accent/15 text-accent"
@@ -134,7 +134,7 @@ export default function TurnByTurnNav({
         {/* "Después" preview */}
         {afterInstruction && !isUrgent && (
           <div className="rounded-xl bg-card/95 border border-border shadow-lg px-3 py-2 flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold shrink-0">
+            <span className="text-[14px] uppercase tracking-wider text-muted-foreground font-bold shrink-0">
               después
             </span>
             <AfterIcon className="w-4 h-4 text-muted-foreground shrink-0" />

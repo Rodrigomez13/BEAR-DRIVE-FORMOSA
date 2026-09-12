@@ -7,6 +7,7 @@ import EmptyState from "@/components/bear/EmptyState";
 import { SkeletonList } from "@/components/bear/SkeletonCard";
 import { MapPin, Clock, DollarSign, Navigation } from "lucide-react";
 import { displayAddress } from "@/lib/geo";
+import PullToRefresh from "@/components/bear/PullToRefresh";
 
 const STATUS_LABELS = {
   SEARCHING: "Buscando conductor",
@@ -25,25 +26,25 @@ export default function PassengerActivity() {
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await base44.entities.Ride.filter({ passenger_id: user.id }, "-created_date", 50);
-        setRides(data);
-      } catch (err) {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [user]);
+  const load = async () => {
+    try {
+      const data = await base44.entities.Ride.filter({ passenger_id: user.id }, "-created_date", 50);
+      setRides(data);
+    } catch (err) {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, [user]);
 
   const formatPrice = (v) => `$${(v || 0).toLocaleString("es-AR")}`;
   const formatDate = (d) => d ? new Date(d).toLocaleDateString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
 
   return (
-    <div className="max-w-md mx-auto px-4 pt-6 pb-8 h-full overflow-y-auto scrollbar-hide">
+    <PullToRefresh onRefresh={load}>
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8">
       <h1 className="text-2xl font-bold mb-6">Actividad</h1>
 
       {loading ? (
@@ -95,5 +96,6 @@ export default function PassengerActivity() {
         </div>
       )}
     </div>
+    </PullToRefresh>
   );
 }

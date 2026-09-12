@@ -38,6 +38,7 @@ import BearAvatar from "@/components/bear/BearAvatar";
 import RideRequestModal from "@/components/bear/RideRequestModal";
 import TurnByTurnNav from "@/components/bear/TurnByTurnNav";
 import LoadingScreen from "@/components/bear/LoadingScreen";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const PICKUP_STATUSES = ["ASSIGNED", "DRIVER_APPROACHING"];
 const ACTIVE_RIDE_STATUSES = [
@@ -382,6 +383,8 @@ export default function DriverConducir() {
       return;
     }
 
+    // Optimistic: show online state immediately, roll back on error
+    setOnline(true);
     try {
       const position = await getCurrentPosition({ enableHighAccuracy: true, maximumAge: 1000 });
       setDriverPos(position);
@@ -407,9 +410,9 @@ export default function DriverConducir() {
       }
 
       lastLocationPersistRef.current = Date.now();
-      setOnline(true);
       toast({ title: "Estás online", description: "Buscando viajes..." });
     } catch (error) {
+      setOnline(false);
       toast({ title: "No pudimos activar el modo conductor", description: error.message, variant: "destructive" });
     }
   };
@@ -924,17 +927,21 @@ export default function DriverConducir() {
       {vehicles.length > 0 && (
         <Card className="p-4 mb-4">
           <p className="text-xs text-muted-foreground mb-2">Vehículo</p>
-          <select
+          <Select
             value={selectedVehicle?.id || ""}
-            onChange={(event) => setSelectedVehicle(vehicles.find((vehicle) => vehicle.id === event.target.value))}
-            className="w-full bg-transparent text-sm font-medium outline-none"
+            onValueChange={(val) => setSelectedVehicle(vehicles.find((v) => v.id === val))}
           >
-            {vehicles.map((vehicle) => (
-              <option key={vehicle.id} value={vehicle.id}>
-                {vehicle.make} {vehicle.model} · {vehicle.plate}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full h-11 text-sm font-medium border-0 bg-transparent focus:ring-0">
+              <SelectValue placeholder="Seleccionar vehículo" />
+            </SelectTrigger>
+            <SelectContent>
+              {vehicles.map((vehicle) => (
+                <SelectItem key={vehicle.id} value={vehicle.id}>
+                  {vehicle.make} {vehicle.model} · {vehicle.plate}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Card>
       )}
 

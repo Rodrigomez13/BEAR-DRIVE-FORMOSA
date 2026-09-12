@@ -63,17 +63,17 @@ export default function RideRequestModal({ ride, driverPos, onAccept, onReject, 
           <div className="text-center p-3 rounded-xl bg-secondary/50">
             <MapPin className="w-4 h-4 text-accent mx-auto mb-1" />
             <p className="text-lg font-bold">{pickupDist.toFixed(1)}</p>
-            <p className="text-[10px] text-muted-foreground">km recogida</p>
+            <p className="text-[14px] text-muted-foreground">km recogida</p>
           </div>
           <div className="text-center p-3 rounded-xl bg-secondary/50">
             <Clock className="w-4 h-4 text-accent mx-auto mb-1" />
             <p className="text-lg font-bold">{ride.duration_min}</p>
-            <p className="text-[10px] text-muted-foreground">min viaje</p>
+            <p className="text-[14px] text-muted-foreground">min viaje</p>
           </div>
           <div className="text-center p-3 rounded-xl bg-accent/10">
             <DollarSign className="w-4 h-4 text-accent mx-auto mb-1" />
             <p className="text-lg font-bold text-accent">{formatPrice(ride.quoted_fare)}</p>
-            <p className="text-[10px] text-muted-foreground">ganancia</p>
+            <p className="text-[14px] text-muted-foreground">ganancia</p>
           </div>
         </div>
 

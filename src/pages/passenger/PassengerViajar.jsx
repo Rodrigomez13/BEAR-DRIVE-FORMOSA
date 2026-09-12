@@ -16,7 +16,7 @@ import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
 import { useBackoffPoll } from "@/hooks/useBackoffPoll";
 import { sanitizeString } from "@/lib/sanitize";
 import BearAvatar from "@/components/bear/BearAvatar";
-import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown } from "lucide-react";
+import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown, Share2 } from "lucide-react";
 import { Image } from "@/components/ui/image";
 import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
 import LoadingScreen from "@/components/bear/LoadingScreen";
@@ -124,7 +124,7 @@ export default function PassengerViajar() {
       const updated = await base44.entities.Ride.get(activeRide.id);
       if (updated) setActiveRide(updated);
     },
-    { enabled: !!activeRide, baseDelay: 3000, maxDelay: 30000 }
+    { enabled: !!activeRide?.id, baseDelay: 3000, maxDelay: 30000 }
   );
 
   // Real-time driver location subscription — no polling delay
@@ -281,6 +281,24 @@ export default function PassengerViajar() {
   const handleRequestRide = async () => {
     if (!quote) return;
     const pin = String(Math.floor(1000 + Math.random() * 9000));
+    // Optimistic: show searching state immediately, roll back on failure
+    const tempRide = {
+      status: "SEARCHING",
+      origin_address: sanitizeString(originAddress, 300) || "Ubicación seleccionada",
+      origin_lat: origin.lat,
+      origin_lng: origin.lng,
+      destination_address: sanitizeString(destinationAddress, 300) || "Ubicación seleccionada",
+      destination_lat: destination.lat,
+      destination_lng: destination.lng,
+      category,
+      payment_method: paymentMethod,
+      quoted_fare: quote.price,
+      distance_km: quote.distance_km,
+      duration_min: quote.duration_min,
+      start_pin: pin,
+    };
+    setActiveRide(tempRide);
+    setQuote(null);
     try {
       const ride = await base44.entities.Ride.create({
         passenger_id: user.id,
@@ -301,9 +319,10 @@ export default function PassengerViajar() {
         quote_data: JSON.stringify(quote),
       });
       setActiveRide(ride);
-      setQuote(null);
       toast({ title: "Viaje solicitado", description: "Buscando conductores cercanos..." });
     } catch (err) {
+      setActiveRide(null);
+      setQuote(quote);
       toast({ title: "No se pudo solicitar el viaje", description: err.message, variant: "destructive" });
     }
   };
@@ -311,6 +330,18 @@ export default function PassengerViajar() {
   // Cancel ride
   const handleCancel = async () => {
     if (!activeRide) return;
+    if (!activeRide.id) {
+      // Optimistic ride not yet created — just clear local state
+      setActiveRide(null);
+      setOrigin(null);
+      setDestination(null);
+      setOriginAddress("");
+      setDestinationAddress("");
+      setQuote(null);
+      setDriverPos(null);
+      setShowCancelDialog(false);
+      return;
+    }
     try {
       await base44.entities.Ride.update(activeRide.id, { status: "CANCELLED", cancelled_date: new Date().toISOString(), cancel_reason: "passenger_cancelled" });
       setActiveRide(null);
@@ -381,6 +412,30 @@ export default function PassengerViajar() {
       toast({ title: "Error al iniciar el pago", description: err.message, variant: "destructive" });
     } finally {
       setPaying(false);
+    }
+  };
+
+  // Share trip details via Web Share API (fallback: clipboard)
+  const handleShareTrip = async () => {
+    if (!activeRide) return;
+    const approachPhase = ["ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING", "PIN_VALIDATION"].includes(activeRide.status);
+    const driver = activeRide.driver_name || "Conductor asignado";
+    const vehicle = [activeRide.vehicle_model, activeRide.vehicle_plate].filter(Boolean).join(" · ");
+    const dest = displayAddress(activeRide.destination_address);
+    const fare = formatPrice(activeRide.quoted_fare);
+    const statusText = approachPhase ? "En camino a mi ubicación" : "En viaje";
+    const text = `🚗 BearDrive — Mi viaje\nConductor: ${driver}${vehicle ? `\nVehículo: ${vehicle}` : ""}\nDestino: ${dest}\nEstado: ${statusText}\nTarifa: ${fare}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "BearDrive — Mi viaje", text, url: "https://bear-drive-go.base44.app" });
+      } else {
+        await navigator.clipboard?.writeText(text);
+        toast({ title: "Detalle del viaje copiado", description: "Pegalo en tu contacto para compartirlo" });
+      }
+    } catch (err) {
+      if (err?.name !== "AbortError") {
+        try { await navigator.clipboard?.writeText(text); toast({ title: "Detalle del viaje copiado" }); } catch {}
+      }
     }
   };
 
@@ -496,7 +551,7 @@ export default function PassengerViajar() {
                   <MapPin className="w-4 h-4 text-accent" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">Destino</p>
+                  <p className="text-[14px] text-muted-foreground font-semibold uppercase tracking-wide">Destino</p>
                   <p className="text-sm font-bold truncate leading-tight">{displayAddress(activeRide.destination_address)}</p>
                 </div>
               </div>
@@ -533,8 +588,9 @@ export default function PassengerViajar() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center"><Phone className="w-5 h-5 text-accent" /></button>
-                    <button onClick={() => setShowSosDialog(true)} className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center" aria-label="Asistencia de seguridad"><Shield className="w-5 h-5 text-accent" /></button>
+                    <button className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center no-select" aria-label="Llamar conductor"><Phone className="w-5 h-5 text-accent" /></button>
+                    <button onClick={handleShareTrip} className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center no-select" aria-label="Compartir viaje"><Share2 className="w-5 h-5 text-accent" /></button>
+                    <button onClick={() => setShowSosDialog(true)} className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center no-select" aria-label="Asistencia de seguridad"><Shield className="w-5 h-5 text-accent" /></button>
                   </div>
                 </div>
                 {status === "DRIVER_ARRIVED" && (
@@ -613,19 +669,18 @@ export default function PassengerViajar() {
           </div>
           <div className="leading-none">
             <p className="text-sm font-bold text-white">Bear<span className="text-accent">Drive</span></p>
-            <p className="text-[10px] text-white/60 mt-0.5">Formosa</p>
+            <p className="text-[14px] text-white/60 mt-0.5">Formosa</p>
           </div>
         </div>
       </div>
 
-      {/* GPS button */}
-      <button onClick={handleGPS} className="absolute right-4 bottom-[420px] z-10 w-11 h-11 rounded-full bg-card shadow-lg flex items-center justify-center hover:bg-secondary">
-        <Crosshair className="w-5 h-5 text-accent" />
-      </button>
-
       {/* Bottom panel with search + collapsibles + quote */}
       <div className="absolute inset-x-0 bottom-0 z-10 p-3">
-        <Card className="rounded-2xl p-4 max-w-md mx-auto">
+        <div className="max-w-md mx-auto relative">
+        <button onClick={handleGPS} className="absolute -top-14 right-0 w-11 h-11 rounded-full bg-card shadow-lg flex items-center justify-center hover:bg-secondary no-select">
+          <Crosshair className="w-5 h-5 text-accent" />
+        </button>
+        <Card className="rounded-2xl p-4">
           {quote ? (
             <div>
               <div className="text-center mb-4">
@@ -640,8 +695,8 @@ export default function PassengerViajar() {
                     onClick={() => setCategory(c.code)}
                     className={`flex-1 p-2.5 rounded-xl text-center transition-colors ${category === c.code ? "bear-gradient text-white" : "bg-secondary text-muted-foreground"}`}
                   >
-                    <p className="text-xs font-semibold">{c.name}</p>
-                    <p className="text-[10px] opacity-70">{c.desc}</p>
+                    <p className="text-[14px] font-semibold">{c.name}</p>
+                    <p className="text-[14px] opacity-70">{c.desc}</p>
                   </button>
                 ))}
               </div>
@@ -764,6 +819,7 @@ export default function PassengerViajar() {
             </div>
           )}
         </Card>
+        </div>
       </div>
     </div>
   );
