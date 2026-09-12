@@ -1,8 +1,8 @@
 import React from "react";
 
-const SEARCHING_GIF = "https://media.base44.com/images/public/6aa1902bd90ac5b66092d80d/821ccfd93_oso-gif-cuadrado-bg-azuloscuro.gif";
+const SEARCHING_GIF = "https://media.base44.com/images/public/6aa1902bd90ac5b66092d80d/9fc650210_oso-gif-cuadrado-bg-azuloscuro.gif";
 
-export default function SearchingDriverAnimation({ size = 140 }) {
+export default function SearchingDriverAnimation({ size = 240 }) {
   return (
     <img
       src={SEARCHING_GIF}

@@ -559,7 +559,7 @@ export default function PassengerViajar() {
             )}
             {status === "SEARCHING" && (
               <div className="text-center py-2">
-                <SearchingDriverAnimation size={140} />
+                <SearchingDriverAnimation size={240} />
                 <p className="font-semibold">Conductores cercanos están verificando disponibilidad para aceptar tu viaje.</p>
                 <p className="text-sm text-muted-foreground mt-1">Buscando conductor...</p>
                 <Button variant="outline" onClick={() => setShowCancelDialog(true)} className="w-full mt-4 text-destructive">Cancelar viaje</Button>
