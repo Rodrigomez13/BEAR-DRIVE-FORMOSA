@@ -1,51 +1,52 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Image } from "@/components/ui/image";
-import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
 
-// Branded loading screen — BearDrive logo with a breathing pulse + gold dots.
-// `className` controls how it fills its container (e.g. "h-full", "absolute inset-0", "h-64").
+// High-impact branded loading screen with 3D mascot + radar glow + official slogan
 export default function LoadingScreen({ label = "Cargando...", className = "" }) {
   return (
-    <div className={`flex flex-col items-center justify-center ${className}`}>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.85 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-20 h-20 flex items-center justify-center"
-      >
+    <div className={`flex flex-col items-center justify-center p-6 ${className}`}>
+      <div className="relative mb-4 flex items-center justify-center">
+        {/* Pulsing ambient gold glow */}
+        <div className="absolute w-28 h-28 rounded-full bg-[#E9B74E]/20 blur-xl animate-pulse" />
+
+        {/* Mascot badge */}
         <motion.div
-          animate={{ scale: [1, 1.08, 1], opacity: [0.85, 1, 0.85] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-          className="w-full h-full"
+          animate={{ scale: [1, 1.05, 1], y: [0, -4, 0] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+          className="relative w-24 h-24 rounded-3xl bg-[#181E2F] border-2 border-[#E9B74E]/40 shadow-2xl p-1.5 flex items-center justify-center overflow-hidden"
         >
-          <Image src={BEAR_LOGO_SVG} alt="BearDrive" className="w-full h-full object-contain" />
-        </motion.div>
-      </motion.div>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3, duration: 0.4 }}
-        className="mt-4 flex items-center gap-1.5"
-      >
-        {[0, 160, 320].map((d) => (
-          <span
-            key={d}
-            className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce"
-            style={{ animationDelay: `${d}ms` }}
+          <img
+            src="./assets/mascot/bear_smile_closeup.jpg"
+            alt="BearDrive"
+            className="w-full h-full object-cover rounded-2xl"
           />
-        ))}
-      </motion.div>
-      {label && (
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.35, duration: 0.4 }}
-          className="mt-3 text-xs font-medium text-muted-foreground"
-        >
-          {label}
-        </motion.p>
-      )}
+        </motion.div>
+      </div>
+
+      {/* Brand slogan & status */}
+      <div className="text-center space-y-2">
+        <img
+          src="./assets/beardrive_logo_slogan.png"
+          alt="BearDrive Compartiendo Destinos"
+          className="h-7 mx-auto object-contain brightness-0 invert opacity-90"
+        />
+
+        <div className="flex items-center justify-center gap-1.5 pt-1">
+          {[0, 160, 320].map((d) => (
+            <span
+              key={d}
+              className="w-1.5 h-1.5 rounded-full bg-[#E9B74E] animate-bounce"
+              style={{ animationDelay: `${d}ms` }}
+            />
+          ))}
+        </div>
+
+        {label && (
+          <p className="text-xs font-semibold text-muted-foreground tracking-wide">
+            {label}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

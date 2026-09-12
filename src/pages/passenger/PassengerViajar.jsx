@@ -894,25 +894,25 @@ export default function PassengerViajar() {
       />
 
       {/* Top header */}
-      <div className="absolute inset-x-0 top-0 z-10 p-3 safe-top">
-        <div className="max-w-md mx-auto flex items-center gap-3 px-4 py-2.5 rounded-2xl glass-navy">
-          <div className="w-9 h-9 shrink-0 flex items-center justify-center">
+      <div className="absolute inset-x-0 top-0 z-20 p-3 safe-top pointer-events-none">
+        <div className="max-w-md mx-auto flex items-center gap-3 px-4 py-2.5 rounded-2xl glass-navy pointer-events-auto shadow-lg border border-white/10">
+          <div className="w-8 h-8 shrink-0 flex items-center justify-center">
             <Image src={BEAR_LOGO_SVG} alt="BearDrive" className="w-full h-full object-contain" />
           </div>
           <div className="leading-none">
             <p className="text-sm font-bold text-white">Bear<span className="text-accent">Drive</span></p>
-            <p className="text-[14px] text-white/60 mt-0.5">Formosa</p>
+            <p className="text-[11px] text-white/60 mt-0.5">Formosa</p>
           </div>
         </div>
       </div>
 
       {/* Bottom panel with search + collapsibles + quote */}
-      <div className="absolute inset-x-0 bottom-0 z-10 p-3">
+      <div className="absolute inset-x-0 bottom-0 z-20 p-3">
         <div className="max-w-md mx-auto relative">
-        <button onClick={handleGPS} className="absolute -top-14 right-0 w-11 h-11 rounded-full bg-card shadow-lg flex items-center justify-center hover:bg-secondary no-select">
+        <button onClick={handleGPS} className="absolute -top-14 right-0 w-11 h-11 rounded-full bg-card shadow-lg flex items-center justify-center hover:bg-secondary no-select z-10">
           <Crosshair className="w-5 h-5 text-accent" />
         </button>
-        <Card className="rounded-2xl p-4">
+        <Card className="rounded-2xl p-4 max-h-[70dvh] overflow-y-auto scrollbar-hide shadow-2xl border-white/10">
           {quote ? (
             <div>
               {(() => {

@@ -698,8 +698,8 @@ export default function RideMapView({
       {/* Floating Controls (Top & Right) */}
       {showControls && status === "ready" && (
         <>
-          {/* Active Drivers Pill & Filter Bar */}
-          <div className="absolute top-3 inset-x-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+          {/* Active Drivers Pill & Filter Bar (positioned cleanly below top header) */}
+          <div className="absolute top-[calc(env(safe-area-inset-top)+4.75rem)] inset-x-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
             {/* Nearby Drivers Count Badge */}
             {showNearbyDrivers && (
               <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#181E2F]/90 backdrop-blur-md border border-[#E9B74E]/30 text-white shadow-lg text-xs font-semibold">
@@ -763,7 +763,7 @@ export default function RideMapView({
           </div>
 
           {/* Right Floating Actions: Recenter & Zoom */}
-          <div className="absolute right-3 top-20 z-10 flex flex-col gap-2 pointer-events-auto">
+          <div className="absolute right-3 top-[calc(env(safe-area-inset-top)+8.25rem)] z-10 flex flex-col gap-2 pointer-events-auto">
             <button
               type="button"
               onClick={handleRecenter}
@@ -799,7 +799,7 @@ export default function RideMapView({
 
       {/* Route Statistics Floating Card */}
       {showRouteStats && routeInfo && (
-        <div className="absolute top-16 left-3 right-16 z-10 pointer-events-auto max-w-sm animate-in fade-in slide-in-from-top-3 duration-300">
+        <div className="absolute top-[calc(env(safe-area-inset-top)+4.75rem)] left-3 right-16 z-10 pointer-events-auto max-w-sm animate-in fade-in slide-in-from-top-3 duration-300">
           <div className="p-3 rounded-2xl bg-[#181E2F]/95 backdrop-blur-md border border-[#E9B74E]/30 shadow-2xl flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-[#E9B74E]/20 flex items-center justify-center border border-[#E9B74E]/40">

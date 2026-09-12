@@ -164,17 +164,25 @@ export default function DriverProfile() {
         </button>
       </Card>
 
-      <Button variant="outline" onClick={() => logout()} className="w-full text-destructive border-destructive/30 hover:bg-destructive/5">
-        <LogOut className="w-4 h-4 mr-2" />Cerrar sesión
-      </Button>
+      <div className="space-y-2 pt-2">
+        <Button
+          variant="outline"
+          onClick={() => logout()}
+          className="w-full h-12 rounded-xl text-destructive border-destructive/30 hover:bg-destructive/10 font-semibold flex items-center justify-center"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Cerrar sesión
+        </Button>
 
-      <button
-        onClick={() => setShowDeleteDialog(true)}
-        className="w-full flex items-center gap-3 px-4 py-3.5 mt-3 rounded-xl border border-destructive/20 text-destructive hover:bg-destructive/5 transition-colors text-sm font-medium"
-      >
-        <Trash2 className="w-4 h-4" />
-        Eliminar cuenta
-      </button>
+        <Button
+          variant="ghost"
+          onClick={() => setShowDeleteDialog(true)}
+          className="w-full h-10 rounded-xl text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/5 font-medium flex items-center justify-center"
+        >
+          <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+          Eliminar cuenta
+        </Button>
+      </div>
 
       <DeleteAccountDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog} />
     </div>
