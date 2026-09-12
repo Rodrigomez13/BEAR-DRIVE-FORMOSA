@@ -20,28 +20,37 @@ export default async function(req) {
       return Response.json({ error: "No estás habilitado para conducir" }, { status: 403 });
     }
 
+    // Pre-fetch for validation (passenger check) — not authoritative for the race
     const ride = await base44.asServiceRole.entities.Ride.get(ride_id);
     if (!ride) return Response.json({ error: "Viaje no encontrado" }, { status: 404 });
-
-    // Server-authoritative status check — only a SEARCHING ride can be accepted
-    if (ride.status !== "SEARCHING") {
-      return Response.json({ error: "El viaje ya fue tomado por otro conductor", reason: "already_assigned" }, { status: 409 });
-    }
 
     // Driver cannot accept their own ride
     if (ride.passenger_id === user.id) {
       return Response.json({ error: "No podés aceptar tu propio viaje" }, { status: 403 });
     }
 
-    const updated = await base44.asServiceRole.entities.Ride.update(ride_id, {
-      status: "DRIVER_APPROACHING",
-      driver_id: user.id,
-      driver_name: user.full_name || user.email,
-      vehicle_id: vehicle_id || null,
-      vehicle_plate: vehicle_plate || null,
-      vehicle_model: vehicle_model || null,
-      vehicle_color: vehicle_color || null,
-    });
+    // Atomic conditional update — only succeeds if the ride is STILL SEARCHING.
+    // The DB-level filter { id, status: "SEARCHING" } eliminates the race window
+    // entirely: if another driver already transitioned the ride between our fetch
+    // and this call, the filter won't match and nothing gets modified.
+    await base44.asServiceRole.entities.Ride.updateMany(
+      { id: ride_id, status: "SEARCHING" },
+      { $set: {
+        status: "DRIVER_APPROACHING",
+        driver_id: user.id,
+        driver_name: user.full_name || user.email,
+        vehicle_id: vehicle_id || null,
+        vehicle_plate: vehicle_plate || null,
+        vehicle_model: vehicle_model || null,
+        vehicle_color: vehicle_color || null,
+      }}
+    );
+
+    // Re-fetch to verify we won the race (our driver_id is set)
+    const updated = await base44.asServiceRole.entities.Ride.get(ride_id);
+    if (!updated || updated.driver_id !== user.id) {
+      return Response.json({ error: "El viaje ya fue tomado por otro conductor", reason: "already_assigned" }, { status: 409 });
+    }
 
     // Audit log
     try {

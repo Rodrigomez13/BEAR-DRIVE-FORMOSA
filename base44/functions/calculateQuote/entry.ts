@@ -25,22 +25,50 @@ export default async function(req) {
 
     const distanceKm = estimateRoadDistanceKm(origin_lat, origin_lng, destination_lat, destination_lng);
     const durationMin = estimateDurationMin(distanceKm);
+
+    // Dynamic surge pricing — supply (online drivers) vs demand (searching rides).
+    // Mirrors Uber/Didi demand-based multipliers: when demand outpaces supply,
+    // fares increase to incentivize more drivers to go online.
+    const onlineDrivers = await base44.asServiceRole.entities.DriverLocation.filter({ online: true });
+    const searchingRides = await base44.asServiceRole.entities.Ride.filter({ status: "SEARCHING" });
+    const supply = onlineDrivers.length;
+    const demand = searchingRides.length;
+    let surgeMultiplier = 1.0;
+    if (supply > 0) {
+      const ratio = demand / supply;
+      if (ratio >= 3) surgeMultiplier = 1.6;
+      else if (ratio >= 2) surgeMultiplier = 1.4;
+      else if (ratio >= 1.5) surgeMultiplier = 1.2;
+    } else if (demand > 0) {
+      surgeMultiplier = 1.6;
+    }
+
     const fare = computeFare(distanceKm, durationMin, cat, pricing);
+    const surgedFare = Math.round(fare * surgeMultiplier);
+    const surgeAmount = surgedFare - fare;
+
+    // Category adjustment for breakdown transparency
+    const baseBeforeCategory = pricing.base_fare + distanceKm * pricing.per_km + durationMin * pricing.per_min;
+    let categoryAdjustment = 0;
+    if (cat === "flash") categoryAdjustment = pricing.flash_supplement || 0;
+    else if (cat === "premium") categoryAdjustment = baseBeforeCategory * (pricing.premium_multiplier || 1.5) - baseBeforeCategory;
 
     const quote = {
       quote_id: "q_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
-      price: fare,
+      price: surgedFare,
       currency: pricing.currency || "ARS",
       distance_km: Math.round(distanceKm * 10) / 10,
       duration_min: durationMin,
       category: cat,
       provider: "internal_haversine_v1",
       ttl_seconds: 300,
+      surge_multiplier: surgeMultiplier,
       breakdown: {
         base: pricing.base_fare,
         distance: Math.round(distanceKm * pricing.per_km),
         time: Math.round(durationMin * pricing.per_min),
-        category_adjustment: fare - (pricing.base_fare + distanceKm * pricing.per_km + durationMin * pricing.per_min)
+        category_adjustment: Math.round(categoryAdjustment),
+        surge: surgeAmount,
       },
       pricing_snapshot: {
         base_fare: pricing.base_fare,

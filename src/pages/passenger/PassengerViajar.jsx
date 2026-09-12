@@ -17,11 +17,12 @@ import { useBackoffPoll } from "@/hooks/useBackoffPoll";
 import { useRideSubscription } from "@/hooks/useRideSubscription";
 import { sanitizeString } from "@/lib/sanitize";
 import BearAvatar from "@/components/bear/BearAvatar";
-import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown, Share2 } from "lucide-react";
+import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown, Share2, MessageCircle } from "lucide-react";
 import { Image } from "@/components/ui/image";
 import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
 import LoadingScreen from "@/components/bear/LoadingScreen";
 import SearchingDriverAnimation from "@/components/bear/SearchingDriverAnimation";
+import RideChat from "@/components/bear/RideChat";
 
 const CATEGORIES = [
   { code: "basic", name: "BearDrive", desc: "Servicio estándar" },
@@ -53,6 +54,7 @@ export default function PassengerViajar() {
   const [showFavoriteModal, setShowFavoriteModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showSosDialog, setShowSosDialog] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [paying, setPaying] = useState(false);
   const [driverPos, setDriverPos] = useState(null);
   const [userPos, setUserPos] = useState(null);
@@ -602,7 +604,7 @@ export default function PassengerViajar() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center no-select" aria-label="Llamar conductor"><Phone className="w-5 h-5 text-accent" /></button>
+                    <button onClick={() => setShowChat(true)} className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center no-select" aria-label="Chat con conductor"><MessageCircle className="w-5 h-5 text-accent" /></button>
                     <button onClick={handleShareTrip} className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center no-select" aria-label="Compartir viaje"><Share2 className="w-5 h-5 text-accent" /></button>
                     <button onClick={() => setShowSosDialog(true)} className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center no-select" aria-label="Asistencia de seguridad"><Shield className="w-5 h-5 text-accent" /></button>
                   </div>
@@ -658,6 +660,14 @@ export default function PassengerViajar() {
           ride={activeRide}
           userPos={userPos}
         />
+        {showChat && (
+          <RideChat
+            rideId={activeRide.id}
+            userId={user.id}
+            peerName={activeRide.driver_name}
+            onClose={() => setShowChat(false)}
+          />
+        )}
       </div>
     );
   }
@@ -704,6 +714,9 @@ export default function PassengerViajar() {
                   <ChevronDown className={`w-5 h-5 transition-transform ${showBreakdown ? "rotate-180" : ""}`} />
                 </button>
                 <p className="text-xs text-muted-foreground mt-1">{quote.distance_km} km · {quote.duration_min} min</p>
+                {quote.surge_multiplier > 1 && (
+                  <p className="text-xs font-bold text-orange-500 mt-1">⚡ Demanda alta · x{quote.surge_multiplier}</p>
+                )}
               </div>
               {showBreakdown && quote.breakdown && (
                 <div className="mb-4 p-3 rounded-xl bg-secondary/50 space-y-1.5 text-sm">
@@ -712,6 +725,9 @@ export default function PassengerViajar() {
                   <div className="flex justify-between"><span className="text-muted-foreground">Tiempo</span><span>{formatPrice(quote.breakdown.time)}</span></div>
                   {Math.abs(quote.breakdown.category_adjustment) > 0 && (
                     <div className="flex justify-between"><span className="text-muted-foreground">Ajuste de categoría</span><span>{formatPrice(quote.breakdown.category_adjustment)}</span></div>
+                  )}
+                  {quote.breakdown.surge > 0 && (
+                    <div className="flex justify-between"><span className="text-muted-foreground">Demanda alta</span><span className="text-orange-500">{formatPrice(quote.breakdown.surge)}</span></div>
                   )}
                   <div className="h-px bg-border" />
                   <div className="flex justify-between font-bold"><span>Total</span><span className="text-accent">{formatPrice(quote.price)}</span></div>

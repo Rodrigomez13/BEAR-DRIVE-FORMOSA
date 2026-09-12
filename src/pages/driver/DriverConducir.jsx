@@ -24,6 +24,7 @@ import {
   ChevronUp,
   ChevronDown,
   Map as MapIcon,
+  MessageCircle,
 } from "lucide-react";
 import {
   getCurrentPosition,
@@ -39,6 +40,7 @@ import BearAvatar from "@/components/bear/BearAvatar";
 import RideRequestModal from "@/components/bear/RideRequestModal";
 import TurnByTurnNav from "@/components/bear/TurnByTurnNav";
 import LoadingScreen from "@/components/bear/LoadingScreen";
+import RideChat from "@/components/bear/RideChat";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const PICKUP_STATUSES = ["ASSIGNED", "DRIVER_APPROACHING"];
@@ -107,6 +109,7 @@ export default function DriverConducir() {
   const [cardMinimized, setCardMinimized] = useState(false);
   const [navMode, setNavMode] = useState("gps");
   const [navHeading, setNavHeading] = useState(0);
+  const [showChat, setShowChat] = useState(false);
 
   const positionWatchRef = useRef(null);
   const lastLocationPersistRef = useRef(0);
@@ -696,10 +699,13 @@ export default function DriverConducir() {
 
             <div className="flex items-center gap-3 mb-3 pb-3 border-b border-border">
               <BearAvatar size={40} />
-              <div>
-                <p className="font-medium text-sm">{activeRide.passenger_name || "Pasajero"}</p>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm truncate">{activeRide.passenger_name || "Pasajero"}</p>
                 <p className="text-xs text-muted-foreground">Pasajero</p>
               </div>
+              <button onClick={() => setShowChat(true)} className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center no-select shrink-0" aria-label="Chat con pasajero">
+                <MessageCircle className="w-5 h-5 text-accent" />
+              </button>
             </div>
 
             <div className="space-y-2 text-sm mb-4">
@@ -833,6 +839,14 @@ export default function DriverConducir() {
           onConfirm={handleCancel}
           isDriver={true}
         />
+        {showChat && (
+          <RideChat
+            rideId={activeRide.id}
+            userId={user.id}
+            peerName={activeRide.passenger_name}
+            onClose={() => setShowChat(false)}
+          />
+        )}
       </div>
     );
   }
