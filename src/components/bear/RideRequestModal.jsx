@@ -1,9 +1,10 @@
 import React from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Star, MapPin, Clock, DollarSign, X, BellOff, Check } from "lucide-react";
+import { Star, MapPin, Clock, DollarSign, X, BellOff, Check, Navigation } from "lucide-react";
 import { displayAddress } from "@/lib/geo";
 import BearAvatar from "@/components/bear/BearAvatar";
+import Haptics from "@/lib/haptics";
 
 export default function RideRequestModal({ ride, driverPos, onAccept, onReject, onSilence }) {
   const haversineKm = (lat1, lng1, lat2, lng2) => {
@@ -73,24 +74,44 @@ export default function RideRequestModal({ ride, driverPos, onAccept, onReject, 
           <div className="text-center p-3 rounded-xl bg-accent/10">
             <DollarSign className="w-4 h-4 text-accent mx-auto mb-1" />
             <p className="text-lg font-bold text-accent">{formatPrice(ride.quoted_fare)}</p>
-            <p className="text-[14px] text-muted-foreground">ganancia</p>
+            <p className="text-[11px] text-emerald-500 font-semibold">0% comisión</p>
           </div>
         </div>
 
-        <div className="flex items-center justify-between mb-4 text-sm">
+        <div className="flex items-center justify-between mb-4 text-sm px-1">
           <span className="text-muted-foreground">Método de pago</span>
-          <span className="font-medium">{paymentLabel}</span>
+          <span className="font-semibold text-foreground">{paymentLabel}</span>
         </div>
 
-        <div className="space-y-2">
-          <Button onClick={onAccept} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold">
-            <Check className="w-5 h-5 mr-2" />Aceptar viaje
+        <div className="space-y-3">
+          <Button
+            onClick={() => {
+              Haptics.success();
+              onAccept();
+            }}
+            className="w-full h-14 bear-gold-gradient text-foreground border-0 font-bold text-base shadow-lg active:scale-95 transition"
+          >
+            <Check className="w-6 h-6 mr-2" />Aceptar viaje
           </Button>
           <div className="flex gap-2">
-            <Button onClick={onReject} variant="outline" className="flex-1 text-destructive">
+            <Button
+              onClick={() => {
+                Haptics.warning();
+                onReject();
+              }}
+              variant="outline"
+              className="flex-1 h-11 text-destructive border-destructive/30 hover:bg-destructive/10"
+            >
               <X className="w-4 h-4 mr-1" />Rechazar
             </Button>
-            <Button onClick={onSilence} variant="outline" className="flex-1">
+            <Button
+              onClick={() => {
+                Haptics.light();
+                onSilence();
+              }}
+              variant="outline"
+              className="flex-1 h-11"
+            >
               <BellOff className="w-4 h-4 mr-1" />Silenciar
             </Button>
           </div>

@@ -9,7 +9,7 @@ import StarRating from "@/components/bear/StarRating";
 import BearAvatar from "@/components/bear/BearAvatar";
 import ThemeToggle from "@/components/bear/ThemeToggle";
 import ModeSwitcher from "@/components/bear/ModeSwitcher";
-import { Car, LogOut, FileText, ChevronRight, Shield, HelpCircle, CheckCircle2, AlertTriangle, Camera, Loader2, Clock, Trash2 } from "lucide-react";
+import { Car, LogOut, User, FileText, ChevronRight, Shield, HelpCircle, CheckCircle2, AlertTriangle, Camera, Loader2, Clock, Trash2 } from "lucide-react";
 import { businessDaysUntil } from "@/lib/businessDays";
 import { validateFile, optimizeForWeb } from "@/lib/imageUtils";
 import DeleteAccountDialog from "@/components/bear/DeleteAccountDialog";

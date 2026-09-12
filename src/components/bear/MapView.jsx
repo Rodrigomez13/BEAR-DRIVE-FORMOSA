@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { animateMarker } from "@/lib/animateMarker";
 import { loadMapsSDK, getAuthFailure, resetSdkPromise } from "@/lib/mapsConfig";
 import { getCachedRoute, setCachedRoute } from "@/lib/routeCache";
 import { AlertTriangle, Navigation } from "lucide-react";
 import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
+import { useTheme } from "@/lib/ThemeContext";
 
-const DARK_MAP_STYLES = [
+export const DARK_MAP_STYLES = [
   { elementType: "geometry", stylers: [{ color: "#0e1320" }] },
   { elementType: "labels.text.stroke", stylers: [{ color: "#0e1320" }] },
   { elementType: "labels.text.fill", stylers: [{ color: "#8b93a8" }] },
@@ -13,7 +13,7 @@ const DARK_MAP_STYLES = [
   { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#e0b85e" }] },
   { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#8a92a6" }] },
   { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#9aa2b5" }] },
-  { featureType: "poi", elementType: "labels.icon", stylers: [{ visibility: "on" }] },
+  { featureType: "poi", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
   { featureType: "poi.business", elementType: "labels.text.fill", stylers: [{ color: "#b8a46e" }] },
   { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#101820" }] },
   { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6a8a6a" }] },
@@ -31,6 +31,35 @@ const DARK_MAP_STYLES = [
   { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#4a5a6a" }] },
   { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#0b0f1c" }] },
   { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#121828" }] },
+];
+
+export const LIGHT_MAP_STYLES = [
+  { elementType: "geometry", stylers: [{ color: "#f4f6f9" }] },
+  { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#1e293b" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 3.5 }] },
+  { featureType: "administrative", elementType: "labels.text.fill", stylers: [{ color: "#0f172a" }] },
+  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#0f172a" }, { weight: "bold" }] },
+  { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#334155" }] },
+  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#475569" }] },
+  { featureType: "poi.business", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#dcfce7" }] },
+  { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#15803d" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#cbd5e1" }, { weight: 1.2 }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#0f172a" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#fed7aa" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#f97316" }, { weight: 1.5 }] },
+  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#7c2d12" }] },
+  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road.arterial", elementType: "geometry.stroke", stylers: [{ color: "#94a3b8" }, { weight: 1.2 }] },
+  { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road.local", elementType: "geometry.stroke", stylers: [{ color: "#e2e8f0" }, { weight: 1 }] },
+  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#bae6fd" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#0369a1" }] },
+  { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#f8fafc" }] },
+  { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#f1f5f9" }] },
 ];
 
 function originPinBackground(g) {
@@ -155,7 +184,12 @@ export default function MapView({
   tilt = 0,
   heading = 0,
   markerAnimationDuration = 900,
+  mapTheme,
 }) {
+  const themeContext = useTheme();
+  const effectiveTheme = mapTheme || themeContext?.theme || "dark";
+  const isDark = effectiveTheme === "dark";
+
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef({});
@@ -208,6 +242,19 @@ export default function MapView({
     driverPosRef.current = driverPos;
   }, [driverPos]);
 
+  // Update map visual style when day/night theme changes
+  useEffect(() => {
+    if (!mapRef.current || status !== "ready") return;
+    const styles = isDark ? DARK_MAP_STYLES : LIGHT_MAP_STYLES;
+    const backgroundColor = isDark ? "#0e1320" : "#f4f6f9";
+    mapRef.current.setOptions({ styles, backgroundColor });
+    if (polylineRef.current) {
+      polylineRef.current.setOptions({
+        strokeColor: isDark ? "#E9B74E" : "#d97706",
+      });
+    }
+  }, [isDark, status]);
+
   // Initialize map.
   useEffect(() => {
     let cancelled = false;
@@ -218,11 +265,14 @@ export default function MapView({
       if (cancelled || !containerRef.current) return;
       setDebugInfo("SDK cargado, creando instancia del mapa...");
 
+      const initialStyles = isDark ? DARK_MAP_STYLES : LIGHT_MAP_STYLES;
+      const initialBg = isDark ? "#0e1320" : "#f4f6f9";
+
       const map = new g.maps.Map(containerRef.current, {
         center,
         zoom,
-        styles: DARK_MAP_STYLES,
-        backgroundColor: "#0e1320",
+        styles: initialStyles,
+        backgroundColor: initialBg,
         gestureHandling: interactive ? "greedy" : "none",
         disableDefaultUI: true,
         clickableIcons: false,
@@ -381,15 +431,13 @@ export default function MapView({
       markers.destination.setVisible(false);
     }
 
-  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, originLabel, destinationLabel, showOriginMarker, showDestinationMarker, status]);
-
-  // Keep the live passenger marker separate from the agreed pickup point.
-  useEffect(() => {
-    const marker = markersRef.current.user;
-    if (!marker || status !== "ready") return;
-    if (!userPos) { marker.setVisible(false); return; }
-    return animateMarker(marker, userPos, 900);
-  }, [userPos?.lat, userPos?.lng, status]);
+    if (userPos && markers.user && !(origin && showOriginMarker)) {
+      markers.user.setPosition(userPos);
+      markers.user.setVisible(true);
+    } else if (markers.user) {
+      markers.user.setVisible(false);
+    }
+  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, originLabel, destinationLabel, showOriginMarker, showDestinationMarker, userPos?.lat, userPos?.lng, status]);
 
   // Smooth driver marker, follow camera and advance maneuver guidance without new route API calls.
   useEffect(() => {
@@ -407,7 +455,33 @@ export default function MapView({
       return;
     }
 
-    const stopAnimation = animateMarker(marker, driverPos, markerAnimationDuration);
+    const startPos = marker.getPosition();
+    if (!startPos || !marker.getVisible()) {
+      marker.setPosition(driverPos);
+      marker.setVisible(true);
+    } else {
+      const startLat = startPos.lat();
+      const startLng = startPos.lng();
+      const endLat = driverPos.lat;
+      const endLng = driverPos.lng;
+      const duration = markerAnimationDuration;
+      const startTime = Date.now();
+      let raf;
+
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const t = Math.min(elapsed / duration, 1);
+        const easeT = 1 - Math.pow(1 - t, 3);
+        marker.setPosition({
+          lat: startLat + (endLat - startLat) * easeT,
+          lng: startLng + (endLng - startLng) * easeT,
+        });
+        if (t < 1) raf = requestAnimationFrame(animate);
+      };
+
+      raf = requestAnimationFrame(animate);
+      setTimeout(() => cancelAnimationFrame(raf), duration + 150);
+    }
 
     if (followDriver && !followSuspended && mapRef.current) {
       mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, tilt, heading));
@@ -464,7 +538,6 @@ export default function MapView({
         setDeviatedOrigin({ lat: driverPos.lat, lng: driverPos.lng });
       }
     }
-    return stopAnimation;
   }, [driverPos?.lat, driverPos?.lng, driverPos?.heading, followDriver, followSuspended, navigationZoom, tilt, heading, status, markerAnimationDuration]);
 
   // Update route only when endpoints/path actually change. Driver GPS updates do not trigger route API calls.
@@ -643,13 +716,15 @@ export default function MapView({
     }
   };
 
+  const currentBg = isDark ? "#0e1320" : "#f4f6f9";
+
   return (
-    <div className={className} style={{ background: "#0e1320" }}>
+    <div className={className} style={{ background: currentBg }}>
       <div
         ref={containerRef}
         className="absolute inset-0"
         style={{
-          background: "#0e1320",
+          background: currentBg,
           transform: tilt > 0 ? `perspective(1000px) rotateX(${tilt}deg) rotateZ(${-heading}deg) scale(1.2)` : "none",
           transformOrigin: "center center",
           transition: "transform 0.4s ease-out",

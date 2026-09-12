@@ -43,3 +43,7 @@ base44/.app.jsonc
 android/local.properties
 android/.gradle/
 android/**/build/
+
+# Local agent skills and tooling
+.agents/
+skills-lock.json

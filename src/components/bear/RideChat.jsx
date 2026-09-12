@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { X, Send, MessageCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { sanitizeString } from "@/lib/sanitize";
+import Haptics from "@/lib/haptics";
 
 // In-app ride chat — privacy-preserving communication channel that replaces
 // direct phone calls. Phone numbers are never exposed; all messages flow
@@ -59,6 +60,27 @@ export default function RideChat({ rideId, userId, peerName, onClose }) {
     }
   };
 
+  const QUICK_CHIPS = [
+    "Ya salgo",
+    "Estoy en la puerta",
+    "Esperame 2 min",
+    "No te veo",
+    "¿De qué color es el auto?",
+    "Estoy con balizas",
+  ];
+
+  const handleSendChip = async (chipText) => {
+    Haptics.light();
+    setSending(true);
+    try {
+      await base44.functions.invoke("sendRideMessage", { ride_id: rideId, text: chipText });
+    } catch {
+      // ignore
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-background">
       <div className="flex items-center gap-3 p-3 border-b border-border safe-top">
@@ -79,7 +101,7 @@ export default function RideChat({ rideId, userId, peerName, onClose }) {
           <div className="text-center mt-8">
             <MessageCircle className="w-10 h-10 text-muted-foreground mx-auto mb-2 opacity-50" />
             <p className="text-sm text-muted-foreground">Aún no hay mensajes.</p>
-            <p className="text-xs text-muted-foreground mt-1">Escribí algo para iniciar la conversación.</p>
+            <p className="text-xs text-muted-foreground mt-1">Elegí un mensaje rápido o escribí abajo.</p>
           </div>
         )}
         {messages.map((msg) => {
@@ -92,6 +114,23 @@ export default function RideChat({ rideId, userId, peerName, onClose }) {
             </div>
           );
         })}
+      </div>
+
+      {/* Quick Chips Row */}
+      <div className="px-3 pt-2 pb-1 border-t border-border/50 bg-secondary/30">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide py-1">
+          {QUICK_CHIPS.map((chip) => (
+            <button
+              key={chip}
+              type="button"
+              disabled={sending}
+              onClick={() => handleSendChip(chip)}
+              className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-card border border-border/80 text-foreground hover:border-accent hover:bg-accent/10 active:scale-95 transition"
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="p-3 border-t border-border flex gap-2 safe-bottom">

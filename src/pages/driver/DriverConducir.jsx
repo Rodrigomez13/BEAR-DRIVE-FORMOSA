@@ -7,8 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import MapView from "@/components/bear/MapView";
+import Haptics from "@/lib/haptics";
+import navVoice from "@/lib/navVoice";
 import {
   Car,
+  Check,
   Power,
   Loader2,
   MapPin,
@@ -25,6 +28,8 @@ import {
   ChevronDown,
   Map as MapIcon,
   MessageCircle,
+  Sun,
+  Moon,
 } from "lucide-react";
 import {
   getCurrentPosition,
@@ -112,6 +117,9 @@ export default function DriverConducir() {
   const [navHeading, setNavHeading] = useState(0);
   const [showChat, setShowChat] = useState(false);
   const [qrCheckoutUrl, setQrCheckoutUrl] = useState(null);
+  const [driverSolarMode, setDriverSolarMode] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("bear_driver_solar") === "true"
+  );
 
   const positionWatchRef = useRef(null);
   const lastLocationPersistRef = useRef(0);
@@ -170,12 +178,11 @@ export default function DriverConducir() {
         });
         const rides = res.data?.rides || [];
         setAvailableRides(rides.filter((ride) => !silencedRides.current.has(ride.id)));
-      } catch (error) {
-        // Conservamos la lista y propagamos el error para activar el backoff.
-        throw error;
+      } catch {
+        // Se mantiene la lista anterior ante errores transitorios de red.
       }
     },
-    { enabled: online && !activeRide && !!driverPos, baseDelay: 4000, maxDelay: 30000 }
+    { enabled: online && !activeRide, baseDelay: 4000, maxDelay: 30000 }
   );
 
   // Realtime ride status subscription — primary sync mechanism (replaces 3s polling).
@@ -283,6 +290,8 @@ export default function DriverConducir() {
             await base44.functions.invoke("transitionRideStatus", {
               ride_id: activeRide.id, target_status: "DRIVER_ARRIVED",
             });
+            navVoice.announceArrival(true);
+            Haptics.arrival();
             setActiveRide((previous) => previous ? { ...previous, status: "DRIVER_ARRIVED" } : previous);
             setRouteInfo(null);
             toast({
@@ -311,6 +320,8 @@ export default function DriverConducir() {
             await base44.functions.invoke("transitionRideStatus", {
               ride_id: activeRide.id, target_status: "ARRIVED",
             });
+            navVoice.announceArrival(false);
+            Haptics.arrival();
             setActiveRide((previous) => previous ? { ...previous, status: "ARRIVED" } : previous);
             setRouteInfo(null);
             toast({
@@ -652,6 +663,10 @@ export default function DriverConducir() {
       ? displayAddress(activeRide.origin_address)
       : displayAddress(activeRide.destination_address);
 
+    const etaString = routeInfo?.durationSeconds
+      ? new Date(Date.now() + routeInfo.durationSeconds * 1000).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })
+      : null;
+
     return (
       <div className="absolute inset-0">
         <MapView
@@ -664,162 +679,241 @@ export default function DriverConducir() {
           driverPos={driverPos}
           interactive={true}
           followDriver={isNavigating}
-          navigationZoom={navMode === "gps" ? 16 : 15}
+          navigationZoom={navMode === "gps" ? 18 : 15}
           onRouteInfo={setRouteInfo}
-          tilt={navMode === "gps" && isNavigating ? 42 : 0}
+          tilt={navMode === "gps" && isNavigating ? 48 : 0}
           heading={navMode === "gps" && isNavigating ? navHeading : 0}
+          mapTheme={driverSolarMode ? "light" : "dark"}
           className="absolute inset-0"
         />
 
+        {/* Turn-by-turn navigation HUD (top) */}
         {isNavigating && (
           <>
             {navMode === "gps" && (
               <TurnByTurnNav
                 routeInfo={routeInfo}
-                phaseLabel={navigatingToPickup ? "Ir a buscar al pasajero" : "En viaje al destino"}
+                phaseLabel={navigatingToPickup ? "Hacia el pasajero" : "Rumbo al destino"}
                 targetAddress={navigationAddress}
                 remainingTime={routeInfo?.durationText}
                 remainingDistance={routeInfo?.distanceText}
               />
             )}
-            <button
-              onClick={() => setNavMode(navMode === "gps" ? "normal" : "gps")}
-              className="absolute right-3 top-[calc(env(safe-area-inset-top)+8.5rem)] z-20 flex items-center gap-2 rounded-full bg-[#181E2F]/95 px-3 py-2 text-xs font-semibold text-white shadow-lg border border-white/10 active:scale-95 transition"
-            >
-              {navMode === "gps" ? <MapIcon className="w-4 h-4 text-accent" /> : <Navigation className="w-4 h-4 text-accent" />}
-              {navMode === "gps" ? "Vista normal" : "Modo GPS"}
-            </button>
+            <div className="absolute right-3 top-[calc(env(safe-area-inset-top)+8.5rem)] z-20 flex flex-col items-end gap-2">
+              <button
+                onClick={() => {
+                  Haptics.light();
+                  setNavMode(navMode === "gps" ? "normal" : "gps");
+                }}
+                className="flex items-center gap-1.5 rounded-full bg-[#0e1320]/90 backdrop-blur-md px-3 py-2 text-xs font-semibold text-white shadow-xl border border-white/10 active:scale-95 transition"
+              >
+                {navMode === "gps" ? <MapIcon className="w-4 h-4 text-accent" /> : <Navigation className="w-4 h-4 text-accent" />}
+                {navMode === "gps" ? "Vista 2D" : "Modo 3D"}
+              </button>
+
+              <button
+                onClick={() => {
+                  Haptics.light();
+                  const next = !driverSolarMode;
+                  setDriverSolarMode(next);
+                  try {
+                    localStorage.setItem("bear_driver_solar", String(next));
+                  } catch {}
+                }}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold shadow-xl border active:scale-95 transition ${
+                  driverSolarMode
+                    ? "bg-[#E9B74E] text-[#181E2F] border-[#E9B74E] font-bold"
+                    : "bg-[#0e1320]/90 backdrop-blur-md text-white border-white/10"
+                }`}
+                title={driverSolarMode ? "Modo Deep Navy / Noche" : "Modo Sol / Alto contraste exterior"}
+              >
+                {driverSolarMode ? <Sun className="w-4 h-4 fill-current text-[#181E2F]" /> : <Moon className="w-4 h-4 text-accent" />}
+                {driverSolarMode ? "Modo Sol" : "Modo Noche"}
+              </button>
+            </div>
           </>
         )}
 
-        {cardMinimized && isNavigating && (
-          <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
-            <button
-              onClick={() => setCardMinimized(false)}
-              className="max-w-md mx-auto flex items-center gap-2 px-3 py-2 rounded-full bg-[#0e1320]/90 border border-white/10 text-white shadow-lg backdrop-blur-md"
-            >
-              <BearAvatar size={24} />
-              <span className="font-medium text-xs truncate flex-1 text-left">{activeRide.passenger_name || "Pasajero"}</span>
-              <span className="text-xs font-bold text-accent shrink-0">{formatPrice(activeRide.quoted_fare)}</span>
-              <ChevronUp className="w-3.5 h-3.5 text-white/40 shrink-0" />
-            </button>
-          </div>
-        )}
-        {!cardMinimized && (
-        <div className="absolute inset-x-0 bottom-0 z-10 p-3">
-          <Card className="rounded-2xl p-4 max-w-md mx-auto">
-            {isNavigating && (
-              <button onClick={() => setCardMinimized(true)} className="w-full flex items-center justify-center gap-1 text-xs text-muted-foreground mb-3">
-                <ChevronDown className="w-4 h-4" /> Minimizar
-              </button>
-            )}
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent capitalize">
-                {status.replace(/_/g, " ")}
-              </span>
-              <span className="font-bold text-lg text-accent">{formatPrice(activeRide.quoted_fare)}</span>
-            </div>
+        {/* NATIVE DRIVER HUD BOTTOM BAR (when navigating to pickup or destination) */}
+        {isNavigating && (
+          <div className="absolute inset-x-0 bottom-0 z-20 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pointer-events-none">
+            <div className="max-w-md mx-auto rounded-3xl bg-[#0e1320]/95 backdrop-blur-md border border-accent/30 p-4 shadow-2xl space-y-3 pointer-events-auto">
+              {/* Top row: ETA + Remaining time & distance + Quick actions */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-baseline gap-2">
+                  {etaString && (
+                    <span className="text-2xl font-black text-accent tracking-tight">
+                      {etaString}
+                    </span>
+                  )}
+                  <span className="text-xs font-bold text-white/90">
+                    {routeInfo?.durationText || `${activeRide.duration_min} min`}
+                  </span>
+                  <span className="text-white/30 text-xs">•</span>
+                  <span className="text-xs font-semibold text-white/60">
+                    {routeInfo?.distanceText || `${activeRide.distance_km} km`}
+                  </span>
+                </div>
 
-            <div className="flex items-center gap-3 mb-3 pb-3 border-b border-border">
-              <BearAvatar size={40} />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{activeRide.passenger_name || "Pasajero"}</p>
-                <p className="text-xs text-muted-foreground">Pasajero</p>
-              </div>
-              <button onClick={() => setShowChat(true)} className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center no-select shrink-0" aria-label="Chat con pasajero">
-                <MessageCircle className="w-5 h-5 text-accent" />
-              </button>
-            </div>
-
-            <div className="space-y-2 text-sm mb-4">
-              <p className="text-muted-foreground truncate">
-                <MapPin className="w-3.5 h-3.5 inline mr-1 shrink-0" />
-                {displayAddress(activeRide.origin_address)}
-              </p>
-              <p className="text-muted-foreground truncate">
-                <Navigation className="w-3.5 h-3.5 inline mr-1 shrink-0" />
-                {displayAddress(activeRide.destination_address)}
-              </p>
-              <div className="flex gap-3 text-xs text-muted-foreground pt-1">
-                <span><Clock className="w-3 h-3 inline mr-1" />{activeRide.duration_min} min</span>
-                <span><MapPin className="w-3 h-3 inline mr-1" />{activeRide.distance_km} km</span>
-                <span className="capitalize flex items-center gap-1">
-                  {activeRide.payment_method === "card" && <CreditCard className="w-3 h-3" />}
-                  {activeRide.payment_method === "cash" && <Banknote className="w-3 h-3" />}
-                  {activeRide.payment_method === "qr" && <QrCode className="w-3 h-3" />}
-                  {activeRide.payment_method === "card"
-                    ? "Tarjeta"
-                    : activeRide.payment_method === "cash"
-                      ? "Efectivo"
-                      : "QR"}
-                </span>
-              </div>
-            </div>
-
-            {PICKUP_STATUSES.includes(status) && (
-              <div>
-                <p className="text-sm text-center text-muted-foreground mb-3">
-                  Seguí la guía hasta el punto de encuentro. La llegada se detecta automáticamente.
-                </p>
-                <Button onClick={handleArrived} variant="outline" className="w-full">
-                  Marcar “Llegué” manualmente
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCancelDialog(true)}
-                  className="w-full mt-2 text-destructive text-sm"
-                >
-                  Cancelar viaje
-                </Button>
-              </div>
-            )}
-
-            {status === "DRIVER_ARRIVED" && (
-              <div>
-                <p className="text-sm text-center text-muted-foreground mb-3">
-                  Estás en el punto de encuentro. Pedile al pasajero el PIN de inicio:
-                </p>
-                <div className="flex gap-2">
-                  <Input
-                    value={pinInput}
-                    onChange={(event) => setPinInput(event.target.value.replace(/\D/g, ""))}
-                    inputMode="numeric"
-                    placeholder="PIN de 4 dígitos"
-                    maxLength={4}
-                    className="text-center text-lg tracking-widest"
-                  />
-                  <Button
-                    onClick={handleValidatePin}
-                    disabled={pinInput.length !== 4}
-                    className="bear-gold-gradient text-foreground border-0"
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowChat(true)}
+                    className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white relative active:scale-95 transition"
+                    aria-label="Chat con pasajero"
                   >
-                    <KeyRound className="w-4 h-4" />
-                  </Button>
+                    <MessageCircle className="w-4 h-4 text-accent" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCardMinimized(!cardMinimized)}
+                    className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 active:scale-95 transition"
+                    aria-label="Detalles del viaje"
+                  >
+                    {cardMinimized ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
-            )}
 
-            {status === "IN_PROGRESS" && (
-              <div>
-                <p className="text-sm text-center text-muted-foreground mb-3">
-                  Seguí la guía hasta el destino. BearDrive detectará la llegada automáticamente.
+              {/* Target address pill */}
+              <div className="flex items-center gap-2 px-1">
+                <div className="w-2.5 h-2.5 rounded-full bg-accent shrink-0 animate-pulse" />
+                <p className="text-xs font-medium text-white/90 truncate flex-1">
+                  <span className="text-white/50">{navigatingToPickup ? "Recogida: " : "Destino: "}</span>
+                  {navigationAddress}
                 </p>
-                <Button onClick={handleDestinationArrived} variant="outline" className="w-full">
-                  Marcar llegada manualmente
-                </Button>
               </div>
-            )}
 
-            {status === "ARRIVED" && (
-              <div className="text-center">
-                <Navigation className="w-8 h-8 text-accent mx-auto mb-2" />
-                <p className="text-sm font-medium mb-1">Llegaste al destino</p>
-                <p className="text-xs text-muted-foreground mb-3">Continuá con el cobro para cerrar el viaje.</p>
-                <Button onClick={handleProceedToPayment} className="w-full bear-gold-gradient text-foreground border-0">
-                  Continuar al cobro
+              {/* Main Driver Action Button (large single-touch target) */}
+              {PICKUP_STATUSES.includes(status) && (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    Haptics.success();
+                    handleArrived();
+                  }}
+                  className="w-full h-12 bear-gold-gradient text-foreground border-0 font-extrabold text-sm shadow-lg active:scale-98 transition flex items-center justify-center gap-2"
+                >
+                  <Check className="w-5 h-5 stroke-[2.5]" />
+                  Marcar “Llegué al punto de encuentro”
                 </Button>
+              )}
+
+              {status === "IN_PROGRESS" && (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    Haptics.success();
+                    handleDestinationArrived();
+                  }}
+                  className="w-full h-12 bear-gold-gradient text-foreground border-0 font-extrabold text-sm shadow-lg active:scale-98 transition flex items-center justify-center gap-2"
+                >
+                  <Check className="w-5 h-5 stroke-[2.5]" />
+                  Marcar “Llegué al destino”
+                </Button>
+              )}
+
+              {/* Expanded details drawer */}
+              {cardMinimized && (
+                <div className="pt-2.5 border-t border-white/10 space-y-2 text-xs animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between text-white/70">
+                    <span>Pasajero: <strong className="text-white">{activeRide.passenger_name || "Pasajero"}</strong></span>
+                    <span className="text-accent font-bold">{formatPrice(activeRide.quoted_fare)}</span>
+                  </div>
+                  {activeRide.notes && (
+                    <p className="p-2 rounded-xl bg-white/5 text-white/85 border border-white/10 italic text-[11px]">
+                      {activeRide.notes}
+                    </p>
+                  )}
+                  <div className="flex justify-between items-center pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowCancelDialog(true)}
+                      className="text-red-400 hover:underline text-[11px]"
+                    >
+                      Cancelar viaje
+                    </button>
+                    {navigationTarget && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = `https://www.google.com/maps/dir/?api=1&destination=${navigationTarget.lat},${navigationTarget.lng}&travelmode=driving`;
+                          window.open(url, "_blank");
+                        }}
+                        className="text-white/40 hover:text-white/70 text-[11px] underline"
+                      >
+                        Abrir en app externa
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* FOCUSED ACTION CARDS (when arrived, validating PIN, or payment pending) */}
+        {!isNavigating && (
+          <div className="absolute inset-x-0 bottom-0 z-20 p-3">
+            <Card className="rounded-3xl p-5 max-w-md mx-auto shadow-2xl border-border bg-card">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent capitalize">
+                  {status.replace(/_/g, " ")}
+                </span>
+                <span className="font-bold text-lg text-accent">{formatPrice(activeRide.quoted_fare)}</span>
               </div>
-            )}
+
+              <div className="flex items-center gap-3 mb-4 pb-3 border-b border-border">
+                <BearAvatar size={40} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{activeRide.passenger_name || "Pasajero"}</p>
+                  <p className="text-xs text-muted-foreground">Pasajero</p>
+                </div>
+                <button
+                  onClick={() => setShowChat(true)}
+                  className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center no-select shrink-0"
+                  aria-label="Chat con pasajero"
+                >
+                  <MessageCircle className="w-5 h-5 text-accent" />
+                </button>
+              </div>
+
+              {status === "DRIVER_ARRIVED" && (
+                <div>
+                  <p className="text-sm text-center text-muted-foreground mb-3">
+                    Estás en el punto de encuentro. Pedile al pasajero el PIN de inicio:
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      value={pinInput}
+                      onChange={(event) => setPinInput(event.target.value.replace(/\D/g, ""))}
+                      inputMode="numeric"
+                      placeholder="PIN de 4 dígitos"
+                      maxLength={4}
+                      className="text-center text-xl tracking-widest font-mono font-black h-12"
+                    />
+                    <Button
+                      onClick={handleValidatePin}
+                      disabled={pinInput.length !== 4}
+                      className="bear-gold-gradient text-foreground border-0 h-12 px-5 font-bold"
+                    >
+                      <KeyRound className="w-5 h-5 mr-1" />
+                      Iniciar
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {status === "ARRIVED" && (
+                <div className="text-center">
+                  <Navigation className="w-8 h-8 text-accent mx-auto mb-2" />
+                  <p className="text-sm font-medium mb-1">Llegaste al destino</p>
+                  <p className="text-xs text-muted-foreground mb-3">Continuá con el cobro para cerrar el viaje.</p>
+                  <Button onClick={handleProceedToPayment} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-bold">
+                    Continuar al cobro
+                  </Button>
+                </div>
+              )}
 
             {status === "PAYMENT_PENDING" && (
               <div className="text-center">
@@ -827,6 +921,7 @@ export default function DriverConducir() {
                   <QrPaymentDisplay
                     checkoutUrl={qrCheckoutUrl}
                     amount={activeRide.final_fare || activeRide.quoted_fare}
+                    rideId={activeRide.id}
                     onClose={() => setQrCheckoutUrl(null)}
                   />
                 ) : activeRide.payment_method === "card" ? (
@@ -916,6 +1011,7 @@ export default function DriverConducir() {
           driverPos={driverPos}
           recenter={driverPos}
           interactive={true}
+          mapTheme={driverSolarMode ? "light" : "dark"}
           className="absolute inset-0"
         />
 

@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
-import { AlertCircle, Receipt, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { DollarSign, TrendingUp, Car, AlertCircle, Receipt, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { displayAddress } from "@/lib/geo";
 import LoadingScreen from "@/components/bear/LoadingScreen";
 import PullToRefresh from "@/components/bear/PullToRefresh";
@@ -65,9 +65,22 @@ export default function DriverEarnings() {
   return (
     <PullToRefresh onRefresh={load}>
     <div className="max-w-md mx-auto px-4 pt-6 pb-8">
-      <h1 className="text-2xl font-bold mb-6">Ganancias</h1>
+      <h1 className="text-2xl font-bold mb-4">Ganancias</h1>
 
-      {/* Debt alert */}
+      {/* 0% Commission Value Prop Banner */}
+      <Card className="p-4 mb-4 bg-accent/10 border-accent/30">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+            <DollarSign className="w-5 h-5 text-accent" />
+          </div>
+          <div>
+            <p className="font-bold text-sm text-foreground">0% de comisión por viaje</p>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+              BearDrive no descuenta comisión de tus viajes. Pagás un único cargo diario sólo si completás al menos un viaje en el día.
+            </p>
+          </div>
+        </div>
+      </Card>
       {totalDebt > 0 && (
         <Card className="p-4 mb-4 bg-destructive/5 border-destructive/30">
           <div className="flex items-start gap-3">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -6,17 +6,20 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import MapView from "@/components/bear/MapView";
+import RideMapView from "@/components/bear/RideMapView";
 import StarRating from "@/components/bear/StarRating";
 import FavoriteModal from "@/components/bear/FavoriteModal";
 import FavoritesBar from "@/components/bear/FavoritesBar";
-import { searchPlaces, geocodePlace, reverseGeocode, getCurrentPosition, watchCurrentPosition, clearPositionWatch, FORMOSA_CENTER, displayAddress } from "@/lib/geo";
+import { searchPlaces, geocodePlace, reverseGeocode, getCurrentPosition, FORMOSA_CENTER, displayAddress, FORMOSA_POIS } from "@/lib/geo";
 import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import SosDialog from "@/components/bear/SosDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
+import { useBackoffPoll } from "@/hooks/useBackoffPoll";
 import { useRideSubscription } from "@/hooks/useRideSubscription";
 import { sanitizeString } from "@/lib/sanitize";
+import Haptics from "@/lib/haptics";
 import BearAvatar from "@/components/bear/BearAvatar";
-import { MapPin, Search, Crosshair, Loader2, Car, Star, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown, Share2, MessageCircle } from "lucide-react";
+import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown, Share2, MessageCircle, Sparkles } from "lucide-react";
 import { Image } from "@/components/ui/image";
 import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
 import LoadingScreen from "@/components/bear/LoadingScreen";
@@ -24,9 +27,9 @@ import SearchingDriverAnimation from "@/components/bear/SearchingDriverAnimation
 import RideChat from "@/components/bear/RideChat";
 
 const CATEGORIES = [
-  { code: "basic", name: "BearDrive", desc: "Servicio estándar" },
-  { code: "flash", name: "BearFlash", desc: "Prioridad alta" },
-  { code: "premium", name: "BearPremium", desc: "Gama superior" },
+  { code: "basic", name: "BearDrive", eta: "4 min", desc: "Económico estándar", badge: null },
+  { code: "flash", name: "BearFlash", eta: "2 min", desc: "Prioritario", badge: "Más rápido" },
+  { code: "premium", name: "BearPremium", eta: "5 min", desc: "Confort premium", badge: "Confort" },
 ];
 
 const ACTIVE_STATUSES = ["SEARCHING", "ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING", "PIN_VALIDATION", "IN_PROGRESS", "ARRIVED", "PAYMENT_PENDING"];
@@ -68,6 +71,9 @@ export default function PassengerViajar() {
   const [destExpanded, setDestExpanded] = useState(true);
   const [paymentExpanded, setPaymentExpanded] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(true);
+  const [usePoints, setUsePoints] = useState(false);
+  const [cashNoteOption, setCashNoteOption] = useState("exact");
+  const [pickupReference, setPickupReference] = useState("");
   // Handle Stripe redirect return + card setup return + fetch saved card
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -147,26 +153,6 @@ export default function PassengerViajar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Foreground tracking updates only our marker, never the quoted pickup or route.
-  useEffect(() => {
-    if (!user?.id || loading) return;
-    let cancelled = false;
-    let handle;
-    let lastTimestamp = 0;
-    const stop = (watch) => clearPositionWatch(watch).catch(() => {});
-    watchCurrentPosition((position, error) => {
-      if (cancelled || error || !position) return;
-      if (!Number.isFinite(position.lat) || !Number.isFinite(position.lng)) return;
-      if (Number.isFinite(position.accuracy) && position.accuracy > 100) return;
-      if (position.timestamp && position.timestamp <= lastTimestamp) return;
-      lastTimestamp = position.timestamp || lastTimestamp;
-      setUserPos(position);
-    }, { enableHighAccuracy: false, maximumAge: 1000, minimumUpdateInterval: 1000 })
-      .then((watch) => { if (cancelled) stop(watch); else handle = watch; })
-      .catch(() => { /* Manual pickup remains available when permission is denied. */ });
-    return () => { cancelled = true; if (handle) stop(handle); };
-  }, [user?.id, loading]);
-
   // Realtime ride status subscription — primary sync mechanism (replaces 3s polling).
   // A 15s fallback poll inside the hook covers recovery if a realtime event is missed.
   useRideSubscription(activeRide?.id, (updated) => {
@@ -193,14 +179,34 @@ export default function PassengerViajar() {
     return () => unsubscribe();
   }, [activeRide?.driver_id]);
 
-  // Auto-minimize card and capture route origin when driver is assigned
+  // Auto-minimize/expand card and trigger tactile/audio feedback on status transitions
+  const prevRideStatusRef = useRef(activeRide?.status);
   useEffect(() => {
-    if (activeRide && ["ASSIGNED", "DRIVER_APPROACHING"].includes(activeRide.status)) {
-      setCardMinimized(true);
-    }
+    const prev = prevRideStatusRef.current;
+    const current = activeRide?.status;
+    prevRideStatusRef.current = current;
+
     if (!activeRide) {
       setCardMinimized(false);
       setRouteOrigin(null);
+      return;
+    }
+
+    if (["ASSIGNED", "DRIVER_APPROACHING"].includes(current) && !prev) {
+      setCardMinimized(true);
+    } else if (current === "DRIVER_ARRIVED" && prev !== "DRIVER_ARRIVED") {
+      setCardMinimized(false); // Auto-expand for instant PIN visibility
+      Haptics.arrival();
+      toast({
+        title: "¡Tu conductor llegó!",
+        description: "Mostrale o dictale el PIN de 4 dígitos al subir al auto.",
+      });
+    } else if (current === "IN_PROGRESS" && prev !== "IN_PROGRESS") {
+      setCardMinimized(true); // Auto-minimize during trip so the route map is clear
+      Haptics.success();
+    } else if (current === "ARRIVED" && prev !== "ARRIVED") {
+      setCardMinimized(false); // Auto-expand when reaching destination
+      Haptics.arrival();
     }
   }, [activeRide?.status, activeRide?.id]);
 
@@ -330,7 +336,24 @@ export default function PassengerViajar() {
       toast({ title: "Vinculá una tarjeta primero", description: "Tocá \"Vincular tarjeta\" abajo", variant: "destructive" });
       return;
     }
+    Haptics.medium();
     const pin = String(Math.floor(1000 + Math.random() * 9000));
+    const availablePoints = user?.bear_points || 0;
+    const pointsDiscount = (usePoints && availablePoints >= 50)
+      ? Math.min(Math.floor(availablePoints / 10) * 100, Math.floor(quote.price * 0.3))
+      : 0;
+    const finalFare = Math.max(quote.price - pointsDiscount, 500);
+
+    const notesList = [];
+    if (pickupReference.trim()) notesList.push(`Ref: ${sanitizeString(pickupReference.trim(), 100)}`);
+    if (paymentMethod === "cash") {
+      if (cashNoteOption === "exact") notesList.push("Pago justo (sin vuelto)");
+      else if (cashNoteOption === "change") notesList.push("Necesita cambio");
+      else notesList.push(`Abona con billete de $${Number(cashNoteOption).toLocaleString("es-AR")}`);
+    }
+    if (pointsDiscount > 0) notesList.push(`Desc. BearPoints: -$${pointsDiscount}`);
+    const finalNotes = notesList.join(" · ");
+
     // Optimistic: show searching state immediately, roll back on failure
     const tempRide = {
       status: "SEARCHING",
@@ -342,10 +365,11 @@ export default function PassengerViajar() {
       destination_lng: destination.lng,
       category,
       payment_method: paymentMethod,
-      quoted_fare: quote.price,
+      quoted_fare: finalFare,
       distance_km: quote.distance_km,
       duration_min: quote.duration_min,
       start_pin: pin,
+      notes: finalNotes,
     };
     setActiveRide(tempRide);
     setQuote(null);
@@ -362,10 +386,11 @@ export default function PassengerViajar() {
         destination_lng: destination.lng,
         category,
         payment_method: paymentMethod,
-        quoted_fare: quote.price,
+        quoted_fare: finalFare,
         distance_km: quote.distance_km,
         duration_min: quote.duration_min,
         start_pin: pin,
+        notes: finalNotes,
         quote_data: JSON.stringify(quote),
       });
       setActiveRide(ride);
@@ -626,8 +651,18 @@ export default function PassengerViajar() {
               <BearAvatar size={40} />
               <div className="flex-1 text-left min-w-0">
                 <p className="font-bold text-sm truncate">{activeRide.driver_name || "Conductor"}</p>
-                <p className="text-xs text-muted-foreground">
-                  {status === "DRIVER_APPROACHING" ? "En camino a tu ubicación" : status === "DRIVER_ARRIVED" ? "Llegó al punto de encuentro" : "Conductor asignado"}
+                <p className="text-xs text-muted-foreground truncate">
+                  {status === "DRIVER_APPROACHING"
+                    ? "En camino a tu ubicación"
+                    : status === "DRIVER_ARRIVED"
+                    ? "Llegó al punto de encuentro"
+                    : status === "IN_PROGRESS"
+                    ? `En viaje hacia destino (${activeRide.duration_min || 5} min)`
+                    : status === "ARRIVED"
+                    ? "Llegaste a destino"
+                    : status === "PAYMENT_PENDING"
+                    ? "Pendiente de cobro"
+                    : "Conductor asignado"}
                 </p>
               </div>
               <ChevronUp className="w-5 h-5 text-muted-foreground shrink-0" />
@@ -669,42 +704,73 @@ export default function PassengerViajar() {
                 <Button onClick={() => setActiveRide(null)} className="w-full bear-gold-gradient text-foreground border-0">Aceptar</Button>
               </div>
             )}
-            {["ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING"].includes(status) && (
+            {["ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING", "IN_PROGRESS"].includes(status) && (
               <div>
-                <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-3 mb-3">
                   <BearAvatar size={48} />
-                  <div className="flex-1">
-                    <p className="font-bold text-base">{activeRide.driver_name || "Conductor"}</p>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Star className="w-3.5 h-3.5 fill-accent text-accent" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-base truncate">{activeRide.driver_name || "Conductor"}</p>
+                    <div className="flex items-center gap-2 text-xs truncate">
+                      <Star className="w-3.5 h-3.5 fill-accent text-accent shrink-0" />
                       <span>{user?.rating_avg || "5.0"}</span>
                       <span className="text-muted-foreground">·</span>
-                      <span className="text-muted-foreground">{activeRide.vehicle_model || ""}</span>
+                      <span className="text-muted-foreground truncate">{activeRide.vehicle_model || ""}</span>
                       <span className="text-muted-foreground">·</span>
-                      <span className="font-medium">{activeRide.vehicle_plate || ""}</span>
+                      <span className="font-medium text-foreground">{activeRide.vehicle_plate || ""}</span>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => setShowChat(true)} className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center no-select" aria-label="Chat con conductor"><MessageCircle className="w-5 h-5 text-accent" /></button>
-                    <button onClick={handleShareTrip} className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center no-select" aria-label="Compartir viaje"><Share2 className="w-5 h-5 text-accent" /></button>
-                    <button onClick={() => setShowSosDialog(true)} className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center no-select" aria-label="Asistencia de seguridad"><Shield className="w-5 h-5 text-accent" /></button>
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => setShowChat(true)} className="w-10 h-10 rounded-full bg-accent/10 hover:bg-accent/20 flex items-center justify-center no-select transition" aria-label="Chat con conductor"><MessageCircle className="w-5 h-5 text-accent" /></button>
+                    <button onClick={handleShareTrip} className="w-10 h-10 rounded-full bg-accent/10 hover:bg-accent/20 flex items-center justify-center no-select transition" aria-label="Compartir viaje"><Share2 className="w-5 h-5 text-accent" /></button>
+                    <button onClick={() => setShowSosDialog(true)} className="w-10 h-10 rounded-full bg-accent/10 hover:bg-accent/20 flex items-center justify-center no-select transition" aria-label="Asistencia de seguridad"><Shield className="w-5 h-5 text-accent" /></button>
                   </div>
                 </div>
-                {status === "DRIVER_ARRIVED" && (
-                  <div className="bg-accent/10 rounded-xl p-4 text-center mb-3">
-                    <p className="text-sm text-muted-foreground mb-1">Tu conductor llegó. Compartile este PIN:</p>
-                    <p className="text-3xl font-extrabold tracking-[0.5em] text-accent">{activeRide.start_pin}</p>
+
+                {status === "IN_PROGRESS" && (
+                  <div className="rounded-2xl bg-accent/10 border border-accent/30 p-3 my-3 space-y-1.5 shadow-inner">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" />
+                        <span className="text-xs font-bold text-accent uppercase tracking-wide">
+                          En viaje hacia destino
+                        </span>
+                      </div>
+                      <span className="text-xs font-bold text-foreground">
+                        {activeRide.duration_min} min · {activeRide.distance_km} km
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-muted-foreground pt-1">
+                      <span>Tarifa: <strong className="text-accent font-bold">{formatPrice(activeRide.quoted_fare)}</strong></span>
+                      <span className="capitalize">{activeRide.payment_method === "cash" ? "Efectivo" : activeRide.payment_method === "qr" ? "QR" : "Tarjeta"}</span>
+                    </div>
+                  </div>
+                )}
+
+                {activeRide.start_pin && ["ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING"].includes(status) && (
+                  <div className="bg-accent/10 border border-accent/30 rounded-2xl p-4 text-center mb-3 shadow-inner">
+                    <p className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider mb-1">
+                      PIN de inicio de viaje
+                    </p>
+                    <div className="text-3xl font-extrabold tracking-[0.4em] font-mono text-accent">
+                      {activeRide.start_pin}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {status === "DRIVER_ARRIVED"
+                        ? "El conductor llegó al punto. Dictale este código para iniciar."
+                        : "Dictale este código a tu conductor al subir al auto."}
+                    </p>
                   </div>
                 )}
                 {status === "ASSIGNED" || status === "DRIVER_APPROACHING" ? (
                   <p className="text-center text-sm text-muted-foreground">{status === "DRIVER_APPROACHING" ? "Tu conductor está en camino" : "Conductor asignado, en camino..."}</p>
                 ) : null}
-                <Button variant="outline" onClick={() => setShowCancelDialog(true)} className="w-full mt-3 text-destructive text-sm">Cancelar viaje</Button>
+                {["ASSIGNED", "DRIVER_APPROACHING", "WAITING"].includes(status) && (
+                  <Button variant="outline" onClick={() => setShowCancelDialog(true)} className="w-full mt-3 text-destructive text-sm">Cancelar viaje</Button>
+                )}
               </div>
             )}
-            {["PIN_VALIDATION", "IN_PROGRESS", "ARRIVED", "PAYMENT_PENDING"].includes(status) && (
+            {["PIN_VALIDATION", "ARRIVED", "PAYMENT_PENDING"].includes(status) && (
               <div className="text-center py-2">
-                {status === "IN_PROGRESS" && <><Car className="w-10 h-10 text-accent mx-auto mb-2" /><p className="font-semibold">En viaje</p><p className="text-sm text-muted-foreground">Llegando a destino...</p></>}
                 {status === "ARRIVED" && <><CheckCircle2 className="w-10 h-10 text-accent mx-auto mb-2" /><p className="font-semibold">Llegaste a destino</p></>}
                 {status === "PAYMENT_PENDING" && <>
                   <Wallet className="w-10 h-10 text-accent mx-auto mb-2" />
@@ -722,9 +788,16 @@ export default function PassengerViajar() {
                     </div>
                   ) : activeRide.payment_method === "qr" ? (
                     <>
-                      <p className="text-sm text-muted-foreground mb-3">Escaneá el QR del conductor o tocá para pagar</p>
-                      <Button onClick={handleQrPayment} disabled={paying} className="w-full bear-gold-gradient text-foreground border-0 font-semibold">
-                        {paying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Procesando...</> : <><QrCode className="w-4 h-4 mr-2" />Pagar con QR</>}
+                      <p className="text-sm text-muted-foreground mb-3">Escaneá el código dinámico del chofer o abrí tu app de pagos</p>
+                      <Button
+                        onClick={() => {
+                          Haptics.medium();
+                          handleQrPayment();
+                        }}
+                        disabled={paying}
+                        className="w-full h-12 bear-gold-gradient text-foreground border-0 font-bold shadow-md"
+                      >
+                        {paying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Abriendo pasarela de pago...</> : <><QrCode className="w-4 h-4 mr-2" />Pagar ahora con QR / App de pagos</>}
                       </Button>
                     </>
                   ) : (
@@ -767,13 +840,15 @@ export default function PassengerViajar() {
   // Planning / quoting view
   return (
     <div className="absolute inset-0">
-      <MapView
+      <RideMapView
+        userLocation={userPos || origin}
+        userPos={userPos}
         center={origin || userPos || FORMOSA_CENTER}
         origin={origin}
         destination={destination}
-        userPos={userPos}
         onMapClick={handleMapClick}
         recenter={origin || userPos}
+        categoryFilter={category}
         className="absolute inset-0"
       />
 
@@ -799,17 +874,31 @@ export default function PassengerViajar() {
         <Card className="rounded-2xl p-4">
           {quote ? (
             <div>
-              <div className="text-center mb-3">
-                <p className="text-sm text-muted-foreground">Precio del viaje</p>
-                <button onClick={() => setShowBreakdown(!showBreakdown)} className="text-4xl font-extrabold text-accent inline-flex items-center gap-1">
-                  {formatPrice(quote.price)}
-                  <ChevronDown className={`w-5 h-5 transition-transform ${showBreakdown ? "rotate-180" : ""}`} />
-                </button>
-                <p className="text-xs text-muted-foreground mt-1">{quote.distance_km} km · {quote.duration_min} min</p>
-                {quote.surge_multiplier > 1 && (
-                  <p className="text-xs font-bold text-orange-500 mt-1">⚡ Demanda alta · x{quote.surge_multiplier}</p>
-                )}
-              </div>
+              {(() => {
+                const ptsDiscount = (usePoints && (user?.bear_points || 0) >= 50)
+                  ? Math.min(Math.floor((user?.bear_points || 0) / 10) * 100, Math.floor(quote.price * 0.3))
+                  : 0;
+                const effectivePrice = Math.max(quote.price - ptsDiscount, 500);
+
+                return (
+                  <div className="text-center mb-3">
+                    <p className="text-sm text-muted-foreground">Precio del viaje</p>
+                    <button onClick={() => setShowBreakdown(!showBreakdown)} className="text-4xl font-extrabold text-accent inline-flex items-center gap-1">
+                      {formatPrice(effectivePrice)}
+                      {ptsDiscount > 0 && (
+                        <span className="text-xs line-through text-muted-foreground ml-2 font-normal">
+                          {formatPrice(quote.price)}
+                        </span>
+                      )}
+                      <ChevronDown className={`w-5 h-5 transition-transform ${showBreakdown ? "rotate-180" : ""}`} />
+                    </button>
+                    <p className="text-xs text-muted-foreground mt-1">{quote.distance_km} km · {quote.duration_min} min</p>
+                    {quote.surge_multiplier > 1 && (
+                      <p className="text-xs font-bold text-orange-500 mt-1">⚡ Demanda alta · x{quote.surge_multiplier}</p>
+                    )}
+                  </div>
+                );
+              })()}
               {showBreakdown && quote.breakdown && (
                 <div className="mb-4 p-3 rounded-xl bg-secondary/50 space-y-1.5 text-sm">
                   <div className="flex justify-between"><span className="text-muted-foreground">Tarifa base</span><span>{formatPrice(quote.breakdown.base)}</span></div>
@@ -825,28 +914,143 @@ export default function PassengerViajar() {
                   <div className="flex justify-between font-bold"><span>Total</span><span className="text-accent">{formatPrice(quote.price)}</span></div>
                 </div>
               )}
+              {/* Categories with ETA, Price & Badges */}
               <div className="flex gap-2 mb-3">
                 {CATEGORIES.map((c) => (
                   <button
                     key={c.code}
-                    onClick={() => setCategory(c.code)}
-                    className={`flex-1 p-2.5 rounded-xl text-center transition-colors ${category === c.code ? "bear-gradient text-white" : "bg-secondary text-muted-foreground"}`}
+                    onClick={() => {
+                      Haptics.light();
+                      setCategory(c.code);
+                    }}
+                    className={`relative flex-1 p-2.5 rounded-xl text-center transition-all ${
+                      category === c.code
+                        ? "bear-gradient text-white shadow-md scale-[1.02]"
+                        : "bg-secondary/70 text-muted-foreground hover:bg-secondary"
+                    }`}
                   >
-                    <p className="text-[14px] font-semibold">{c.name}</p>
-                    <p className="text-[14px] opacity-70">{c.desc}</p>
+                    {c.badge && (
+                      <span className="absolute -top-2 right-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-accent text-accent-foreground shadow-sm">
+                        {c.badge}
+                      </span>
+                    )}
+                    <p className="text-xs font-bold leading-tight">{c.name}</p>
+                    <p className="text-[11px] text-accent font-semibold">{c.eta}</p>
+                    <p className="text-[10px] opacity-75 truncate">{c.desc}</p>
                   </button>
                 ))}
               </div>
-              <div className="flex gap-2 mb-4">
-                <button onClick={() => setPaymentMethod("cash")} className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${paymentMethod === "cash" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+
+              {/* BearPoints Immediate Discount Toggle */}
+              {user?.bear_points > 0 && (
+                <div className="mb-3 p-2.5 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-accent shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-foreground">Usar BearPoints</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Tenés {user.bear_points} pts disponibles (-${Math.min(Math.floor(user.bear_points / 10) * 100, Math.floor(quote.price * 0.3))} OFF)
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={usePoints}
+                    onChange={(e) => {
+                      Haptics.light();
+                      setUsePoints(e.target.checked);
+                    }}
+                    className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                  />
+                </div>
+              )}
+
+              {/* Payment Method Selector */}
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={() => {
+                    Haptics.light();
+                    setPaymentMethod("cash");
+                  }}
+                  className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${
+                    paymentMethod === "cash"
+                      ? "bear-gold-gradient text-foreground font-bold"
+                      : "bg-secondary text-muted-foreground"
+                  }`}
+                >
                   <Banknote className="w-4 h-4" />Efectivo
                 </button>
-                <button onClick={() => setPaymentMethod("qr")} className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${paymentMethod === "qr" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+                <button
+                  onClick={() => {
+                    Haptics.light();
+                    setPaymentMethod("qr");
+                  }}
+                  className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${
+                    paymentMethod === "qr"
+                      ? "bear-gold-gradient text-foreground font-bold"
+                      : "bg-secondary text-muted-foreground"
+                  }`}
+                >
                   <QrCode className="w-4 h-4" />QR
                 </button>
-                <button onClick={() => setPaymentMethod("card")} className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${paymentMethod === "card" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+                <button
+                  onClick={() => {
+                    Haptics.light();
+                    setPaymentMethod("card");
+                  }}
+                  className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${
+                    paymentMethod === "card"
+                      ? "bear-gold-gradient text-foreground font-bold"
+                      : "bg-secondary text-muted-foreground"
+                  }`}
+                >
                   <CreditCard className="w-4 h-4" />Tarjeta
                 </button>
+              </div>
+
+              {/* Cash Options: Change requirement */}
+              {paymentMethod === "cash" && (
+                <div className="mb-3 p-2.5 rounded-xl bg-secondary/50 space-y-1.5">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    ¿Con cuánto abonás? (para cambio)
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { id: "exact", label: "Pago justo" },
+                      { id: "5000", label: "$5.000" },
+                      { id: "10000", label: "$10.000" },
+                      { id: "20000", label: "$20.000" },
+                      { id: "change", label: "Necesito cambio" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          Haptics.light();
+                          setCashNoteOption(opt.id);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                          cashNoteOption === opt.id
+                            ? "bg-accent text-accent-foreground font-bold shadow-sm"
+                            : "bg-card border border-border text-foreground hover:bg-secondary"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Pickup Reference Input */}
+              <div className="mb-3">
+                <Input
+                  value={pickupReference}
+                  onChange={(e) => setPickupReference(e.target.value)}
+                  placeholder="Referencia de recogida (ej. rejas blancas, frente al kiosco)"
+                  className="h-10 text-xs bg-secondary/40 border-border/70"
+                  maxLength={100}
+                />
               </div>
               {paymentMethod === "card" && (
                 <div className="mb-4 p-3 rounded-xl bg-secondary/50">
@@ -904,9 +1108,37 @@ export default function PassengerViajar() {
                   ))}
                 </div>
               )}
-              {searchResults.length === 0 && searchQuery.trim().length < 3 && (
-                <div className="mb-3">
+              {searchResults.length === 0 && searchQuery.trim().length < 2 && (
+                <div className="mb-3 space-y-2.5">
                   <FavoritesBar onSelect={handleSelectFavorite} />
+                  {/* Formosa Landmark Chips */}
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 px-0.5">
+                      Puntos populares en Formosa
+                    </p>
+                    <div className="flex gap-1.5 overflow-x-auto scrollbar-hide py-0.5">
+                      {FORMOSA_POIS.slice(0, 6).map((poi) => (
+                        <button
+                          key={poi.name}
+                          type="button"
+                          onClick={() => {
+                            Haptics.light();
+                            if (selectingTarget === "origin") {
+                              setOrigin({ lat: poi.lat, lng: poi.lng });
+                              setOriginAddress(`${poi.name} (${poi.address})`);
+                            } else {
+                              setDestination({ lat: poi.lat, lng: poi.lng });
+                              setDestinationAddress(`${poi.name} (${poi.address})`);
+                            }
+                            setSearchQuery("");
+                          }}
+                          className="shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium bg-secondary/80 hover:bg-accent/15 hover:border-accent border border-border/80 text-foreground transition active:scale-95"
+                        >
+                          {poi.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
 

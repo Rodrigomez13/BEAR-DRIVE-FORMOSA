@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Navigation,
   ArrowUp,
@@ -12,7 +12,11 @@ import {
   ArrowRight,
   ArrowLeft,
   ChevronRight,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
+import navVoice from "@/lib/navVoice";
+import Haptics from "@/lib/haptics";
 
 function maneuverIcon(maneuver) {
   if (!maneuver) return Navigation;
@@ -45,43 +49,60 @@ export default function TurnByTurnNav({
   remainingTime,
   remainingDistance,
 }) {
+  const [muted, setMuted] = useState(() => navVoice.isMuted());
   const ManeuverIcon = maneuverIcon(routeInfo?.nextManeuver);
   const distance = routeInfo?.nextManeuverDistanceMeters;
-  const instruction = routeInfo?.nextInstruction || "Calculando la mejor ruta...";
+  const instruction = routeInfo?.nextInstruction || "Seguí la ruta indicada";
   const hasDistance = Number.isFinite(distance) && distance !== null;
 
   const afterInstruction = routeInfo?.afterNextInstruction;
   const AfterIcon = maneuverIcon(routeInfo?.afterNextManeuver);
 
-  const isUrgent = hasDistance && distance < 80;
-  const isApproaching = hasDistance && distance < 200 && distance >= 80;
+  const isUrgent = hasDistance && distance < 65;
+
+  // Vocalize maneuver when entering instruction window
+  useEffect(() => {
+    if (hasDistance && instruction) {
+      navVoice.announceManeuver(instruction, distance, isUrgent);
+      if (isUrgent) {
+        Haptics.light();
+      }
+    }
+  }, [instruction, distance, isUrgent, hasDistance]);
+
+  const handleToggleMute = (e) => {
+    e.stopPropagation();
+    Haptics.light();
+    const newMuted = navVoice.toggleMute();
+    setMuted(newMuted);
+  };
 
   return (
-    <div className="absolute inset-x-0 top-0 z-10 p-3 safe-top pointer-events-none">
+    <div className="absolute inset-x-0 top-0 z-20 p-3 safe-top pointer-events-none">
       <div className="max-w-md mx-auto pointer-events-auto space-y-2">
-        {/* GPS-style maneuver banner */}
+        {/* Native GPS Maneuver Card */}
         <div
-          className={`rounded-2xl border shadow-2xl overflow-hidden transition-colors duration-300 ${
+          className={`rounded-2xl border shadow-2xl overflow-hidden transition-all duration-300 ${
             isUrgent
-              ? "bg-accent border-accent"
-              : "bg-[#0e1320]/95 border-accent/40"
+              ? "bg-[#E9B74E] text-[#181E2F] border-[#E9B74E] shadow-[#E9B74E]/30 scale-[1.01]"
+              : "bg-[#0e1320]/95 backdrop-blur-md border-[#E9B74E]/40 text-white"
           }`}
         >
           <div className="flex items-stretch">
-            {/* Left: big maneuver icon + distance */}
+            {/* Left: Prominent maneuver icon & distance */}
             <div
-              className={`flex flex-col items-center justify-center px-5 py-4 shrink-0 min-w-[120px] border-r ${
-                isUrgent ? "border-accent-foreground/20" : "border-accent/30 bg-accent/10"
+              className={`flex flex-col items-center justify-center px-4 py-3.5 shrink-0 min-w-[110px] border-r ${
+                isUrgent ? "border-[#181E2F]/20 bg-black/5" : "border-white/10 bg-[#181E2F]/60"
               }`}
             >
               <ManeuverIcon
-                className={`w-12 h-12 mb-1.5 ${isUrgent ? "text-accent-foreground" : "text-accent"}`}
-                strokeWidth={2.5}
+                className={`w-11 h-11 mb-1 ${isUrgent ? "text-[#181E2F]" : "text-[#E9B74E]"}`}
+                strokeWidth={2.6}
               />
               {hasDistance ? (
                 <span
-                  className={`text-3xl font-extrabold leading-none ${
-                    isUrgent ? "text-accent-foreground" : "text-accent"
+                  className={`text-2xl font-black tracking-tight leading-none ${
+                    isUrgent ? "text-[#181E2F]" : "text-[#E9B74E]"
                   }`}
                 >
                   {formatDistance(distance)}
@@ -89,39 +110,58 @@ export default function TurnByTurnNav({
               ) : null}
             </div>
 
-            {/* Right: instruction */}
-            <div className="px-4 py-3 flex-1 min-w-0 flex flex-col justify-center">
-              <div className="flex items-center gap-2 mb-1">
+            {/* Right: Text instruction + ETA + Sound Toggle */}
+            <div className="px-3.5 py-3 flex-1 min-w-0 flex flex-col justify-center">
+              <div className="flex items-center justify-between gap-1 mb-1">
                 <span
-                  className={`text-[14px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${
+                  className={`text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full ${
                     isUrgent
-                      ? "bg-accent-foreground/15 text-accent-foreground"
-                      : "bg-accent/15 text-accent"
+                      ? "bg-[#181E2F]/15 text-[#181E2F]"
+                      : "bg-[#E9B74E]/20 text-[#E9B74E]"
                   }`}
                 >
                   {phaseLabel}
                 </span>
-                {(remainingTime || remainingDistance) && (
-                  <span
-                    className={`text-xs font-semibold whitespace-nowrap ml-auto ${
-                      isUrgent ? "text-accent-foreground/80" : "text-white/60"
+
+                <div className="flex items-center gap-2">
+                  {(remainingTime || remainingDistance) && (
+                    <span
+                      className={`text-xs font-bold whitespace-nowrap ${
+                        isUrgent ? "text-[#181E2F]/80" : "text-white/70"
+                      }`}
+                    >
+                      {[remainingTime, remainingDistance].filter(Boolean).join(" • ")}
+                    </span>
+                  )}
+
+                  {/* Audio Mute/Unmute Toggle */}
+                  <button
+                    type="button"
+                    onClick={handleToggleMute}
+                    className={`w-7 h-7 rounded-full flex items-center justify-center transition active:scale-90 ${
+                      isUrgent
+                        ? "bg-[#181E2F]/20 text-[#181E2F] hover:bg-[#181E2F]/30"
+                        : "bg-white/10 text-white/80 hover:text-white hover:bg-white/20"
                     }`}
+                    title={muted ? "Activar voz" : "Silenciar voz"}
                   >
-                    {[remainingTime, remainingDistance].filter(Boolean).join(" · ")}
-                  </span>
-                )}
+                    {muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
               </div>
+
               <p
-                className={`text-lg font-bold leading-tight ${
-                  isUrgent ? "text-accent-foreground" : "text-white"
+                className={`text-base font-bold leading-tight line-clamp-2 ${
+                  isUrgent ? "text-[#181E2F]" : "text-white"
                 }`}
               >
                 {instruction}
               </p>
+
               {targetAddress && (
                 <p
-                  className={`text-xs mt-1 truncate ${
-                    isUrgent ? "text-accent-foreground/70" : "text-white/50"
+                  className={`text-[11px] mt-0.5 truncate ${
+                    isUrgent ? "text-[#181E2F]/75 font-medium" : "text-white/50"
                   }`}
                 >
                   {targetAddress}
@@ -131,15 +171,15 @@ export default function TurnByTurnNav({
           </div>
         </div>
 
-        {/* "Después" preview */}
+        {/* Secondary "Después" preview banner */}
         {afterInstruction && !isUrgent && (
-          <div className="rounded-xl bg-card/95 border border-border shadow-lg px-3 py-2 flex items-center gap-2">
-            <span className="text-[14px] uppercase tracking-wider text-muted-foreground font-bold shrink-0">
+          <div className="rounded-xl bg-[#181E2F]/90 backdrop-blur-md border border-white/10 shadow-lg px-3 py-1.5 flex items-center gap-2 animate-in fade-in duration-200">
+            <span className="text-[10px] uppercase tracking-wider text-[#E9B74E] font-bold shrink-0">
               después
             </span>
-            <AfterIcon className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span className="text-xs text-muted-foreground truncate flex-1">{afterInstruction}</span>
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+            <AfterIcon className="w-3.5 h-3.5 text-white/70 shrink-0" />
+            <span className="text-xs text-white/80 truncate flex-1">{afterInstruction}</span>
+            <ChevronRight className="w-3.5 h-3.5 text-white/30 shrink-0" />
           </div>
         )}
       </div>
