@@ -16,7 +16,7 @@ export default function LoadingScreen({ label = "Cargando...", className = "" })
           className="relative w-24 h-24 rounded-3xl bg-[#181E2F] border-2 border-[#E9B74E]/40 shadow-2xl p-1.5 flex items-center justify-center overflow-hidden"
         >
           <img
-            src="./assets/mascot/bear_smile_closeup.jpg"
+            src="./assets/mascot/bear_costanera_wave.jpg"
             alt="BearDrive"
             className="w-full h-full object-cover rounded-2xl"
           />
