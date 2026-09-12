@@ -41,6 +41,7 @@ import RideRequestModal from "@/components/bear/RideRequestModal";
 import TurnByTurnNav from "@/components/bear/TurnByTurnNav";
 import LoadingScreen from "@/components/bear/LoadingScreen";
 import RideChat from "@/components/bear/RideChat";
+import QrPaymentDisplay from "@/components/bear/QrPaymentDisplay";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const PICKUP_STATUSES = ["ASSIGNED", "DRIVER_APPROACHING"];
@@ -110,6 +111,7 @@ export default function DriverConducir() {
   const [navMode, setNavMode] = useState("gps");
   const [navHeading, setNavHeading] = useState(0);
   const [showChat, setShowChat] = useState(false);
+  const [qrCheckoutUrl, setQrCheckoutUrl] = useState(null);
 
   const positionWatchRef = useRef(null);
   const lastLocationPersistRef = useRef(0);
@@ -542,20 +544,40 @@ export default function DriverConducir() {
   const handleComplete = async () => {
     setCompleting(true);
     try {
-      await base44.functions.invoke("completeRide", {
+      const res = await base44.functions.invoke("completeRide", {
         ride_id: activeRide.id,
-        final_fare: activeRide.quoted_fare,
-        payment_method: activeRide.payment_method,
       });
-      toast({
-        title: "Viaje completado",
-        description: `Ganaste $${activeRide.quoted_fare.toLocaleString("es-AR")}`,
-      });
-      setActiveRide(null);
-      setNavigationStart(null);
-      setRouteInfo(null);
+
+      const paymentStatus = res.data?.payment_status;
+
+      if (paymentStatus === "completed") {
+        toast({
+          title: "Viaje completado",
+          description: `Ganaste $${(activeRide.final_fare || activeRide.quoted_fare).toLocaleString("es-AR")}`,
+        });
+        setActiveRide(null);
+        setNavigationStart(null);
+        setRouteInfo(null);
+        setQrCheckoutUrl(null);
+      } else if (paymentStatus === "qr_pending") {
+        setQrCheckoutUrl(res.data.checkout_url);
+        toast({ title: "QR generado", description: "Mostrale el QR al pasajero" });
+      } else if (paymentStatus === "requires_action") {
+        toast({ title: "Pago requiere autenticación", description: res.data.message, variant: "destructive" });
+      } else {
+        toast({ title: "Viaje completado" });
+        setActiveRide(null);
+        setNavigationStart(null);
+        setRouteInfo(null);
+      }
     } catch (error) {
-      toast({ title: "Error al completar", description: error.message, variant: "destructive" });
+      const msg = error?.response?.data?.error || error.message;
+      const reason = error?.response?.data?.reason;
+      if (reason === "no_card") {
+        toast({ title: "El pasajero no tiene tarjeta vinculada", description: "Sugerile pagar con QR o efectivo", variant: "destructive" });
+      } else {
+        toast({ title: "Error al completar", description: msg, variant: "destructive" });
+      }
     } finally {
       setCompleting(false);
     }
@@ -800,19 +822,53 @@ export default function DriverConducir() {
 
             {status === "PAYMENT_PENDING" && (
               <div className="text-center">
-                {activeRide.payment_method === "card" ? (
+                {qrCheckoutUrl ? (
+                  <QrPaymentDisplay
+                    checkoutUrl={qrCheckoutUrl}
+                    amount={activeRide.final_fare || activeRide.quoted_fare}
+                    onClose={() => setQrCheckoutUrl(null)}
+                  />
+                ) : activeRide.payment_method === "card" ? (
                   <>
-                    <Loader2 className="w-8 h-8 text-accent mx-auto mb-2 animate-spin" />
-                    <p className="text-sm text-muted-foreground mb-1">Esperando pago con tarjeta</p>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      El pasajero está pagando. El viaje se completará automáticamente.
+                    <CreditCard className="w-8 h-8 text-accent mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Cobro automático a la tarjeta del pasajero
                     </p>
+                    <Button
+                      onClick={handleComplete}
+                      disabled={completing}
+                      className="w-full bear-gold-gradient text-foreground border-0"
+                    >
+                      {completing ? (
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cobrando...</>
+                      ) : (
+                        "Confirmar cobro automático"
+                      )}
+                    </Button>
+                  </>
+                ) : activeRide.payment_method === "qr" ? (
+                  <>
+                    <QrCode className="w-8 h-8 text-accent mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Generá el QR para que el pasajero pague
+                    </p>
+                    <Button
+                      onClick={handleComplete}
+                      disabled={completing}
+                      className="w-full bear-gold-gradient text-foreground border-0"
+                    >
+                      {completing ? (
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generando...</>
+                      ) : (
+                        "Generar QR de pago"
+                      )}
+                    </Button>
                   </>
                 ) : (
                   <>
                     <Wallet className="w-8 h-8 text-accent mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground mb-3 capitalize">
-                      {activeRide.payment_method === "cash" ? "Cobrá en efectivo" : "Generá el QR de pago"}
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Cobrá en efectivo
                     </p>
                     <Button
                       onClick={handleComplete}
@@ -822,7 +878,7 @@ export default function DriverConducir() {
                       {completing ? (
                         <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Confirmando...</>
                       ) : (
-                        "Confirmar pago"
+                        "Confirmar pago recibido"
                       )}
                     </Button>
                   </>

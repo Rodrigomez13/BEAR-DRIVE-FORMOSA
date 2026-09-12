@@ -1,7 +1,11 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { secrets } from 'base44:runtime';
-import { todayBusinessDay } from '../../shared/pricing.ts';
+import { finalizeRideCompletion } from '../../shared/rideCompletion.ts';
 
+// Stripe webhook handler — confirms ride completion when payments succeed.
+// Handles two event types:
+// - checkout.session.completed: QR payments (passenger paid via Checkout URL)
+// - payment_intent.succeeded: card auto-charges (off-session PaymentIntent)
 export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
@@ -27,6 +31,7 @@ export default async function(req) {
 
     const event = JSON.parse(rawBody);
 
+    // Handle checkout.session.completed (QR payments)
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
       const rideId = session.metadata?.ride_id;
@@ -49,50 +54,46 @@ export default async function(req) {
       const fare = ride.final_fare || ride.quoted_fare;
       const completedDate = new Date().toISOString();
 
-      // Mark ride COMPLETED
       await base44.asServiceRole.entities.Ride.update(rideId, {
         status: "COMPLETED",
         final_fare: fare,
-        completed_date: completedDate
+        completed_date: completedDate,
       });
 
-      // Award BearPoints to passenger (10 points per completed ride)
-      const pointsAward = 10;
-      await base44.asServiceRole.entities.BearPointsLedger.create({
-        user_id: ride.passenger_id,
-        points: pointsAward,
-        reason: "ride_completed",
-        ride_id: rideId,
-        balance_after: pointsAward
-      });
+      await finalizeRideCompletion(base44, rideId, completedDate);
+    }
 
-      const passenger = await base44.asServiceRole.entities.User.get(ride.passenger_id);
-      if (passenger) {
-        await base44.asServiceRole.entities.User.update(ride.passenger_id, {
-          bearpoints_balance: (passenger.bearpoints_balance || 0) + pointsAward,
-          total_rides: (passenger.total_rides || 0) + 1
-        });
+    // Handle payment_intent.succeeded (card auto-charges)
+    if (event.type === "payment_intent.succeeded") {
+      const pi = event.data.object;
+      const rideId = pi.metadata?.ride_id;
+
+      if (!rideId) {
+        return Response.json({ received: true, warning: "no_ride_id" });
       }
 
-      // Driver daily charge — only on first completed ride of the business day
-      const businessDay = todayBusinessDay(completedDate);
-      const existingCharges = await base44.asServiceRole.entities.DriverDailyCharge.filter({
-        driver_id: ride.driver_id,
-        business_day: businessDay
-      });
-      if (existingCharges.length === 0 && ride.driver_id) {
-        const chargeConfigs = await base44.asServiceRole.entities.DailyChargeConfig.filter({ active: true });
-        const chargeConfig = chargeConfigs[0] || { amount: 1500, currency: "ARS" };
-        await base44.asServiceRole.entities.DriverDailyCharge.create({
-          driver_id: ride.driver_id,
-          driver_name: ride.driver_name || "",
-          business_day: businessDay,
-          amount: chargeConfig.amount,
-          currency: chargeConfig.currency || "ARS",
-          status: "pending",
-          total_due: chargeConfig.amount,
-          trigger_ride_id: rideId
+      const ride = await base44.asServiceRole.entities.Ride.get(rideId);
+      if (!ride) {
+        return Response.json({ received: true, warning: "ride_not_found" });
+      }
+
+      if (ride.status === "COMPLETED") {
+        return Response.json({ received: true, already_completed: true });
+      }
+
+      // Only complete if the ride is in PAYMENT_PENDING (off-session charge confirmed)
+      if (ride.status === "PAYMENT_PENDING") {
+        const fare = ride.final_fare || ride.quoted_fare;
+        const completedDate = new Date().toISOString();
+
+        await base44.asServiceRole.entities.Ride.update(rideId, {
+          status: "COMPLETED",
+          final_fare: fare,
+          completed_date: completedDate,
+          stripe_payment_intent_id: pi.id,
         });
+
+        await finalizeRideCompletion(base44, rideId, completedDate);
       }
     }
 

@@ -130,7 +130,11 @@
     },
     "stripe_session_id": {
       "type": "string",
-      "description": "Stripe Checkout session ID for card payments"
+      "description": "Stripe Checkout session ID for QR payments"
+    },
+    "stripe_payment_intent_id": {
+      "type": "string",
+      "description": "Stripe PaymentIntent ID for card auto-charges"
     },
     "idempotency_key": {
       "type": "string"

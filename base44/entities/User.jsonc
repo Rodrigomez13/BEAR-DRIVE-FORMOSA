@@ -74,6 +74,10 @@
     "bearpoints_balance": {
       "type": "number",
       "default": 0
+    },
+    "stripe_customer_id": {
+      "type": "string",
+      "description": "Stripe Customer ID for saved payment methods"
     }
   },
   "required": [
