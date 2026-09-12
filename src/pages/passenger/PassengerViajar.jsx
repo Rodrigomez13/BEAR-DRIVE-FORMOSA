@@ -20,6 +20,7 @@ import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shiel
 import { Image } from "@/components/ui/image";
 import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
 import LoadingScreen from "@/components/bear/LoadingScreen";
+import SearchingDriverAnimation from "@/components/bear/SearchingDriverAnimation";
 
 const CATEGORIES = [
   { code: "basic", name: "BearDrive", desc: "Servicio estándar" },
@@ -558,7 +559,7 @@ export default function PassengerViajar() {
             )}
             {status === "SEARCHING" && (
               <div className="text-center py-2">
-                <Loader2 className="w-10 h-10 animate-spin text-accent mx-auto mb-3" />
+                <SearchingDriverAnimation size={140} />
                 <p className="font-semibold">Conductores cercanos están verificando disponibilidad para aceptar tu viaje.</p>
                 <p className="text-sm text-muted-foreground mt-1">Buscando conductor...</p>
                 <Button variant="outline" onClick={() => setShowCancelDialog(true)} className="w-full mt-4 text-destructive">Cancelar viaje</Button>
