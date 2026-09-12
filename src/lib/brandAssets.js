@@ -2,6 +2,7 @@
 export const BEAR_LOGO_LIGHT = "https://media.base44.com/images/public/6aa1902bd90ac5b66092d80d/c37ad1c83_beardrive-logo-bgwhite.png";
 export const BEAR_LOGO_DARK = "https://media.base44.com/images/public/6aa1902bd90ac5b66092d80d/2b5c5136f_beardrive-logo-bgnightblue.png";
 export const BEAR_LOGO_ICON = "https://media.base44.com/images/public/6aa1902bd90ac5b66092d80d/2b5c5136f_beardrive-logo-bgnightblue.png";
+export const BEAR_LOGO_SVG = "https://media.base44.com/images/public/6aa1902bd90ac5b66092d80d/6caa7b214_logo-beardrive.svg";
 // Backward compatibility
 export const BEAR_LOGO_MARK = BEAR_LOGO_LIGHT;
 export const BEAR_MASCOT_WAVE = "https://media.base44.com/images/public/6aa1902bd90ac5b66092d80d/2e91db04a_5.png";

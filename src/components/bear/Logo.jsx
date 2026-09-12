@@ -1,22 +1,21 @@
 import React, { useRef, useCallback } from "react";
 import { Image } from "@/components/ui/image";
-import { BEAR_LOGO_LIGHT, BEAR_LOGO_DARK } from "@/lib/brandAssets";
-import { useTheme } from "@/lib/ThemeContext";
+import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
 
-// BearDrive logo. Supports long-press (>=2.5s) to trigger the hidden admin access.
+// BearDrive logo. Renders the full SVG logo (icon + wordmark) at its natural
+// aspect ratio — width-driven, never cropped. Supports long-press (>=2.5s)
+// to trigger the hidden admin access.
 export default function Logo({ size = "md", onLongPress, className = "" }) {
   const timerRef = useRef(null);
   const triggeredRef = useRef(false);
-  const { theme } = useTheme();
-  const logoSrc = theme === "dark" ? BEAR_LOGO_DARK : BEAR_LOGO_LIGHT;
 
   const sizes = {
-    sm: { box: "w-9 h-9", text: "text-lg" },
-    md: { box: "w-12 h-12", text: "text-2xl" },
-    lg: { box: "w-20 h-20", text: "text-4xl" },
-    xl: { box: "w-28 h-28", text: "text-5xl" }
+    sm: "w-20",
+    md: "w-28",
+    lg: "w-40",
+    xl: "w-52",
   };
-  const s = sizes[size] || sizes.md;
+  const width = sizes[size] || sizes.md;
 
   const startPress = useCallback(() => {
     triggeredRef.current = false;
@@ -44,16 +43,11 @@ export default function Logo({ size = "md", onLongPress, className = "" }) {
       onTouchCancel={cancelPress}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="flex flex-col items-center gap-3">
-        <div className={`${s.box} rounded-2xl overflow-hidden`}>
-          <Image src={logoSrc} fittingType="fit" className="block w-full h-full" />
-        </div>
-        <div className="text-center leading-none">
-          <span className={`${s.text} font-extrabold tracking-tight text-foreground`}>
-            Bear<span className="text-accent">Drive</span>
-          </span>
-        </div>
-      </div>
+      <Image
+        src={BEAR_LOGO_SVG}
+        alt="BearDrive"
+        className={`block ${width} h-auto object-contain`}
+      />
     </div>
   );
 }
