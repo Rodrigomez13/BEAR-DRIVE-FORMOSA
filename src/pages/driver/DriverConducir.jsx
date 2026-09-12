@@ -561,18 +561,18 @@ export default function DriverConducir() {
   const handleCancel = async () => {
     if (!activeRide) return;
     try {
-      await base44.entities.Ride.update(activeRide.id, {
-        status: "CANCELLED",
-        cancelled_date: new Date().toISOString(),
-        cancel_reason: "driver_cancelled",
-      });
+      const res = await base44.functions.invoke("driverCancelRide", { ride_id: activeRide.id });
+      if (res.data?.re_searched) {
+        toast({ title: "Viaje reasignado", description: "Buscando otro conductor para el pasajero" });
+      } else {
+        toast({ title: "Viaje cancelado" });
+      }
       setActiveRide(null);
       setNavigationStart(null);
       setRouteInfo(null);
       setShowCancelDialog(false);
-      toast({ title: "Viaje cancelado" });
-    } catch {
-      toast({ title: "No se pudo cancelar", variant: "destructive" });
+    } catch (error) {
+      toast({ title: "No se pudo cancelar", description: error.message, variant: "destructive" });
     }
   };
 

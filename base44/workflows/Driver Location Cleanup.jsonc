@@ -1,0 +1,44 @@
+{
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "driver_location_cleanup",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "cleanup": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "cleanupStaleDriverLocations"
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Limpiar ubicaciones obsoletas",
+            "description": "Marca offline conductores inactivos"
+          }
+        }
+      }
+    ]
+  },
+  "name": "Driver Location Cleanup",
+  "description": "Marca offline los conductores que no reportan ubicaci\u00f3n hace m\u00e1s de 5 minutos",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 5,
+      "interval_unit": "minutes",
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  }
+}

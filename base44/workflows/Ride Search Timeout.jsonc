@@ -1,6 +1,6 @@
 {
   "name": "Ride Search Timeout",
-  "description": "Mueve viajes en SEARCHING a NO_DRIVERS tras 90 segundos sin conductor",
+  "description": "Notifica conductores cercanos y mueve viajes en SEARCHING a NO_DRIVERS tras 90s sin conductor",
   "trigger": {
     "config": {
       "trigger_type": "entity",
@@ -20,6 +20,22 @@
       "namespace": "base44"
     },
     "do": [
+      {
+        "notify_nearby": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "notifyNearbyDrivers",
+            "args": {
+              "ride_id": "${ .trigger.entity_id }"
+            }
+          },
+          "then": "wait_timeout",
+          "x-base44": {
+            "title": "Notificar conductores",
+            "description": "Push a conductores cercanos"
+          }
+        }
+      },
       {
         "wait_timeout": {
           "wait": "PT90S",
