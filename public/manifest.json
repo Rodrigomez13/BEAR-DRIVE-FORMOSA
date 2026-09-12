@@ -9,9 +9,9 @@
   "theme_color": "#181E2F",
   "icons": [
     {
-      "src": "https://media.base44.com/images/public/6aa1902bd90ac5b66092d80d/2b5c5136f_beardrive-logo-bgnightblue.png",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "https://media.base44.com/images/public/6aa1902bd90ac5b66092d80d/69a535e07_beardrive-logo-bgtransp-svg.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {

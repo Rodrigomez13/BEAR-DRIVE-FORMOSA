@@ -1,6 +1,6 @@
 import React from "react";
-import { Outlet } from "react-router-dom";
 import BottomNav from "@/components/bear/BottomNav";
+import AnimatedOutlet from "@/components/bear/AnimatedOutlet";
 import { Navigation, Activity, Gift, User } from "lucide-react";
 
 export default function PassengerShell() {
@@ -13,7 +13,7 @@ export default function PassengerShell() {
   return (
     <div className="app-screen h-[100dvh] overflow-hidden flex flex-col bg-background">
       <main className="flex-1 min-h-0 overflow-hidden relative">
-        <Outlet />
+        <AnimatedOutlet />
       </main>
       <BottomNav items={items} basePath="/passenger" />
     </div>
