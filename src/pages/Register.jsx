@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserPlus, Mail, Lock, Loader2, IdCard, Phone } from "lucide-react";
+import { UserPlus, Mail, Lock, Loader2, IdCard, Phone, Eye, EyeOff } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
@@ -22,6 +22,8 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
   const [otpCode, setOtpCode] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const validateDni = (value) => /^\d{7,8}$/.test(value);
 
@@ -76,9 +78,15 @@ export default function Register() {
       const result = await base44.auth.verifyOtp({ email, otpCode });
       if (result?.access_token) {
         base44.auth.setToken(result.access_token);
-        // Save DNI and phone to the user profile
+        // Save DNI and Argentine phone to the user profile
         try {
-          await base44.auth.updateMe({ dni: dni.trim(), ...(phone.trim() ? { phone: phone.trim() } : {}) });
+          const rawPhone = phone.trim().replace(/^0/, "");
+          const formattedPhone = rawPhone
+            ? rawPhone.startsWith("+")
+              ? rawPhone
+              : `+54 9 ${rawPhone}`
+            : "";
+          await base44.auth.updateMe({ dni: dni.trim(), ...(formattedPhone ? { phone: formattedPhone } : {}) });
         } catch { /* non-critical */ }
       }
       window.location.href = safeReturnTo();
@@ -168,24 +176,79 @@ export default function Register() {
           {dniError && <p className="text-xs text-destructive">{dniError}</p>}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="phone">Teléfono <span className="text-muted-foreground font-normal">(opcional)</span></Label>
-          <div className="relative">
-            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            <Input id="phone" type="tel" autoComplete="tel" placeholder="+54 370 123 4567" value={phone} onChange={(e) => setPhone(e.target.value)} className="pl-10 h-12" />
+          <div className="flex items-center justify-between">
+            <Label htmlFor="phone">Celular <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+            <span className="text-[11px] text-muted-foreground">Formosa (+54 9)</span>
           </div>
+          <div className="flex gap-2">
+            <div className="flex items-center gap-1.5 px-3 rounded-xl bg-secondary/80 border border-border text-xs font-semibold text-foreground select-none shrink-0 h-12">
+              <span>🇦🇷</span>
+              <span>+54 9</span>
+            </div>
+            <div className="relative flex-1">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+              <Input
+                id="phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="370 412 3456"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="pl-10 h-12"
+              />
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Ingresá tu código de área local (ej: <strong>370</strong>) sin el 15.
+          </p>
         </div>
+
         <div className="space-y-2">
           <Label htmlFor="password">Contraseña</Label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            <Input id="password" type="password" autoComplete="new-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 h-12" required />
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="pl-10 pr-10 h-12"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
           </div>
         </div>
+
         <div className="space-y-2">
           <Label htmlFor="confirm">Confirmar contraseña</Label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            <Input id="confirm" type="password" autoComplete="new-password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="pl-10 h-12" required />
+            <Input
+              id="confirm"
+              type={showConfirmPassword ? "text" : "password"}
+              autoComplete="new-password"
+              placeholder="••••••••"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="pl-10 pr-10 h-12"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
           </div>
         </div>
         <Button type="submit" className="w-full h-12 font-medium bear-gold-gradient text-foreground border-0" disabled={loading}>

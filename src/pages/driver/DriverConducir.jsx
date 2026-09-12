@@ -9,6 +9,7 @@ import { toast } from "@/components/ui/use-toast";
 import MapView from "@/components/bear/MapView";
 import Haptics from "@/lib/haptics";
 import navVoice from "@/lib/navVoice";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import {
   Car,
   Check,
@@ -30,6 +31,9 @@ import {
   MessageCircle,
   Sun,
   Moon,
+  Radio,
+  Zap,
+  ShieldCheck,
 } from "lucide-react";
 import {
   getCurrentPosition,
@@ -120,6 +124,7 @@ export default function DriverConducir() {
   const [driverSolarMode, setDriverSolarMode] = useState(
     () => typeof window !== "undefined" && localStorage.getItem("bear_driver_solar") === "true"
   );
+  const { isLocked: isScreenAwake } = useWakeLock(online || !!activeRide);
 
   const positionWatchRef = useRef(null);
   const lastLocationPersistRef = useRef(0);
@@ -1057,11 +1062,65 @@ export default function DriverConducir() {
           </div>
         )}
 
+        {/* Radar concéntrico animado de 15 km sobre el mapa */}
         {!incomingRide && (
-          <div className="absolute inset-x-0 bottom-0 z-10 p-3">
-            <Card className="rounded-2xl p-4 max-w-md mx-auto text-center">
-              <Loader2 className="w-6 h-6 animate-spin text-accent mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">Esperando solicitudes de viaje...</p>
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-[5]">
+            <div className="relative w-72 h-72 flex items-center justify-center">
+              <span
+                className="absolute w-80 h-80 rounded-full border-2 border-accent/20 animate-ping opacity-60"
+                style={{ animationDuration: "3.2s" }}
+              />
+              <span
+                className="absolute w-56 h-56 rounded-full border border-accent/30 animate-pulse"
+                style={{ animationDuration: "2s" }}
+              />
+              <span className="absolute w-36 h-36 rounded-full border border-accent/40 bg-accent/5 animate-pulse" />
+              <div className="w-12 h-12 rounded-full bg-accent/20 border border-accent/60 flex items-center justify-center shadow-lg shadow-accent/20">
+                <Radio className="w-5 h-5 text-accent animate-pulse" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* HUD de Espera Activa con Radar 15km y WakeLock */}
+        {!incomingRide && (
+          <div className="absolute inset-x-0 bottom-0 z-10 p-3 pb-5 safe-bottom">
+            <Card className="rounded-3xl p-4 max-w-md mx-auto border border-accent/20 bg-card/90 backdrop-blur-xl shadow-2xl">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-full bg-accent/15 flex items-center justify-center border border-accent/40 shrink-0">
+                    <Radio className="w-4 h-4 text-accent animate-spin" style={{ animationDuration: "6s" }} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                      Radar de Viajes Activo
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground font-medium">
+                      Escaneando en Formosa • Cobertura 15 km
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary/80 border border-border text-[11px] font-semibold text-foreground shrink-0">
+                  <Zap className={`w-3.5 h-3.5 ${isScreenAwake ? "text-accent fill-accent" : "text-muted-foreground"}`} />
+                  <span>{isScreenAwake ? "Pantalla activa" : "Modo auto"}</span>
+                </div>
+              </div>
+
+              {selectedVehicle && (
+                <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-secondary/40 border border-border/40 text-xs">
+                  <div className="flex items-center gap-2">
+                    <Car className="w-3.5 h-3.5 text-accent" />
+                    <span className="font-semibold text-foreground">
+                      {selectedVehicle.brand} {selectedVehicle.model}
+                    </span>
+                  </div>
+                  <span className="font-mono text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
+                    {selectedVehicle.plate}
+                  </span>
+                </div>
+              )}
             </Card>
           </div>
         )}

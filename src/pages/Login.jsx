@@ -1,14 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Mail, Lock, Loader2, User, Car, ShieldCheck, X, MapPin } from "lucide-react";
+import { Mail, Lock, Loader2, User, Car, ShieldCheck, X, MapPin, Eye, EyeOff } from "lucide-react";
 import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
 import { requestLocationPermission } from "@/lib/geo";
-import Logo from "@/components/bear/Logo";
 import ThemeToggle from "@/components/bear/ThemeToggle";
 
 export default function Login() {
@@ -37,11 +36,23 @@ export default function Login() {
     }
   }, [adminDenied]);
 
-  const handleLongPress = () => {
-    setAdminModal(true);
-    setAdminError("");
-    setAdminCode("");
-  };
+  const [showPassword, setShowPassword] = useState(false);
+  const timerRef = useRef(null);
+
+  const startPress = useCallback(() => {
+    timerRef.current = setTimeout(() => {
+      setAdminModal(true);
+      setAdminError("");
+      setAdminCode("");
+    }, 2500);
+  }, []);
+
+  const cancelPress = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
 
   const handleAdminSubmit = async (e) => {
     e.preventDefault();
@@ -123,10 +134,39 @@ export default function Login() {
             No pudimos validar el acceso.
           </div>
         )}
-        <div className="flex flex-col items-center mb-8">
-          <Logo size="xl" onLongPress={handleLongPress} />
-          <p className="mt-4 text-sm text-muted-foreground text-center">
-            Movilidad urbana en Formosa
+        <div
+          className="flex flex-col items-center mb-6 cursor-pointer select-none"
+          onMouseDown={startPress}
+          onMouseUp={cancelPress}
+          onMouseLeave={cancelPress}
+          onTouchStart={startPress}
+          onTouchEnd={cancelPress}
+          onTouchCancel={cancelPress}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          {/* Mascota 3D con Aura Dorada */}
+          <div className="relative mb-3 group">
+            <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-accent/30 to-amber-500/15 p-1.5 shadow-xl shadow-accent/15 flex items-center justify-center border-2 border-accent/40 group-hover:scale-105 transition-transform duration-300">
+              <img
+                src="/assets/mascot/frame_01.png"
+                alt="Mascota BearDrive"
+                className="w-full h-full object-contain filter drop-shadow-md"
+              />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-accent text-slate-950 flex items-center justify-center shadow-md font-extrabold text-[10px]">
+              3D
+            </div>
+          </div>
+
+          {/* Logotipo Oficial BearDrive - Compartiendo Destinos */}
+          <img
+            src="/assets/beardrive_logo_slogan.png"
+            alt="BearDrive - Compartiendo Destinos"
+            className="h-11 w-auto object-contain drop-shadow"
+          />
+
+          <p className="mt-2 text-xs text-muted-foreground font-medium text-center">
+            Movilidad urbana y segura en Formosa
           </p>
         </div>
 
@@ -209,7 +249,23 @@ export default function Login() {
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input id="password" type="password" autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 h-12" required />
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10 pr-10 h-12"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
               <Button type="submit" className="w-full h-12 font-semibold bear-gold-gradient text-foreground border-0" disabled={loading}>

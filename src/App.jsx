@@ -11,6 +11,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { AnimatePresence, motion } from 'framer-motion';
 import Splash from '@/components/bear/Splash';
 import PwaInstallPrompt from '@/components/bear/PwaInstallPrompt';
+import OfflineBanner from '@/components/bear/OfflineBanner';
 // Auth pages
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -97,6 +98,7 @@ function App() {
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <Router>
+          <OfflineBanner />
           <ScrollToTop />
           <AuthenticatedApp />
         </Router>
