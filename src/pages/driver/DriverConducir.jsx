@@ -150,11 +150,22 @@ export default function DriverConducir() {
     load();
   }, [user?.id]);
 
-  // Poll de solicitudes con backoff exponencial ante fallos de red.
+  // Poll de solicitudes cercanas con backoff exponencial ante fallos de red.
+  // Solo se ofrecen viajes dentro del radio de proximidad al conductor.
   useBackoffPoll(
     async () => {
-      const rides = await base44.entities.Ride.filter({ status: "SEARCHING" }, "-created_date", 10);
-      setAvailableRides(rides.filter((ride) => !silencedRides.current.has(ride.id)));
+      if (!driverPos) return;
+      try {
+        const res = await base44.functions.invoke("getNearbyRideRequests", {
+          lat: driverPos.lat,
+          lng: driverPos.lng,
+          radius_km: 15,
+        });
+        const rides = res.data?.rides || [];
+        setAvailableRides(rides.filter((ride) => !silencedRides.current.has(ride.id)));
+      } catch {
+        // Se mantiene la lista anterior ante errores transitorios de red.
+      }
     },
     { enabled: online && !activeRide, baseDelay: 4000, maxDelay: 30000 }
   );

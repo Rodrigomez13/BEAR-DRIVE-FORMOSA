@@ -11,6 +11,7 @@ import FavoriteModal from "@/components/bear/FavoriteModal";
 import FavoritesBar from "@/components/bear/FavoritesBar";
 import { searchPlaces, geocodePlace, reverseGeocode, getCurrentPosition, FORMOSA_CENTER, displayAddress } from "@/lib/geo";
 import CancelRideDialog from "@/components/bear/CancelRideDialog";
+import SosDialog from "@/components/bear/SosDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
 import { useBackoffPoll } from "@/hooks/useBackoffPoll";
 import { sanitizeString } from "@/lib/sanitize";
@@ -49,6 +50,7 @@ export default function PassengerViajar() {
   const [ratingComment, setRatingComment] = useState("");
   const [showFavoriteModal, setShowFavoriteModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showSosDialog, setShowSosDialog] = useState(false);
   const [paying, setPaying] = useState(false);
   const [driverPos, setDriverPos] = useState(null);
   const [userPos, setUserPos] = useState(null);
@@ -532,7 +534,7 @@ export default function PassengerViajar() {
                   </div>
                   <div className="flex gap-2">
                     <button className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center"><Phone className="w-5 h-5 text-accent" /></button>
-                    <button className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center"><Shield className="w-5 h-5 text-accent" /></button>
+                    <button onClick={() => setShowSosDialog(true)} className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center" aria-label="Asistencia de seguridad"><Shield className="w-5 h-5 text-accent" /></button>
                   </div>
                 </div>
                 {status === "DRIVER_ARRIVED" && (
@@ -579,6 +581,12 @@ export default function PassengerViajar() {
           onOpenChange={setShowCancelDialog}
           onConfirm={handleCancel}
           isDriver={false}
+        />
+        <SosDialog
+          open={showSosDialog}
+          onOpenChange={setShowSosDialog}
+          ride={activeRide}
+          userPos={userPos}
         />
       </div>
     );
