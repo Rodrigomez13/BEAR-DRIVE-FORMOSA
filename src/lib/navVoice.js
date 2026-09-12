@@ -21,6 +21,19 @@ class NavVoiceService {
       if (window.speechSynthesis.onvoiceschanged !== undefined) {
         window.speechSynthesis.onvoiceschanged = loadVoice;
       }
+
+      // Desbloqueo automático en el primer toque del usuario (requerido por navegadores móviles)
+      const unlockAudio = () => {
+        try {
+          const silent = new SpeechSynthesisUtterance("");
+          silent.volume = 0.01;
+          window.speechSynthesis.speak(silent);
+        } catch {}
+        window.removeEventListener("touchstart", unlockAudio);
+        window.removeEventListener("click", unlockAudio);
+      };
+      window.addEventListener("touchstart", unlockAudio, { once: true, passive: true });
+      window.addEventListener("click", unlockAudio, { once: true, passive: true });
     }
   }
 

@@ -770,7 +770,7 @@ export default function DriverConducir() {
                     className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 active:scale-95 transition"
                     aria-label="Detalles del viaje"
                   >
-                    {cardMinimized ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                    {cardMinimized ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
@@ -813,8 +813,8 @@ export default function DriverConducir() {
                 </Button>
               )}
 
-              {/* Expanded details drawer */}
-              {cardMinimized && (
+              {/* Expanded details drawer (visible when expanded) */}
+              {!cardMinimized && (
                 <div className="pt-2.5 border-t border-white/10 space-y-2 text-xs animate-in fade-in duration-200">
                   <div className="flex items-center justify-between text-white/70">
                     <span>Pasajero: <strong className="text-white">{activeRide.passenger_name || "Pasajero"}</strong></span>

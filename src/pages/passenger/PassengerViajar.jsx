@@ -235,22 +235,63 @@ export default function PassengerViajar() {
 
   // Instant place search — predictions only, no geocoding delay
   useEffect(() => {
-    if (searchQuery.trim().length < 3) { setSearchResults([]); return; }
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 2) {
+      setSearchResults([]);
+      setSearchingPlace(false);
+      return;
+    }
+
+    // 1. Instant local POI matches (< 1ms)
+    const qNorm = trimmed.toLowerCase();
+    const immediateLocal = FORMOSA_POIS.filter(
+      (p) =>
+        p.name.toLowerCase().includes(qNorm) ||
+        p.address.toLowerCase().includes(qNorm) ||
+        p.category.toLowerCase().includes(qNorm)
+    ).map((p) => ({
+      place_id: `poi_${p.name.replace(/\s+/g, "_")}`,
+      label: `${p.name} (${p.address})`,
+      main_text: p.name,
+      secondary_text: `${p.category} · ${p.address}, Formosa`,
+      location: { lat: p.lat, lng: p.lng, label: `${p.name}, ${p.address}` },
+      is_poi: true,
+    }));
+
+    if (immediateLocal.length > 0) {
+      setSearchResults(immediateLocal);
+    }
+
+    // 2. Async Google Autocomplete predictions
     setSearchingPlace(true);
     const t = setTimeout(async () => {
-      const results = await searchPlaces(searchQuery);
+      const results = await searchPlaces(trimmed);
       setSearchResults(results);
       setSearchingPlace(false);
-    }, 300);
+    }, 250);
     return () => clearTimeout(t);
   }, [searchQuery]);
 
   const handleSelectPlace = async (place) => {
     setSearchQuery("");
     setSearchResults([]);
+    Haptics.light();
+
+    // 0ms instant selection if place already has coordinates (local POI)
+    if (place.location && Number.isFinite(place.location.lat) && Number.isFinite(place.location.lng)) {
+      if (selectingTarget === "origin") {
+        setOrigin({ lat: place.location.lat, lng: place.location.lng });
+        setOriginAddress(place.location.label || place.label);
+      } else {
+        setDestination({ lat: place.location.lat, lng: place.location.lng });
+        setDestinationAddress(place.location.label || place.label);
+      }
+      return;
+    }
+
     setGeocoding(true);
     try {
-      const geo = await geocodePlace(place.place_id);
+      const geo = await geocodePlace(place.place_id, place.location);
       if (!geo) { toast({ title: "No se pudo obtener la ubicación", variant: "destructive" }); return; }
       if (selectingTarget === "origin") {
         setOrigin({ lat: geo.lat, lng: geo.lng });
