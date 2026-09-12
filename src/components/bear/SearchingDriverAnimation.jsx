@@ -4,11 +4,16 @@ const SEARCHING_GIF = "https://media.base44.com/images/public/6aa1902bd90ac5b660
 
 export default function SearchingDriverAnimation({ size = 140 }) {
   return (
-    <img
-      src={SEARCHING_GIF}
-      alt="Buscando conductor"
-      className="mx-auto mb-2 object-contain rounded-2xl mix-blend-multiply"
+    <div
+      className="mx-auto mb-2 rounded-full bg-white overflow-hidden flex items-center justify-center shadow-lg"
       style={{ width: size, height: size }}
-    />
+    >
+      <img
+        src={SEARCHING_GIF}
+        alt="Buscando conductor"
+        className="object-contain"
+        style={{ width: size, height: size }}
+      />
+    </div>
   );
 }
