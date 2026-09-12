@@ -129,11 +129,11 @@ export default function Login() {
     <div className="relative h-[100dvh] overflow-y-auto scrollbar-hide flex flex-col items-center justify-center px-6 py-10 bg-gradient-to-b from-background to-secondary/40">
       <div className="absolute top-4 right-4 z-10"><ThemeToggle /></div>
       <div className="w-full max-w-sm">
-        {adminDenied && (
-          <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm text-center">
+        {adminDenied &&
+        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm text-center">
             No pudimos validar el acceso.
           </div>
-        )}
+        }
         <div
           className="flex flex-col items-center mb-6 cursor-pointer select-none"
           onMouseDown={startPress}
@@ -142,16 +142,16 @@ export default function Login() {
           onTouchStart={startPress}
           onTouchEnd={cancelPress}
           onTouchCancel={cancelPress}
-          onContextMenu={(e) => e.preventDefault()}
-        >
+          onContextMenu={(e) => e.preventDefault()}>
+          
           {/* Mascota 3D con Aura Dorada */}
           <div className="relative mb-3 group">
             <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-accent/30 to-amber-500/15 p-1.5 shadow-xl shadow-accent/15 flex items-center justify-center border-2 border-accent/40 group-hover:scale-105 transition-transform duration-300">
-              <img
-                src="/assets/mascot/frame_01.png"
-                alt="Mascota BearDrive"
-                className="w-full h-full object-contain filter drop-shadow-md"
-              />
+              <img src="https://media.base44.com/images/public/6aa1902bd90ac5b66092d80d/6caa7b214_logo-beardrive.svg"
+
+              alt="Mascota BearDrive"
+              className="w-full h-full object-contain filter drop-shadow-md" />
+              
             </div>
             <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-accent text-slate-950 flex items-center justify-center shadow-md font-extrabold text-[10px]">
               3D
@@ -162,21 +162,21 @@ export default function Login() {
           <img
             src="/assets/beardrive_logo_slogan.png"
             alt="BearDrive - Compartiendo Destinos"
-            className="h-11 w-auto object-contain drop-shadow"
-          />
+            className="h-11 w-auto object-contain drop-shadow" />
+          
 
           <p className="mt-2 text-xs text-muted-foreground font-medium text-center">
             Movilidad urbana y segura en Formosa
           </p>
         </div>
 
-        {!mode ? (
-          <div className="space-y-4">
+        {!mode ?
+        <div className="space-y-4">
             <p className="text-center text-lg font-semibold mb-2">¿Cómo querés ingresar?</p>
             <button
-              onClick={() => setMode("passenger")}
-              className="w-full p-5 rounded-2xl bear-gradient text-white flex items-center gap-4 hover:opacity-90 transition-opacity shadow-lg"
-            >
+            onClick={() => setMode("passenger")}
+            className="w-full p-5 rounded-2xl bear-gradient text-white flex items-center gap-4 hover:opacity-90 transition-opacity shadow-lg">
+            
               <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
                 <User className="w-6 h-6 text-accent" />
               </div>
@@ -186,9 +186,9 @@ export default function Login() {
               </div>
             </button>
             <button
-              onClick={() => setMode("driver")}
-              className="w-full p-5 rounded-2xl border-2 border-accent/40 bg-card flex items-center gap-4 hover:border-accent transition-colors"
-            >
+            onClick={() => setMode("driver")}
+            className="w-full p-5 rounded-2xl border-2 border-accent/40 bg-card flex items-center gap-4 hover:border-accent transition-colors">
+            
               <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
                 <Car className="w-6 h-6 text-accent" />
               </div>
@@ -203,11 +203,11 @@ export default function Login() {
                 Crear una
               </Link>
             </p>
-          </div>
-        ) : (
-          <div className="space-y-5">
+          </div> :
+
+        <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <button onClick={() => { setMode(null); setPermissionsGranted(false); }} className="text-sm text-muted-foreground hover:text-foreground">
+              <button onClick={() => {setMode(null);setPermissionsGranted(false);}} className="text-sm text-muted-foreground hover:text-foreground">
                 ← Volver
               </button>
               <span className="text-sm font-medium capitalize flex items-center gap-1.5">
@@ -230,9 +230,9 @@ export default function Login() {
               </div>
             </div>
 
-            {error && (
-              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm text-center">{error}</div>
-            )}
+            {error &&
+          <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm text-center">{error}</div>
+          }
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -250,34 +250,34 @@ export default function Login() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="current-password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10 h-12"
-                    required
-                  />
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10 pr-10 h-12"
+                  required />
+                
                   <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
               <Button type="submit" className="w-full h-12 font-semibold bear-gold-gradient text-foreground border-0" disabled={loading}>
-                {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Ingresando...</>) : "Ingresar"}
+                {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Ingresando...</> : "Ingresar"}
               </Button>
             </form>
           </div>
-        )}
+        }
       </div>
 
-      {mode && !permissionsGranted && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
+      {mode && !permissionsGranted &&
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
           <div className="w-full max-w-sm bg-card rounded-2xl p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold">Permisos necesarios</h3>
@@ -291,16 +291,16 @@ export default function Login() {
                 BearDrive usa tu ubicación para {mode === "passenger" ? "conectar con conductores cercanos y mostrar tu viaje en tiempo real" : "recibir solicitudes de pasajeros cercanos y navegar a sus puntos de encuentro"}.
               </p>
               <p className="text-xs text-muted-foreground">
-                {mode === "driver"
-                  ? "El modo conductor necesita ubicación precisa. Las notificaciones push se activarán en una etapa posterior del MVP."
-                  : "También necesitamos notificaciones para informarte cambios importantes del viaje."}
+                {mode === "driver" ?
+              "El modo conductor necesita ubicación precisa. Las notificaciones push se activarán en una etapa posterior del MVP." :
+              "También necesitamos notificaciones para informarte cambios importantes del viaje."}
               </p>
             </div>
-            {permissionError && (
-              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm text-center mb-4">
+            {permissionError &&
+          <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm text-center mb-4">
                 {permissionError}
               </div>
-            )}
+          }
             <Button onClick={handleRequestPermissions} disabled={requestingPermission} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold mb-2">
               {requestingPermission ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Solicitando...</> : <><MapPin className="w-4 h-4 mr-2" />Permitir ubicación</>}
             </Button>
@@ -309,10 +309,10 @@ export default function Login() {
             </Button>
           </div>
         </div>
-      )}
+      }
 
-      {adminModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6" onClick={() => setAdminModal(false)}>
+      {adminModal &&
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6" onClick={() => setAdminModal(false)}>
           <div className="w-full max-w-sm bg-card rounded-2xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -334,7 +334,7 @@ export default function Login() {
             </form>
           </div>
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 }
