@@ -33,6 +33,13 @@ export function useBackoffPoll(fn, { enabled = true, baseDelay = 3000, maxDelay 
 
     const tick = async () => {
       if (cancelled) return;
+
+      // Si la app está en segundo plano, estirar el intervalo para no saturar consultas
+      if (typeof document !== "undefined" && document.hidden) {
+        timerRef.current = setTimeout(tick, Math.max(baseDelay * 2, 20000));
+        return;
+      }
+
       try {
         await fnRef.current();
         if (cancelled) return;
@@ -46,6 +53,17 @@ export function useBackoffPoll(fn, { enabled = true, baseDelay = 3000, maxDelay 
       }
     };
 
+    const handleVisibility = () => {
+      if (typeof document !== "undefined" && !document.hidden && enabled) {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        tick();
+      }
+    };
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibility);
+    }
+
     tick();
 
     return () => {
@@ -53,6 +71,9 @@ export function useBackoffPoll(fn, { enabled = true, baseDelay = 3000, maxDelay 
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
+      }
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibility);
       }
     };
   }, [enabled, baseDelay, maxDelay]);

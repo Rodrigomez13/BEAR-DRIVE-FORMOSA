@@ -124,6 +124,7 @@ export default function DriverConducir() {
   const [driverSolarMode, setDriverSolarMode] = useState(
     () => typeof window !== "undefined" && localStorage.getItem("bear_driver_solar") === "true"
   );
+  const [mapRecenterTrigger, setMapRecenterTrigger] = useState(0);
   const { isLocked: isScreenAwake } = useWakeLock(online || !!activeRide);
 
   const positionWatchRef = useRef(null);
@@ -187,7 +188,7 @@ export default function DriverConducir() {
         // Se mantiene la lista anterior ante errores transitorios de red.
       }
     },
-    { enabled: online && !activeRide, baseDelay: 4000, maxDelay: 30000 }
+    { enabled: online && !activeRide, baseDelay: 10000, maxDelay: 30000 }
   );
 
   // Realtime ride status subscription — primary sync mechanism (replaces 3s polling).
@@ -213,6 +214,14 @@ export default function DriverConducir() {
     phaseRef.current = `${activeRide.id}:${phase}`;
     setRouteInfo(null);
 
+    // Snapshot inmediato para no dejar origin en null durante el cambio de fase
+    const immediateOrigin = driverPosRef.current || driverPos || (
+      activeRide.origin_lat ? { lat: activeRide.origin_lat, lng: activeRide.origin_lng } : null
+    );
+    if (immediateOrigin) {
+      setNavigationStart({ lat: immediateOrigin.lat, lng: immediateOrigin.lng });
+    }
+
     let cancelled = false;
     getCurrentPosition({ enableHighAccuracy: true, maximumAge: 2000 })
       .then((position) => {
@@ -221,7 +230,7 @@ export default function DriverConducir() {
         setNavigationStart({ lat: position.lat, lng: position.lng });
       })
       .catch(() => {
-        if (!cancelled && driverPos) {
+        if (!cancelled && !immediateOrigin && driverPos) {
           setNavigationStart({ lat: driverPos.lat, lng: driverPos.lng });
         }
       });
@@ -257,7 +266,7 @@ export default function DriverConducir() {
     const persistDriverLocation = async (position) => {
       if (!driverLocationId) return;
       const now = Date.now();
-      const persistInterval = activeRide ? 4000 : 15000;
+      const persistInterval = activeRide ? 5000 : 25000;
       if (now - lastLocationPersistRef.current < persistInterval) return;
       lastLocationPersistRef.current = now;
 
@@ -518,8 +527,11 @@ export default function DriverConducir() {
       const res = await base44.functions.invoke("validateRidePin", {
         ride_id: activeRide.id, pin: pinInput,
       });
+      const startCoord = driverPos
+        ? { lat: driverPos.lat, lng: driverPos.lng }
+        : (activeRide.origin_lat ? { lat: activeRide.origin_lat, lng: activeRide.origin_lng } : null);
       setActiveRide(res.data.ride);
-      setNavigationStart(driverPos ? { lat: driverPos.lat, lng: driverPos.lng } : null);
+      setNavigationStart(startCoord);
       setRouteInfo(null);
       phaseRef.current = `${activeRide.id}:destination`;
       setPinInput("");
@@ -663,6 +675,15 @@ export default function DriverConducir() {
       : navigatingToDestination
         ? { lat: activeRide.destination_lat, lng: activeRide.destination_lng }
         : null;
+
+    const navigationOrigin = isNavigating
+      ? (navigationStart || (driverPos ? { lat: driverPos.lat, lng: driverPos.lng } : (activeRide.origin_lat ? { lat: activeRide.origin_lat, lng: activeRide.origin_lng } : null)))
+      : { lat: activeRide.origin_lat, lng: activeRide.origin_lng };
+
+    const navigationDestination = isNavigating
+      ? (navigationTarget || { lat: activeRide.destination_lat, lng: activeRide.destination_lng })
+      : { lat: activeRide.destination_lat, lng: activeRide.destination_lng };
+
     const navigationTargetLabel = navigatingToPickup ? "Punto de encuentro" : "Destino";
     const navigationAddress = navigatingToPickup
       ? displayAddress(activeRide.origin_address)
@@ -675,8 +696,8 @@ export default function DriverConducir() {
     return (
       <div className="absolute inset-0">
         <MapView
-          origin={isNavigating ? navigationStart : { lat: activeRide.origin_lat, lng: activeRide.origin_lng }}
-          destination={isNavigating ? navigationTarget : { lat: activeRide.destination_lat, lng: activeRide.destination_lng }}
+          origin={navigationOrigin}
+          destination={navigationDestination}
           originLabel={isNavigating ? "" : "Origen"}
           destinationLabel={isNavigating ? navigationTargetLabel : "Destino"}
           showOriginMarker={!isNavigating}
@@ -686,8 +707,9 @@ export default function DriverConducir() {
           followDriver={isNavigating}
           navigationZoom={navMode === "gps" ? 18 : 15}
           onRouteInfo={setRouteInfo}
-          tilt={navMode === "gps" && isNavigating ? 48 : 0}
+          rotateHeading={navMode === "gps" && isNavigating}
           heading={navMode === "gps" && isNavigating ? navHeading : 0}
+          tilt={0}
           mapTheme={driverSolarMode ? "light" : "dark"}
           className="absolute inset-0"
         />
@@ -713,7 +735,7 @@ export default function DriverConducir() {
                 className="flex items-center gap-1.5 rounded-full bg-[#0e1320]/90 backdrop-blur-md px-3 py-2 text-xs font-semibold text-white shadow-xl border border-white/10 active:scale-95 transition"
               >
                 {navMode === "gps" ? <MapIcon className="w-4 h-4 text-accent" /> : <Navigation className="w-4 h-4 text-accent" />}
-                {navMode === "gps" ? "Vista 2D" : "Modo 3D"}
+                {navMode === "gps" ? "Norte arriba" : "Seguir rumbo"}
               </button>
 
               <button
@@ -1015,6 +1037,7 @@ export default function DriverConducir() {
         <MapView
           driverPos={driverPos}
           recenter={driverPos}
+          recenterTrigger={mapRecenterTrigger}
           interactive={true}
           mapTheme={driverSolarMode ? "light" : "dark"}
           className="absolute inset-0"
@@ -1080,6 +1103,22 @@ export default function DriverConducir() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Botón flotante para recentrar mapa en ubicación del conductor */}
+        {driverPos && !incomingRide && (
+          <button
+            type="button"
+            onClick={() => {
+              Haptics.light();
+              setMapRecenterTrigger((prev) => prev + 1);
+            }}
+            className="absolute right-3.5 bottom-40 z-20 flex items-center gap-2 rounded-full bg-[#181E2F]/95 backdrop-blur-md px-3.5 py-2.5 text-xs font-semibold text-white shadow-2xl border border-white/10 active:scale-95 transition"
+            aria-label="Recentrar mi ubicación"
+          >
+            <Navigation className="w-4 h-4 text-accent fill-accent/20" />
+            <span>Mi ubicación</span>
+          </button>
         )}
 
         {/* HUD de Espera Activa con Radar 15km y WakeLock */}

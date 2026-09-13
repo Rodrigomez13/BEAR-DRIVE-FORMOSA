@@ -177,6 +177,8 @@ export default function MapView({
   onMapClick,
   className = "",
   recenter,
+  recenterTrigger,
+  recenterZoom = 16,
   interactive = true,
   followDriver = false,
   navigationZoom = 17,
@@ -698,12 +700,25 @@ export default function MapView({
     recalculatingRef.current = false;
   }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng]);
 
-  // Explicit recenter for non-navigation maps.
+  // Explicit recenter for non-navigation maps or when recenterTrigger changes.
   useEffect(() => {
     if (mapRef.current && recenter && status === "ready" && !followDriver) {
-      mapRef.current.panTo(recenter);
+      mapRef.current.panTo({ lat: recenter.lat, lng: recenter.lng });
+      if (recenterZoom) {
+        mapRef.current.setZoom(recenterZoom);
+      }
     }
-  }, [recenter?.lat, recenter?.lng, status, followDriver]);
+  }, [recenter?.lat, recenter?.lng, recenterTrigger, recenterZoom, status, followDriver]);
+
+  // Ensure map canvas adapts when rotating navigation mode is toggled.
+  useEffect(() => {
+    if (mapRef.current && window.google?.maps) {
+      window.google.maps.event.trigger(mapRef.current, "resize");
+      if (driverPos) {
+        mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, isRotating, heading));
+      }
+    }
+  }, [isRotating]);
 
   // Detect gm_authFailure that fires after map load.
   useEffect(() => {
@@ -731,25 +746,41 @@ export default function MapView({
   const resumeFollow = () => {
     setFollowSuspended(false);
     if (driverPos && mapRef.current) {
-      mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, tilt, heading));
+      mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, isRotating, heading));
       mapRef.current.setZoom(navigationZoom);
     }
   };
 
   const currentBg = isDark ? "#0e1320" : "#f4f6f9";
+  const safeHeading = Number.isFinite(heading) ? heading : 0;
 
   return (
-    <div className={className} style={{ background: currentBg }}>
+    <div className={`relative overflow-hidden ${className}`} style={{ background: currentBg }}>
       <div
         ref={containerRef}
-        className="absolute inset-0"
-        style={{
-          background: currentBg,
-          transform: tilt > 0 ? `perspective(1000px) rotateX(${tilt}deg) rotateZ(${-heading}deg) scale(1.2)` : "none",
-          transformOrigin: "center center",
-          transition: "transform 0.4s ease-out",
-          backfaceVisibility: "hidden",
-        }}
+        style={
+          isRotating
+            ? {
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                width: "180vmax",
+                height: "180vmax",
+                transform: `translate(-50%, -50%) rotate(${-safeHeading}deg)`,
+                transformOrigin: "center center",
+                transition: "transform 0.25s linear",
+                willChange: "transform",
+                background: currentBg,
+              }
+            : {
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                transform: "none",
+                background: currentBg,
+              }
+        }
       />
 
       {followDriver && followSuspended && status === "ready" && (
