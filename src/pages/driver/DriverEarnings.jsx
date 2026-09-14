@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
-import { DollarSign, AlertCircle, Receipt, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { DollarSign, AlertCircle, Receipt, ChevronLeft, ChevronRight, Calendar, CreditCard, CheckCircle2 } from "lucide-react";
 import { displayAddress } from "@/lib/geo";
 import LoadingScreen from "@/components/bear/LoadingScreen";
 import PullToRefresh from "@/components/bear/PullToRefresh";
@@ -15,6 +15,7 @@ export default function DriverEarnings() {
   const [charges, setCharges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [paymentAccount, setPaymentAccount] = useState(null);
 
   const load = async () => {
     try {
@@ -22,7 +23,20 @@ export default function DriverEarnings() {
       setRides(r);
       const c = await base44.entities.DriverDailyCharge.filter({ driver_id: user.id }, "-business_day", 50);
       setCharges(c);
+      const accs = await base44.entities.PaymentAccount.filter({ driver_id: user.id });
+      if (accs.length > 0 && accs[0].seller_id) {
+        setPaymentAccount(accs[0]);
+      }
     } catch (err) {} finally { setLoading(false); }
+  };
+
+  const connectPayments = async () => {
+    try {
+      const res = await base44.functions.invoke("connectDriverPayments", {});
+      window.location.assign(res.data.url);
+    } catch (e) {
+      toast({ title: e.response?.data?.error || e.message, variant: "destructive" });
+    }
   };
 
   useEffect(() => { load(); }, [user]);
@@ -80,6 +94,41 @@ export default function DriverEarnings() {
           </div>
         </div>
       </Card>
+
+      {/* Mercado Pago Account Connection Card */}
+      {paymentAccount ? (
+        <div className="p-3.5 mb-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-bold text-xs text-foreground">Mercado Pago conectado</p>
+              <p className="text-[11px] text-muted-foreground">ID Vendedor: {paymentAccount.seller_id} · Cobros activos</p>
+            </div>
+          </div>
+          <Button onClick={connectPayments} variant="ghost" size="sm" className="text-xs text-emerald-400 hover:text-emerald-300 h-8 px-2">
+            Reconectar
+          </Button>
+        </div>
+      ) : (
+        <Card className="p-4 mb-4 border-accent/40 bg-accent/5">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#009EE3]/15 flex items-center justify-center shrink-0 mt-0.5">
+              <CreditCard className="w-4 h-4 text-[#009EE3]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-xs text-foreground">Vincular cuenta de Mercado Pago</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                Necesario para recibir pagos digitales de viajes por QR y tarjetas directamente a tu cuenta.
+              </p>
+              <Button onClick={connectPayments} className="w-full mt-2.5 h-9 bear-gold-gradient text-foreground font-bold text-xs">
+                Vincular mi Mercado Pago
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
       {totalDebt > 0 && (
         <Card className="p-4 mb-4 bg-destructive/5 border-destructive/30">
           <div className="flex items-start gap-3">

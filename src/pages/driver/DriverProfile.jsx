@@ -9,7 +9,7 @@ import StarRating from "@/components/bear/StarRating";
 import BearAvatar from "@/components/bear/BearAvatar";
 import ThemeToggle from "@/components/bear/ThemeToggle";
 import ModeSwitcher from "@/components/bear/ModeSwitcher";
-import { Car, LogOut, FileText, ChevronRight, Shield, HelpCircle, CheckCircle2, AlertTriangle, Camera, Loader2, Clock, Trash2 } from "lucide-react";
+import { Car, LogOut, FileText, ChevronRight, Shield, HelpCircle, CheckCircle2, AlertTriangle, Camera, Loader2, Clock, Trash2, CreditCard } from "lucide-react";
 import { businessDaysUntil } from "@/lib/businessDays";
 import { validateFile, optimizeForWeb } from "@/lib/imageUtils";
 import DeleteAccountDialog from "@/components/bear/DeleteAccountDialog";
@@ -23,6 +23,19 @@ export default function DriverProfile() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [application, setApplication] = useState(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [paymentAccount, setPaymentAccount] = useState(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("payments") === "connected") {
+        toast({
+          title: "Mercado Pago conectado",
+          description: "Tu cuenta de Mercado Pago quedó vinculada para recibir los pagos de tus viajes.",
+        });
+      }
+    }
+  }, []);
 
   const connectPayments = async () => {
     try {
@@ -65,6 +78,10 @@ export default function DriverProfile() {
           const apps = await base44.entities.DriverApplication.filter({ user_id: user.id }, "-created_date", 1);
           if (apps.length > 0) setApplication(apps[0]);
         }
+        const accs = await base44.entities.PaymentAccount.filter({ driver_id: user.id });
+        if (accs.length > 0 && accs[0].seller_id) {
+          setPaymentAccount(accs[0]);
+        }
       } catch (err) {}
     };
     load();
@@ -87,7 +104,39 @@ export default function DriverProfile() {
         <ThemeToggle />
       </div>
 
-        <Button onClick={connectPayments} variant="outline" className="w-full mb-4">Vincular mi Mercado Pago para recibir pagos</Button>
+      {paymentAccount ? (
+        <div className="p-3.5 mb-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-sm text-foreground">Mercado Pago vinculado</p>
+              <p className="text-xs text-muted-foreground">ID Vendedor: {paymentAccount.seller_id} · Pagos activos</p>
+            </div>
+          </div>
+          <Button onClick={connectPayments} variant="ghost" size="sm" className="text-xs text-emerald-400 hover:text-emerald-300">
+            Reconectar
+          </Button>
+        </div>
+      ) : (
+        <Card className="p-4 mb-4 border-accent/40 bg-accent/5">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#009EE3]/15 flex items-center justify-center shrink-0">
+              <CreditCard className="w-5 h-5 text-[#009EE3]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm text-foreground">Cobros con Mercado Pago</p>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                Vinculá tu cuenta para cobrar viajes directamente con QR y tarjetas sin comisiones de la app.
+              </p>
+              <Button onClick={connectPayments} className="w-full mt-3 h-10 bear-gold-gradient text-foreground font-bold text-xs">
+                Vincular mi cuenta de Mercado Pago
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
       <Card className="p-5 mb-4 bear-gradient text-white">
         <div className="flex items-center gap-4">
           <div className="relative">
