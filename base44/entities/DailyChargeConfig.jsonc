@@ -7,7 +7,7 @@
     },
     "amount": {
       "type": "number",
-      "default": 1500
+      "default": 5000
     },
     "currency": {
       "type": "string",

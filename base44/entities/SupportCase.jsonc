@@ -37,10 +37,16 @@
       "type": "string"
     },
     "resolution": {
-      "type": "string"
+      "type": "string",
+      "rls": {
+        "write": false
+      }
     },
     "assigned_to": {
-      "type": "string"
+      "type": "string",
+      "rls": {
+        "write": false
+      }
     }
   },
   "required": [
@@ -77,21 +83,7 @@
         }
       ]
     },
-    "update": {
-      "$or": [
-        {
-          "data.user_id": "{{user.id}}"
-        },
-        {
-          "data.assigned_to": "{{user.email}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
+    "update": false,
     "delete": {
       "user_condition": {
         "role": "admin"

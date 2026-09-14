@@ -1,3 +1,4 @@
+import { eligibleVehicle, requireNoDebt, premiumEligible } from '../../shared/domain.ts';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
 function haversineKm(lat1, lng1, lat2, lng2) {
@@ -11,23 +12,7 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-// Matching rounds — each round targets a distinct distance band so no driver
-// receives duplicate pushes. Closest drivers are notified first; the search
-// expands outward only if earlier rounds don't produce an acceptance.
-//
-// Round 1 (0–5 km, max 5 drivers):  immediate, closest matches
-// Round 2 (5–10 km, max 10 drivers): first expansion after 30s
-// Round 3 (10–15 km, all):           final expansion after 60s
-const ROUND_CONFIG = {
-  1: { minKm: 0, maxKm: 5, limit: 5 },
-  2: { minKm: 5, maxKm: 10, limit: 10 },
-  3: { minKm: 10, maxKm: 15, limit: null },
-};
-
-// System function invoked by the "Ride Search Timeout" workflow when a ride
-// enters SEARCHING. Best-effort push to nearby online drivers in expanding
-// rounds. Polling (getNearbyRideRequests) is the fallback if push credentials
-// aren't configured — failures are caught and logged, never thrown.
+// Notification hint only. Acceptance eligibility is always checked on the server.
 export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
@@ -36,7 +21,7 @@ export default async function(req) {
     if (!ride_id) return Response.json({ error: "ride_id es obligatorio" }, { status: 400 });
 
     const roundNum = [1, 2, 3].includes(round) ? round : 1;
-    const config = ROUND_CONFIG[roundNum];
+    if (roundNum !== 1) return Response.json({ skipped: true });
 
     let ride;
     try {
@@ -52,6 +37,10 @@ export default async function(req) {
       return Response.json({ skipped: true, reason: "no_origin" });
     }
 
+    const generation = ride.search_started_at || ride.created_date;
+    const notifiedSearch = await base44.asServiceRole.entities.Ride.updateMany({ id: ride.id, status: 'SEARCHING', notified_search: ride.notified_search || null }, { $set: { notified_search: generation } });
+    if (ride.notified_search === generation || notifiedSearch.updated !== 1) return Response.json({ skipped: true });
+
     const onlineDrivers = await base44.asServiceRole.entities.DriverLocation.filter({ online: true });
 
     // Filter by this round's distance band, sort closest-first.
@@ -61,14 +50,18 @@ export default async function(req) {
         ...dl,
         _dist: haversineKm(ride.origin_lat, ride.origin_lng, dl.lat, dl.lng),
       }))
-      .filter((dl) => dl._dist >= config.minKm && dl._dist <= config.maxKm)
+      .filter((dl) => dl._dist <= (ride.search_radius_km || 10))
       .sort((a, b) => a._dist - b._dist);
 
-    const toNotify = config.limit ? candidates.slice(0, config.limit) : candidates;
+    const toNotify = candidates;
 
     let notified = 0;
     for (const dl of toNotify) {
       try {
+        const candidate = await base44.asServiceRole.entities.User.get(dl.driver_id);
+        const vehicle = await eligibleVehicle(base44, candidate, dl.vehicle_id);
+        await requireNoDebt(base44, candidate.id);
+        if (ride.category === 'premium' && !premiumEligible(vehicle)) continue;
         await base44.asServiceRole.integrations.Core.SendPushNotification({
           user_id: dl.driver_id,
           title: "Nuevo viaje cercano",

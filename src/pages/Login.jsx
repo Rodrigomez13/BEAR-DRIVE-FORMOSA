@@ -144,17 +144,15 @@ export default function Login() {
           onTouchCancel={cancelPress}
           onContextMenu={(e) => e.preventDefault()}>
           
-          {/* Mascota 3D con Aura Dorada */}
-          <div className="relative mb-3 group">
-            <div className="w-22 h-22 rounded-full bg-gradient-to-tr from-accent/30 to-amber-500/15 p-1.5 shadow-xl shadow-accent/15 flex items-center justify-center border-2 border-accent/40 group-hover:scale-105 transition-transform duration-300">
-              <img src="https://media.base44.com/images/public/6aa1902bd90ac5b66092d80d/6caa7b214_logo-beardrive.svg"
-
-              alt="Mascota BearDrive"
-              className="w-full h-full object-contain filter drop-shadow-md" />
-              
-            </div>
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-accent text-slate-950 flex items-center justify-center shadow-md font-extrabold text-[10px]">
-              3D
+          {/* Logo Pin Oficial BearDrive */}
+          <div className="relative mb-3 group flex items-center justify-center">
+            <div className="relative w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
+              <div className="absolute inset-0 rounded-full bg-accent/20 blur-xl opacity-70 group-hover:opacity-100 transition-opacity" />
+              <img
+                src="/assets/beardrive-login-pin.png"
+                alt="Logo BearDrive Formosa"
+                className="relative z-10 w-full h-full object-contain filter drop-shadow-[0_8px_16px_rgba(233,183,78,0.25)]"
+              />
             </div>
           </div>
 

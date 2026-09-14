@@ -65,19 +65,43 @@
     },
     "rating_avg": {
       "type": "number",
-      "default": 0
+      "default": 0,
+      "rls": {
+        "write": false
+      }
     },
     "total_rides": {
       "type": "number",
-      "default": 0
+      "default": 0,
+      "rls": {
+        "write": false
+      }
     },
     "bearpoints_balance": {
       "type": "number",
-      "default": 0
+      "default": 0,
+      "rls": {
+        "write": false
+      }
     },
     "stripe_customer_id": {
       "type": "string",
-      "description": "Stripe Customer ID for saved payment methods"
+      "description": "Stripe Customer ID for saved payment methods",
+      "rls": {
+        "write": false
+      }
+    },
+    "operation_lock": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    },
+    "operation_started_at": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
     }
   },
   "required": [

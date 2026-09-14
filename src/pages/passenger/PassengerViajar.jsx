@@ -14,12 +14,12 @@ import { searchPlaces, geocodePlace, reverseGeocode, getCurrentPosition, FORMOSA
 import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import SosDialog from "@/components/bear/SosDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
-import { useBackoffPoll } from "@/hooks/useBackoffPoll";
+import RideDestinationChange from "@/components/bear/RideDestinationChange";
 import { useRideSubscription } from "@/hooks/useRideSubscription";
 import { sanitizeString } from "@/lib/sanitize";
 import Haptics from "@/lib/haptics";
 import BearAvatar from "@/components/bear/BearAvatar";
-import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown, Share2, MessageCircle, Sparkles } from "lucide-react";
+import { MapPin, Search, Crosshair, Loader2, Star, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown, Share2, MessageCircle } from "lucide-react";
 import { Image } from "@/components/ui/image";
 import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
 import LoadingScreen from "@/components/bear/LoadingScreen";
@@ -27,9 +27,9 @@ import SearchingDriverAnimation from "@/components/bear/SearchingDriverAnimation
 import RideChat from "@/components/bear/RideChat";
 
 const CATEGORIES = [
-  { code: "basic", name: "BearDrive", eta: "4 min", desc: "Económico estándar", badge: null },
-  { code: "flash", name: "BearFlash", eta: "2 min", desc: "Prioritario", badge: "Más rápido" },
-  { code: "premium", name: "BearPremium", eta: "5 min", desc: "Confort premium", badge: "Confort" },
+  { code: "basic", name: "BearDrive", eta: "Según disponibilidad", desc: "Económico estándar", badge: null },
+  { code: "flash", name: "BearFlash", eta: "Mayor cobertura", desc: "Radio ampliado", badge: "Más opciones" },
+  { code: "premium", name: "BearPremium", eta: "Según disponibilidad", desc: "Confort premium", badge: "Confort" },
 ];
 
 const ACTIVE_STATUSES = ["SEARCHING", "ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING", "PIN_VALIDATION", "IN_PROGRESS", "ARRIVED", "PAYMENT_PENDING"];
@@ -71,7 +71,7 @@ export default function PassengerViajar() {
   const [destExpanded, setDestExpanded] = useState(true);
   const [paymentExpanded, setPaymentExpanded] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(true);
-  const [usePoints, setUsePoints] = useState(false);
+
   const [cashNoteOption, setCashNoteOption] = useState("exact");
   const [pickupReference, setPickupReference] = useState("");
   // Handle Stripe redirect return + card setup return + fetch saved card
@@ -103,14 +103,6 @@ export default function PassengerViajar() {
       window.history.replaceState({}, "", url);
     }
 
-    // Fetch saved card info
-    const fetchCard = async () => {
-      try {
-        const res = await base44.functions.invoke("getPassengerPaymentMethod", {});
-        if (res.data?.has_card) setSavedCard(res.data);
-      } catch { /* ignore */ }
-    };
-    fetchCard();
   }, []);
 
   // Recover active ride on mount.
@@ -159,25 +151,21 @@ export default function PassengerViajar() {
     if (updated) setActiveRide(updated);
   });
 
-  // Real-time driver location subscription — no polling delay
   useEffect(() => {
-    if (!activeRide?.driver_id) return;
+    if (Number.isFinite(activeRide?.driver_lat) && Number.isFinite(activeRide?.driver_lng)) {
+      setDriverPos({ lat: activeRide.driver_lat, lng: activeRide.driver_lng, heading: activeRide.driver_heading });
+    } else if (!activeRide?.driver_id) setDriverPos(null);
+  }, [activeRide?.driver_id, activeRide?.driver_lat, activeRide?.driver_lng, activeRide?.driver_heading]);
 
-    // Initial fetch so the marker appears immediately
-    base44.entities.DriverLocation.filter({ driver_id: activeRide.driver_id })
-      .then((locs) => {
-        if (locs.length > 0) setDriverPos({ lat: locs[0].lat, lng: locs[0].lng, heading: locs[0].heading });
-      })
-      .catch(() => {});
-
-    const unsubscribe = base44.entities.DriverLocation.subscribe((event) => {
-      if (event.data?.driver_id !== activeRide.driver_id) return;
-      if (event.type === "delete") return;
-      setDriverPos({ lat: event.data.lat, lng: event.data.lng, heading: event.data.heading });
-    });
-
-    return () => unsubscribe();
-  }, [activeRide?.driver_id]);
+  useEffect(() => {
+    if (activeRide?.status !== "SEARCHING" || !activeRide.id) return;
+    const remaining = Math.max(0, 90000 - (Date.now() - Date.parse(activeRide.search_started_at || activeRide.created_date)));
+    const timer = setTimeout(() => {
+      base44.functions.invoke("timeoutSearchingRide", { ride_id: activeRide.id })
+        .then(() => base44.entities.Ride.get(activeRide.id)).then(setActiveRide).catch(() => {});
+    }, remaining + 500);
+    return () => clearTimeout(timer);
+  }, [activeRide?.id, activeRide?.status, activeRide?.search_started_at]);
 
   // Auto-minimize/expand card and trigger tactile/audio feedback on status transitions
   const prevRideStatusRef = useRef(activeRide?.status);
@@ -333,16 +321,17 @@ export default function PassengerViajar() {
     if (!quote || !origin || !destination) return;
     let cancelled = false;
     const recalculate = async () => {
+      setQuoteLoading(true);
       try {
         const res = await base44.functions.invoke("calculateQuote", {
           origin_lat: origin.lat, origin_lng: origin.lng,
           destination_lat: destination.lat, destination_lng: destination.lng,
-          category,
+          category, origin_address: originAddress, destination_address: destinationAddress,
         });
         if (!cancelled) setQuote(res.data.quote);
       } catch {
-        // keep existing quote on error
-      }
+        if (!cancelled) setQuote(null);
+      } finally { if (!cancelled) setQuoteLoading(false); }
     };
     recalculate();
     return () => { cancelled = true; };
@@ -360,7 +349,7 @@ export default function PassengerViajar() {
       const res = await base44.functions.invoke("calculateQuote", {
         origin_lat: origin.lat, origin_lng: origin.lng,
         destination_lat: destination.lat, destination_lng: destination.lng,
-        category,
+        category, origin_address: originAddress, destination_address: destinationAddress,
       });
       setQuote(res.data.quote);
     } catch (err) {
@@ -372,19 +361,8 @@ export default function PassengerViajar() {
 
   // Request ride
   const handleRequestRide = async () => {
-    if (!quote) return;
-    if (paymentMethod === "card" && !savedCard) {
-      toast({ title: "Vinculá una tarjeta primero", description: "Tocá \"Vincular tarjeta\" abajo", variant: "destructive" });
-      return;
-    }
+    if (!quote || quoteLoading) return;
     Haptics.medium();
-    const pin = String(Math.floor(1000 + Math.random() * 9000));
-    const availablePoints = user?.bear_points || 0;
-    const pointsDiscount = (usePoints && availablePoints >= 50)
-      ? Math.min(Math.floor(availablePoints / 10) * 100, Math.floor(quote.price * 0.3))
-      : 0;
-    const finalFare = Math.max(quote.price - pointsDiscount, 500);
-
     const notesList = [];
     if (pickupReference.trim()) notesList.push(`Ref: ${sanitizeString(pickupReference.trim(), 100)}`);
     if (paymentMethod === "cash") {
@@ -392,55 +370,37 @@ export default function PassengerViajar() {
       else if (cashNoteOption === "change") notesList.push("Necesita cambio");
       else notesList.push(`Abona con billete de $${Number(cashNoteOption).toLocaleString("es-AR")}`);
     }
-    if (pointsDiscount > 0) notesList.push(`Desc. BearPoints: -$${pointsDiscount}`);
     const finalNotes = notesList.join(" · ");
 
-    // Optimistic: show searching state immediately, roll back on failure
-    const tempRide = {
-      status: "SEARCHING",
-      origin_address: sanitizeString(originAddress, 300) || "Ubicación seleccionada",
-      origin_lat: origin.lat,
-      origin_lng: origin.lng,
-      destination_address: sanitizeString(destinationAddress, 300) || "Ubicación seleccionada",
-      destination_lat: destination.lat,
-      destination_lng: destination.lng,
-      category,
-      payment_method: paymentMethod,
-      quoted_fare: finalFare,
-      distance_km: quote.distance_km,
-      duration_min: quote.duration_min,
-      start_pin: pin,
-      notes: finalNotes,
-    };
-    setActiveRide(tempRide);
-    setQuote(null);
+    setQuoteLoading(true);
     try {
-      const ride = await base44.entities.Ride.create({
-        passenger_id: user.id,
-        passenger_name: sanitizeString(user.full_name || user.email, 100),
-        status: "SEARCHING",
-        origin_address: sanitizeString(originAddress, 300) || "Ubicación seleccionada",
-        origin_lat: origin.lat,
-        origin_lng: origin.lng,
-        destination_address: sanitizeString(destinationAddress, 300) || "Ubicación seleccionada",
-        destination_lat: destination.lat,
-        destination_lng: destination.lng,
-        category,
+      const response = await base44.functions.invoke("createRide", {
+        quote_id: quote.quote_id || quote.id,
         payment_method: paymentMethod,
-        quoted_fare: finalFare,
-        distance_km: quote.distance_km,
-        duration_min: quote.duration_min,
-        start_pin: pin,
         notes: finalNotes,
-        quote_data: JSON.stringify(quote),
       });
+      const ride = response.data.ride;
+      setQuote(null);
       setActiveRide(ride);
       toast({ title: "Viaje solicitado", description: "Buscando conductores cercanos..." });
     } catch (err) {
       setActiveRide(null);
       setQuote(quote);
-      toast({ title: "No se pudo solicitar el viaje", description: err.message, variant: "destructive" });
-    }
+      toast({ title: "No se pudo solicitar el viaje", description: err.response?.data?.error || err.message, variant: "destructive" });
+    } finally { setQuoteLoading(false); }
+  };
+
+  const retrySearch = async () => {
+    setQuoteLoading(true);
+    try {
+      const res = await base44.functions.invoke("retryRideQuote", { ride_id: activeRide.id });
+      setQuote(res.data.quote);
+      setCategory(activeRide.category);
+      setPaymentMethod(activeRide.payment_method);
+      setActiveRide(null);
+      toast({ title: `Nueva oferta: +${res.data.increase_percent}%`, description: "Revisá el precio y confirmá para ampliar la búsqueda." });
+    } catch (e) { toast({ title: e.response?.data?.error || e.message, variant: "destructive" }); }
+    finally { setQuoteLoading(false); }
   };
 
   // Cancel ride
@@ -729,6 +689,8 @@ export default function PassengerViajar() {
                 </div>
               </div>
             )}
+            {status === "ASSIGNED" && <p className="mb-3 text-sm text-accent">Tu conductor está terminando otro viaje y luego irá a buscarte.</p>}
+            {status === "IN_PROGRESS" && <RideDestinationChange ride={activeRide} onUpdated={setActiveRide} />}
             {status === "SEARCHING" && (
               <div className="text-center py-2">
                 <SearchingDriverAnimation size={240} />
@@ -742,7 +704,7 @@ export default function PassengerViajar() {
                 <X className="w-10 h-10 text-destructive mx-auto mb-3" />
                 <p className="font-semibold">No hay conductores disponibles</p>
                 <p className="text-sm text-muted-foreground mt-1 mb-4">Probá nuevamente en unos minutos</p>
-                <Button onClick={() => setActiveRide(null)} className="w-full bear-gold-gradient text-foreground border-0">Aceptar</Button>
+                <Button onClick={retrySearch} disabled={quoteLoading} className="w-full bear-gold-gradient text-foreground border-0">Ver nueva oferta y ampliar búsqueda</Button>
               </div>
             )}
             {["ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING", "IN_PROGRESS"].includes(status) && (
@@ -882,6 +844,7 @@ export default function PassengerViajar() {
   return (
     <div className="absolute inset-0">
       <RideMapView
+        showNearbyDrivers={false}
         userLocation={userPos || origin}
         userPos={userPos}
         center={origin || userPos || FORMOSA_CENTER}
@@ -916,11 +879,8 @@ export default function PassengerViajar() {
           {quote ? (
             <div>
               {(() => {
-                const ptsDiscount = (usePoints && (user?.bear_points || 0) >= 50)
-                  ? Math.min(Math.floor((user?.bear_points || 0) / 10) * 100, Math.floor(quote.price * 0.3))
-                  : 0;
-                const effectivePrice = Math.max(quote.price - ptsDiscount, 500);
-
+                const ptsDiscount = 0;
+                const effectivePrice = quote.price;
                 return (
                   <div className="text-center mb-3">
                     <p className="text-sm text-muted-foreground">Precio del viaje</p>
@@ -983,28 +943,7 @@ export default function PassengerViajar() {
               </div>
 
               {/* BearPoints Immediate Discount Toggle */}
-              {user?.bear_points > 0 && (
-                <div className="mb-3 p-2.5 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-accent shrink-0" />
-                    <div>
-                      <p className="text-xs font-bold text-foreground">Usar BearPoints</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        Tenés {user.bear_points} pts disponibles (-${Math.min(Math.floor(user.bear_points / 10) * 100, Math.floor(quote.price * 0.3))} OFF)
-                      </p>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={usePoints}
-                    onChange={(e) => {
-                      Haptics.light();
-                      setUsePoints(e.target.checked);
-                    }}
-                    className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
-                  />
-                </div>
-              )}
+
 
               {/* Payment Method Selector */}
               <div className="flex gap-2 mb-3">
@@ -1032,21 +971,9 @@ export default function PassengerViajar() {
                       : "bg-secondary text-muted-foreground"
                   }`}
                 >
-                  <QrCode className="w-4 h-4" />QR
+                  <QrCode className="w-4 h-4" />Mercado Pago / QR
                 </button>
-                <button
-                  onClick={() => {
-                    Haptics.light();
-                    setPaymentMethod("card");
-                  }}
-                  className={`flex-1 p-2.5 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${
-                    paymentMethod === "card"
-                      ? "bear-gold-gradient text-foreground font-bold"
-                      : "bg-secondary text-muted-foreground"
-                  }`}
-                >
-                  <CreditCard className="w-4 h-4" />Tarjeta
-                </button>
+                
               </div>
 
               {/* Cash Options: Change requirement */}
@@ -1113,7 +1040,7 @@ export default function PassengerViajar() {
                   )}
                 </div>
               )}
-              <Button onClick={handleRequestRide} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold">
+              <Button onClick={handleRequestRide} disabled={quoteLoading} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold">
                 Solicitar viaje
               </Button>
               <Button variant="ghost" onClick={() => setQuote(null)} className="w-full text-sm mt-1">Cambiar destino</Button>
@@ -1230,10 +1157,10 @@ export default function PassengerViajar() {
                       <Banknote className="w-4 h-4" />Efectivo
                     </button>
                     <button onClick={() => setPaymentMethod("qr")} className={`flex-1 p-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${paymentMethod === "qr" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
-                      <QrCode className="w-4 h-4" />QR
+                      <QrCode className="w-4 h-4" />Mercado Pago / QR
                     </button>
-                    <button onClick={() => setPaymentMethod("card")} className={`flex-1 p-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${paymentMethod === "card" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
-                      <CreditCard className="w-4 h-4" />Tarjeta
+                    <button onClick={() => setPaymentMethod("qr")} className={`flex-1 p-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${paymentMethod === "card" ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground"}`}>
+                      <CreditCard className="w-4 h-4" />Mercado Pago
                     </button>
                   </div>
                 )}

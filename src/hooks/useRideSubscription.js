@@ -23,10 +23,11 @@ export function useRideSubscription(rideId, onUpdate) {
   useEffect(() => {
     if (!rideId) return;
 
+    let live = true;
     // Initial fetch ensures we have the latest state on mount/reconnect
     base44.entities.Ride.get(rideId)
       .then((ride) => {
-        if (ride) callbackRef.current?.(ride);
+        if (live && ride) callbackRef.current?.(ride);
       })
       .catch(() => {});
 
@@ -36,7 +37,7 @@ export function useRideSubscription(rideId, onUpdate) {
       unsubscribe = base44.entities.Ride.subscribe((event) => {
         if (event.data?.id !== rideId) return;
         if (event.type === "delete") return;
-        callbackRef.current?.(event.data);
+        if (live) callbackRef.current?.(event.data);
       });
     } catch {
       // Subscription may fail on reconnect — fallback poll covers this
@@ -46,13 +47,14 @@ export function useRideSubscription(rideId, onUpdate) {
     const fallbackInterval = setInterval(async () => {
       try {
         const ride = await base44.entities.Ride.get(rideId);
-        if (ride) callbackRef.current?.(ride);
+        if (live && ride) callbackRef.current?.(ride);
       } catch {
         // Network errors are non-fatal — next interval will retry
       }
     }, 15000);
 
     return () => {
+      live = false;
       unsubscribe();
       clearInterval(fallbackInterval);
     };

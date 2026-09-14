@@ -1,6 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { secrets } from 'base44:runtime';
-import { finalizeRideCompletion } from '../../shared/rideCompletion.ts';
 
 // Stripe webhook handler — confirms ride completion when payments succeed.
 // Handles two event types:
@@ -31,69 +30,13 @@ export default async function(req) {
 
     const event = JSON.parse(rawBody);
 
-    // Handle checkout.session.completed (QR payments)
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object;
-      const rideId = session.metadata?.ride_id;
-
-      if (!rideId) {
-        console.error("Webhook: ride_id ausente en metadata");
-        return Response.json({ received: true, warning: "no_ride_id" });
-      }
-
-      const ride = await base44.asServiceRole.entities.Ride.get(rideId);
-      if (!ride) {
-        console.error("Webhook: viaje no encontrado:", rideId);
-        return Response.json({ received: true, warning: "ride_not_found" });
-      }
-
-      if (ride.status === "COMPLETED") {
-        return Response.json({ received: true, already_completed: true });
-      }
-
-      const fare = ride.final_fare || ride.quoted_fare;
-      const completedDate = new Date().toISOString();
-
-      await base44.asServiceRole.entities.Ride.update(rideId, {
-        status: "COMPLETED",
-        final_fare: fare,
-        completed_date: completedDate,
-      });
-
-      await finalizeRideCompletion(base44, rideId, completedDate);
-    }
-
-    // Handle payment_intent.succeeded (card auto-charges)
-    if (event.type === "payment_intent.succeeded") {
-      const pi = event.data.object;
-      const rideId = pi.metadata?.ride_id;
-
-      if (!rideId) {
-        return Response.json({ received: true, warning: "no_ride_id" });
-      }
-
-      const ride = await base44.asServiceRole.entities.Ride.get(rideId);
-      if (!ride) {
-        return Response.json({ received: true, warning: "ride_not_found" });
-      }
-
-      if (ride.status === "COMPLETED") {
-        return Response.json({ received: true, already_completed: true });
-      }
-
-      // Only complete if the ride is in PAYMENT_PENDING (off-session charge confirmed)
-      if (ride.status === "PAYMENT_PENDING") {
-        const fare = ride.final_fare || ride.quoted_fare;
-        const completedDate = new Date().toISOString();
-
-        await base44.asServiceRole.entities.Ride.update(rideId, {
-          status: "COMPLETED",
-          final_fare: fare,
-          completed_date: completedDate,
-          stripe_payment_intent_id: pi.id,
-        });
-
-        await finalizeRideCompletion(base44, rideId, completedDate);
+    const object = event.data?.object;
+    const rideId = object?.metadata?.ride_id;
+    if (rideId) {
+      const existing = await base44.asServiceRole.entities.SupportCase.filter({ description: `Pago Stripe pendiente de conciliación: ${event.id}` });
+      if (!existing.length) {
+        const ride = await base44.asServiceRole.entities.Ride.get(rideId);
+        await base44.asServiceRole.entities.SupportCase.create({ user_id: ride.passenger_id, ride_id: rideId, category: 'payment', status: 'open', description: `Pago Stripe pendiente de conciliación: ${event.id}` });
       }
     }
 
@@ -115,6 +58,7 @@ async function verifyStripeSignature(rawBody, signature, webhookSecret) {
     const timestamp = timestampPart.split("=")[1];
     const expectedSig = signaturePart.split("=")[1];
 
+    if (!Number.isFinite(Number(timestamp)) || Math.abs(Date.now() - Number(timestamp) * 1000) > 300000) return false;
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       "raw",

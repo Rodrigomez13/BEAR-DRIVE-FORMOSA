@@ -1,209 +1,22 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { secrets } from 'base44:runtime';
+import { api, participant, fail, withLock, cas, publicRide } from '../../shared/domain.ts';
+import { sellerAccount, checkout } from '../../shared/payments.ts';
 import { finalizeRideCompletion } from '../../shared/rideCompletion.ts';
-
-// Server-authoritative ride completion with payment routing.
-// The driver triggers this at PAYMENT_PENDING. Depending on the payment method:
-//
-// - cash:  immediate completion (driver confirms cash received)
-// - card:  auto-charge the passenger's saved card (off-session PaymentIntent).
-//          If the charge succeeds → ride COMPLETED. If it fails → ride stays
-//          PAYMENT_PENDING and the passenger can retry manually.
-// - qr:    create a Stripe Checkout Session and return the URL. The driver
-//          shows a QR encoding this URL; the passenger scans/taps and pays.
-//          The webhook confirms completion when payment succeeds.
-export default async function(req) {
-  try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-
-    const body = await req.json();
-    const { ride_id } = body;
-    if (!ride_id) return Response.json({ error: "ride_id es obligatorio" }, { status: 400 });
-
-    const ride = await base44.asServiceRole.entities.Ride.get(ride_id);
-    if (!ride) return Response.json({ error: "Viaje no encontrado" }, { status: 404 });
-
-    if (ride.status !== "PAYMENT_PENDING") {
-      return Response.json({ error: "El viaje no está en estado de cobro" }, { status: 400 });
-    }
-
-    if (ride.driver_id !== user.id) {
-      return Response.json({ error: "Solo el conductor puede iniciar el cobro" }, { status: 403 });
-    }
-
-    const fare = ride.final_fare || ride.quoted_fare;
-    if (!fare || fare <= 0) {
-      return Response.json({ error: "Tarifa inválida" }, { status: 400 });
-    }
-
-    const completedDate = new Date().toISOString();
-
-    // --- CASH: immediate completion ---
-    if (ride.payment_method === "cash") {
-      const updated = await base44.asServiceRole.entities.Ride.update(ride_id, {
-        status: "COMPLETED",
-        final_fare: fare,
-        completed_date: completedDate,
-      });
-      await finalizeRideCompletion(base44, ride_id, completedDate);
-      return Response.json({ ride: updated, payment_status: "completed" });
-    }
-
-    // --- CARD: auto-charge saved card (off-session) ---
-    if (ride.payment_method === "card") {
-      const passenger = await base44.asServiceRole.entities.User.get(ride.passenger_id);
-      if (!passenger?.stripe_customer_id) {
-        return Response.json({
-          error: "El pasajero no tiene una tarjeta vinculada",
-          reason: "no_card",
-        }, { status: 400 });
-      }
-
-      // Retrieve the passenger's saved payment method
-      const pmRes = await fetch(
-        `https://api.stripe.com/v1/payment_methods?customer=${passenger.stripe_customer_id}&type=card`,
-        {
-          headers: {
-            "Authorization": `Bearer ${secrets.get("STRIPE_SECRET_KEY")}`,
-            "Stripe-Version": "2025-10-29.clover",
-          },
-        }
-      );
-      if (!pmRes.ok) {
-        const err = await pmRes.json();
-        console.error("Stripe error listing PMs:", JSON.stringify(err));
-        return Response.json({ error: err.error?.message }, { status: 500 });
-      }
-      const paymentMethods = await pmRes.json();
-      if (!paymentMethods.data || paymentMethods.data.length === 0) {
-        return Response.json({
-          error: "El pasajero no tiene una tarjeta vinculada",
-          reason: "no_card",
-        }, { status: 400 });
-      }
-      const pmId = paymentMethods.data[0].id;
-
-      // Create + confirm PaymentIntent (off-session)
-      const amountInCents = Math.round(fare * 100);
-      const piParams = new URLSearchParams();
-      piParams.append("amount", String(amountInCents));
-      piParams.append("currency", "ars");
-      piParams.append("customer", passenger.stripe_customer_id);
-      piParams.append("payment_method", pmId);
-      piParams.append("off_session", "true");
-      piParams.append("confirm", "true");
-      piParams.append("metadata[ride_id]", ride_id);
-      piParams.append("metadata[base44_app_id]", secrets.get("BASE44_APP_ID") || "");
-
-      const piRes = await fetch("https://api.stripe.com/v1/payment_intents", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${secrets.get("STRIPE_SECRET_KEY")}`,
-          "Stripe-Version": "2025-10-29.clover",
-          "Content-Type": "application/x-www-form-urlencoded",
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: piParams,
-      });
-
-      if (!piRes.ok) {
-        const err = await piRes.json();
-        console.error("Stripe charge error:", JSON.stringify(err));
-        return Response.json({
-          error: err.error?.message || "Error al cobrar la tarjeta",
-          reason: "charge_failed",
-        }, { status: 500 });
-      }
-
-      const pi = await piRes.json();
-
-      if (pi.status === "succeeded") {
-        const updated = await base44.asServiceRole.entities.Ride.update(ride_id, {
-          status: "COMPLETED",
-          final_fare: fare,
-          completed_date: completedDate,
-          stripe_payment_intent_id: pi.id,
-        });
-        await finalizeRideCompletion(base44, ride_id, completedDate);
-        return Response.json({ ride: updated, payment_status: "completed" });
-      }
-
-      // Charge requires 3DS or pending — ride stays PAYMENT_PENDING
-      await base44.asServiceRole.entities.Ride.update(ride_id, {
-        stripe_payment_intent_id: pi.id,
-      });
-      return Response.json({
-        payment_status: "requires_action",
-        message: "El pago requiere autenticación. El pasajero debe completarlo manualmente.",
-      });
-    }
-
-    // --- QR: create Mercado Pago preference for passenger to pay ---
-    if (ride.payment_method === "qr") {
-      const origin = new URL(req.url).origin;
-      const mpToken = secrets.get("MERCADO_PAGO_ACCESS_TOKEN");
-      if (!mpToken) {
-        return Response.json({ error: "Mercado Pago no configurado" }, { status: 500 });
-      }
-
-      const preference = {
-        items: [{
-          title: "Viaje BearDrive",
-          description: `${ride.origin_address || ""} → ${ride.destination_address || ""}`,
-          quantity: 1,
-          unit_price: fare,
-          currency_id: "ARS",
-        }],
-        metadata: {
-          ride_id: ride_id,
-          base44_app_id: secrets.get("BASE44_APP_ID") || "",
-        },
-        back_urls: {
-          success: `${origin}/passenger?payment=success&ride=${ride_id}`,
-          failure: `${origin}/passenger?payment=cancelled&ride=${ride_id}`,
-          pending: `${origin}/passenger?payment=pending&ride=${ride_id}`,
-        },
-        auto_return: "approved",
-        statement_descriptor: "BEARDRIVE",
-        payment_methods: {
-          installments: 1,
-        },
-      };
-
-      const mpRes = await fetch("https://api.mercadopago.com/checkout/preferences", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${mpToken}`,
-          "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: JSON.stringify(preference),
-      });
-
-      if (!mpRes.ok) {
-        const err = await mpRes.json();
-        console.error("MP error creating preference:", JSON.stringify(err));
-        return Response.json({ error: err.message || "Error al crear preferencia de Mercado Pago" }, { status: 500 });
-      }
-
-      const mpData = await mpRes.json();
-      await base44.asServiceRole.entities.Ride.update(ride_id, {
-        mp_preference_id: mpData.id,
-        payment_checkout_url: mpData.init_point,
-      });
-
-      return Response.json({
-        payment_status: "qr_pending",
-        checkout_url: mpData.init_point,
-        preference_id: mpData.id,
-      });
-    }
-
-    return Response.json({ error: "Método de pago no soportado" }, { status: 400 });
-  } catch (error) {
-    console.error("completeRide error:", error.message);
-    return Response.json({ error: error.message }, { status: 500 });
+export default req=>api(req,createClientFromRequest,async(client,user,body)=>{
+ const e=client.asServiceRole.entities;
+ await participant(client,user,body.ride_id);
+ return withLock(e.Ride,body.ride_id,async()=>{
+  const ride=await participant(client,user,body.ride_id);
+  if(ride.driver_id!==user.id) fail('Solo el conductor puede confirmar el cobro',403);
+  if(['COMPLETED','RATED'].includes(ride.status)) {await finalizeRideCompletion(client,ride.id,ride.completed_date);return {ride:publicRide(ride,user.id),payment_status:'completed'};}
+  if(ride.status!=='PAYMENT_PENDING') fail('El viaje no está listo para cobrar');
+  if(ride.payment_method==='cash') {
+   const date=new Date().toISOString();
+   await cas(e.Ride,{id:ride.id,status:'PAYMENT_PENDING'},{status:'COMPLETED',payment_status:'paid',completed_date:date,final_fare:ride.final_fare||ride.quoted_fare});
+   await finalizeRideCompletion(client,ride.id,date);
+   return {ride:publicRide(await e.Ride.get(ride.id),user.id),payment_status:'completed'};
   }
-}
+  if(ride.payment_method!=='qr') fail('Pago anterior requiere conciliación por soporte');
+  return checkout(client,'Ride',ride,await sellerAccount(client,ride.driver_id),'ride');
+ });
+});

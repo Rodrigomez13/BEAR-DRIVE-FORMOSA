@@ -90,7 +90,13 @@
     },
     "start_pin": {
       "type": "string",
-      "description": "Hashed PIN - set by backend"
+      "description": "Hashed PIN - set by backend",
+      "rls": {
+        "read": {
+          "data.passenger_id": "{{user.id}}"
+        },
+        "write": false
+      }
     },
     "vehicle_id": {
       "type": "string"
@@ -146,6 +152,72 @@
     },
     "idempotency_key": {
       "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "operation_lock": {
+      "type": "string"
+    },
+    "operation_started_at": {
+      "type": "string"
+    },
+    "quote_id": {
+      "type": "string"
+    },
+    "search_radius_km": {
+      "type": "number"
+    },
+    "retry_count": {
+      "type": "number"
+    },
+    "retry_of": {
+      "type": "string"
+    },
+    "search_started_at": {
+      "type": "string"
+    },
+    "queued_after_ride_id": {
+      "type": "string"
+    },
+    "payment_status": {
+      "type": "string"
+    },
+    "payment_id": {
+      "type": "string"
+    },
+    "payment_provider": {
+      "type": "string"
+    },
+    "seller_id": {
+      "type": "string"
+    },
+    "completion_effects_done": {
+      "type": "boolean"
+    },
+    "destination_revision": {
+      "type": "number"
+    },
+    "fare_change_quote": {
+      "type": "string"
+    },
+    "pin_attempts": {
+      "type": "number"
+    },
+    "pin_locked_until": {
+      "type": "string"
+    },
+    "driver_lat": {
+      "type": "number"
+    },
+    "driver_lng": {
+      "type": "number"
+    },
+    "driver_heading": {
+      "type": "number"
+    },
+    "notified_search": {
+      "type": "string"
     }
   },
   "required": [
@@ -153,10 +225,14 @@
     "status"
   ],
   "rls": {
-    "create": {
+    "create": false,
+    "read": {
       "$or": [
         {
           "data.passenger_id": "{{user.id}}"
+        },
+        {
+          "data.driver_id": "{{user.id}}"
         },
         {
           "user_condition": {
@@ -165,12 +241,7 @@
         }
       ]
     },
-    "read": null,
-    "update": null,
-    "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
-    }
+    "update": false,
+    "delete": false
   }
 }
