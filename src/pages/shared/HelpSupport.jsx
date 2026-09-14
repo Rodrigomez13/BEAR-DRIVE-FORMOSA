@@ -7,7 +7,8 @@ import { toast } from "@/components/ui/use-toast";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { HelpCircle, ChevronLeft, AlertCircle, ChevronDown } from "lucide-react";
+import { HelpCircle, ChevronLeft, AlertCircle, ChevronDown, Bot } from "lucide-react";
+import PaymentPricingAgentModal from "@/components/bear/PaymentPricingAgentModal";
 
 const FAQS = [
   { q: "¿Cómo solicito un viaje?", a: "Ingresá a la pestaña Viajar, buscá tu destino o seleccioná un favorito y tocá Cotizar viaje." },
@@ -32,6 +33,7 @@ export default function HelpSupport() {
   const [description, setDescription] = useState("");
   const [sending, setSending] = useState(false);
   const [openFaq, setOpenFaq] = useState(null);
+  const [agentOpen, setAgentOpen] = useState(false);
 
   const handleSubmit = async () => {
     if (description.trim().length < 10) {
@@ -82,6 +84,33 @@ export default function HelpSupport() {
           </div>
         </Card>
 
+        {/* Asistente de Pagos y Tarifas BearBot */}
+        <Card className="p-4 mb-4 border-accent/40 bg-accent/5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center text-accent shrink-0">
+                <Bot className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <p className="font-bold text-xs text-foreground">Asistente de Pagos y Tarifas</p>
+                  <span className="bg-accent text-foreground text-[9px] font-bold px-1.5 py-0.5 rounded">BearBot</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Simulador de tarifas en Formosa, comisiones y vinculación de pagos.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setAgentOpen(true)}
+              className="bear-gold-gradient text-foreground font-bold text-xs h-8 ml-2 shrink-0"
+            >
+              Consultar
+            </Button>
+          </div>
+        </Card>
+
         <h2 className="font-semibold text-sm mb-3">Preguntas frecuentes</h2>
         <div className="space-y-2 mb-6">
           {FAQS.map((f, i) => (
@@ -129,6 +158,7 @@ export default function HelpSupport() {
             {sending ? "Enviando..." : "Enviar consulta"}
           </Button>
         </Card>
+        <PaymentPricingAgentModal open={agentOpen} onOpenChange={setAgentOpen} />
       </div>
     </div>
   );

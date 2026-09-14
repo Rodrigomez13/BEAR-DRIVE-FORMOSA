@@ -11,7 +11,6 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { AnimatePresence, motion } from 'framer-motion';
 import Splash from '@/components/bear/Splash';
 import PwaInstallPrompt from '@/components/bear/PwaInstallPrompt';
-import OfflineBanner from '@/components/bear/OfflineBanner';
 // Auth pages
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -33,11 +32,12 @@ const DriverOnboarding = lazy(() => import('@/pages/driver/DriverOnboarding'));
 const AdminShell = lazy(() => import('@/pages/admin/AdminShell'));
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'));
 const AdminDrivers = lazy(() => import('@/pages/admin/AdminDrivers'));
-const AdminOperations = lazy(() => import('@/pages/admin/AdminOperations'));
 const AdminPricing = lazy(() => import('@/pages/admin/AdminPricing'));
-const AdminPayments = lazy(() => import('@/pages/admin/AdminPayments'));
 import SecurityPrivacy from '@/pages/shared/SecurityPrivacy';
 import HelpSupport from '@/pages/shared/HelpSupport';
+import Wallet from '@/pages/shared/Wallet';
+import PaymentMethods from '@/pages/shared/PaymentMethods';
+import AccountSettings from '@/pages/shared/AccountSettings';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -79,12 +79,13 @@ const AuthenticatedApp = () => {
               <Route path="/onboarding" element={<DriverOnboarding />} />
               <Route path="/security-privacy" element={<SecurityPrivacy />} />
               <Route path="/help-support" element={<HelpSupport />} />
+              <Route path="/wallet" element={<Wallet />} />
+              <Route path="/payment-methods" element={<PaymentMethods />} />
+              <Route path="/settings" element={<AccountSettings />} />
               <Route path="/admin" element={<AdminShell />}>
                 <Route index element={<AdminDashboard />} />
                 <Route path="drivers" element={<AdminDrivers />} />
                 <Route path="pricing" element={<AdminPricing />} />
-                <Route path="payments" element={<AdminPayments />} />
-                <Route path="operations" element={<AdminOperations />} />
               </Route>
             </Route>
             <Route path="*" element={<PageNotFound />} />
@@ -102,7 +103,6 @@ function App() {
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <Router>
-          <OfflineBanner />
           <ScrollToTop />
           <AuthenticatedApp />
         </Router>

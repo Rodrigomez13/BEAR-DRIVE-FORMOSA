@@ -9,10 +9,11 @@ import StarRating from "@/components/bear/StarRating";
 import BearAvatar from "@/components/bear/BearAvatar";
 import ThemeToggle from "@/components/bear/ThemeToggle";
 import ModeSwitcher from "@/components/bear/ModeSwitcher";
-import { Car, LogOut, FileText, ChevronRight, Shield, HelpCircle, CheckCircle2, AlertTriangle, Camera, Loader2, Clock, Trash2, CreditCard } from "lucide-react";
+import { Car, LogOut, FileText, ChevronRight, Shield, HelpCircle, CheckCircle2, AlertTriangle, Camera, Loader2, Clock, Trash2, CreditCard, Wallet, Settings, Bot } from "lucide-react";
 import { businessDaysUntil } from "@/lib/businessDays";
 import { validateFile, optimizeForWeb } from "@/lib/imageUtils";
 import DeleteAccountDialog from "@/components/bear/DeleteAccountDialog";
+import PaymentPricingAgentModal from "@/components/bear/PaymentPricingAgentModal";
 
 export default function DriverProfile() {
   const { user, logout, checkUserAuth } = useAuth();
@@ -25,6 +26,7 @@ export default function DriverProfile() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [paymentAccount, setPaymentAccount] = useState(null);
   const [connecting, setConnecting] = useState(false);
+  const [agentOpen, setAgentOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -39,13 +41,10 @@ export default function DriverProfile() {
   }, []);
 
   const connectPayments = async () => {
-    if (connecting) return;
-    setConnecting(true);
     try {
       const res = await base44.functions.invoke("connectDriverPayments", {});
-      if (!res.data?.url) throw new Error("No se recibió el enlace de vinculación");
       window.location.assign(res.data.url);
-    } catch (e) { toast({ title: e.response?.data?.error || e.message, variant: "destructive" }); } finally { setConnecting(false); }
+    } catch (e) { toast({ title: e.response?.data?.error || e.message, variant: "destructive" }); }
   };
 
   const handlePhotoUpload = async (e) => {
@@ -82,9 +81,11 @@ export default function DriverProfile() {
           const apps = await base44.entities.DriverApplication.filter({ user_id: user.id }, "-created_date", 1);
           if (apps.length > 0) setApplication(apps[0]);
         }
-        const accountResponse = await base44.functions.invoke("getDriverPaymentAccount", {});
-        setPaymentAccount(accountResponse.data.account?.status === "connected" ? accountResponse.data.account : null);
-      } catch (err) { toast({ title: "No se pudo cargar la información", description: err.response?.data?.error || err.message, variant: "destructive" }); }
+        const accs = await base44.entities.PaymentAccount.filter({ driver_id: user.id });
+        if (accs.length > 0 && accs[0].seller_id) {
+          setPaymentAccount(accs[0]);
+        }
+      } catch (err) {}
     };
     load();
   }, [user]);
@@ -114,10 +115,10 @@ export default function DriverProfile() {
             </div>
             <div>
               <p className="font-bold text-sm text-foreground">Mercado Pago vinculado</p>
-              <p className="text-xs text-muted-foreground">ID Vendedor: {paymentAccount.seller_id} · Cuenta vinculada</p>
+              <p className="text-xs text-muted-foreground">ID Vendedor: {paymentAccount.seller_id} · Pagos activos</p>
             </div>
           </div>
-          <Button disabled={connecting} onClick={connectPayments} variant="ghost" size="sm" className="text-xs text-emerald-400 hover:text-emerald-300">
+          <Button onClick={connectPayments} variant="ghost" size="sm" className="text-xs text-emerald-400 hover:text-emerald-300">
             Reconectar
           </Button>
         </div>
@@ -132,7 +133,7 @@ export default function DriverProfile() {
               <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                 Vinculá tu cuenta para cobrar viajes directamente con QR y tarjetas sin comisiones de la app.
               </p>
-              <Button disabled={connecting} onClick={connectPayments} className="w-full mt-3 h-10 bear-gold-gradient text-foreground font-bold text-xs">
+              <Button onClick={connectPayments} className="w-full mt-3 h-10 bear-gold-gradient text-foreground font-bold text-xs">
                 Vincular mi cuenta de Mercado Pago
               </Button>
             </div>
@@ -207,6 +208,84 @@ export default function DriverProfile() {
         </div>
       </Card>
 
+      {/* Driver Management Hub */}
+      <Card className="p-0 mb-4 overflow-hidden border-border bg-card">
+        <button
+          onClick={() => navigate("/wallet")}
+          className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-secondary/50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center text-accent">
+              <Wallet className="w-5 h-5" />
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-sm text-foreground">Billetera Digital</p>
+              <p className="text-xs text-muted-foreground">Ganancias, cargos diarios y deudas</p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </button>
+
+        <div className="h-px bg-border mx-4" />
+
+        <button
+          onClick={() => navigate("/payment-methods")}
+          className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-secondary/50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center text-accent">
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-sm text-foreground">Cobros y Métodos de Pago</p>
+              <p className="text-xs text-muted-foreground">
+                {paymentAccount ? "Mercado Pago Vinculado" : "Vincular cuenta de Mercado Pago"}
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </button>
+
+        <div className="h-px bg-border mx-4" />
+
+        <button
+          onClick={() => navigate("/settings")}
+          className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-secondary/50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground">
+              <Settings className="w-5 h-5" />
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-sm text-foreground">Configuración de Cuenta</p>
+              <p className="text-xs text-muted-foreground">Contraseña, alertas y seguridad</p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </button>
+
+        <div className="h-px bg-border mx-4" />
+
+        <button
+          onClick={() => setAgentOpen(true)}
+          className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-secondary/50 transition-colors bg-accent/5"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center text-accent">
+              <Bot className="w-5 h-5" />
+            </div>
+            <div className="text-left">
+              <div className="flex items-center gap-1.5">
+                <p className="font-semibold text-sm text-foreground">Asistente de Pagos y Tarifas</p>
+                <span className="bg-accent text-foreground text-[9px] font-bold px-1 py-0.5 rounded">BearBot</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Tarifas en Formosa y soporte de cobros</p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-accent" />
+        </button>
+      </Card>
+
       <ModeSwitcher />
 
       <Card className="p-0 mb-4 overflow-hidden">
@@ -244,6 +323,7 @@ export default function DriverProfile() {
       </div>
 
       <DeleteAccountDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog} />
+      <PaymentPricingAgentModal open={agentOpen} onOpenChange={setAgentOpen} />
     </div>
   );
 }
