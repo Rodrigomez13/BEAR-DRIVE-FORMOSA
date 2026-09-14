@@ -22,6 +22,14 @@ export default function AdminPayments() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [readiness, setReadiness] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const checkReadiness = async () => {
+    setChecking(true); setError('');
+    try { setReadiness((await base44.functions.invoke('getPaymentReadiness', {})).data); }
+    catch (err) { setError(err.response?.data?.error || 'No se pudo comprobar la integración.'); }
+    finally { setChecking(false); }
+  };
   useEffect(() => {
     let active = true;
     setLoading(true); setError(''); setData(null);
@@ -49,6 +57,11 @@ export default function AdminPayments() {
     </div>
     {data && <details className="rounded-xl border bg-card p-4"><summary className="cursor-pointer font-semibold">Configuración de Mercado Pago · {data.configuration.filter(c => c.configured).length}/{data.configuration.length}</summary><p className="text-sm text-muted-foreground my-3">Indica presencia de configuración; la conexión y los pagos requieren una prueba completa.</p><ul className="space-y-1 text-sm">{data.configuration.map(c => <li key={c.name} className="break-all">{c.configured ? '✓ Configurado' : 'Falta configurar'} · {c.name}</li>)}</ul></details>}
     <div className="flex gap-2 overflow-x-auto" aria-label="Secciones de pagos">{Object.entries(sections).map(([key,label]) => <Button key={key} variant={key === section ? 'default' : 'outline'} aria-pressed={key === section} onClick={() => { setSection(key); setPage(0); }}>{label}</Button>)}</div>
+    <Card className="p-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Preparación para pruebas</h2><Button variant="outline" disabled={checking} onClick={checkReadiness}>{checking ? 'Comprobando…' : 'Comprobar integración'}</Button></div>
+      <p className="text-sm text-muted-foreground">Consulta la configuración y el receptor en Mercado Pago. No genera cobros.</p>
+      {readiness && <ul className="space-y-2 text-sm">{readiness.checks.map(check => <li key={check.name}><strong>{check.ok ? '✓' : 'Pendiente'} · {check.name}</strong><p className="text-muted-foreground">{check.detail}</p></li>)}</ul>}
+    </Card>
     <Card className="p-4">
       <h2 className="font-semibold mb-4">{sections[section]}</h2>
       {loading && <p role="status">Cargando registros…</p>}

@@ -1,4 +1,5 @@
-import { all, businessDay, chargeDue, fail, withLock } from './domain.ts';
+import { all, businessDay, chargeDue, fail } from './domain.ts';
+import { withUserLock } from './userLock.ts';
 
 async function resolveDailyChargeConfig(entities, completedDate) {
   const configs = await all(entities.DailyChargeConfig, { active: true });
@@ -47,7 +48,7 @@ export async function finalizeRideCompletion(client, rideId, completedDate) {
     return;
   }
 
-  await withLock(e.User, ride.passenger_id, async () => {
+  await withUserLock(client, ride.passenger_id, async () => {
     const ledger = await all(e.BearPointsLedger, {
       user_id: ride.passenger_id,
     });
@@ -83,7 +84,7 @@ export async function finalizeRideCompletion(client, rideId, completedDate) {
   });
 
   if (ride.driver_id) {
-    await withLock(e.User, ride.driver_id, async () => {
+    await withUserLock(client, ride.driver_id, async () => {
       const day = businessDay(completedDate);
 
       const charges = await e.DriverDailyCharge.filter({

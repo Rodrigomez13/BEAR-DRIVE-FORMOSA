@@ -1,8 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { api, fail, all, ACTIVE, requireNoDebt, withLock } from '../../shared/domain.ts';
+import { api, fail, all, ACTIVE, requireNoDebt } from '../../shared/domain.ts';
+import { withUserLock } from '../../shared/userLock.ts';
 export default req => api(req, createClientFromRequest, async (client, user, body) => {
   const e = client.asServiceRole.entities;
-  return withLock(e.User, user.id, async () => {
+  return withUserLock(client, user.id, async () => {
     if (!body.quote_id) fail('Cotizá el viaje primero');
     const previous = await e.Ride.filter({ passenger_id: user.id, quote_id: body.quote_id });
     if (previous.length) return { ride: previous[0] };

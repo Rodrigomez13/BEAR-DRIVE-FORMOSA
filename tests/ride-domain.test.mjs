@@ -38,6 +38,7 @@ function matches(row, query) {
 function setup(seed = {}, userId = 'passenger') {
   const db = structuredClone(seed);
   db.User ||= [{id:'passenger'}, {id:'driver'}, {id:'driver2'}];
+  db.UserOperationLock ||= Array.from({length:32}, (_,slot) => ({id:`lock-${slot}`,slot,operation_lock:null}));
   const entities = new Proxy({}, { get: (_,name) => {
     db[name] ||= [];
     return {
@@ -47,6 +48,7 @@ function setup(seed = {}, userId = 'passenger') {
       async create(data) { const row={id:`${name}-${db[name].length+1}`,created_date:new Date().toISOString(),...structuredClone(data)};db[name].push(row);return structuredClone(row); },
       async update(id,data) { const row=db[name].find(r=>r.id===id);assert.ok(row);Object.assign(row,structuredClone(data));return structuredClone(row); },
       async updateMany(query, update) {
+        if (name === 'User') throw new Error('Bulk user update not allowed');
         const rows=db[name].filter(r=>matches(r,query));
         rows.forEach(r=>Object.assign(r,structuredClone(update.$set)));
         return {updated:rows.length};
@@ -54,7 +56,7 @@ function setup(seed = {}, userId = 'passenger') {
     };
   }});
   const client={auth:{me:async()=>db.User.find(u=>u.id===userId)},asServiceRole:{entities}};
-  globalThis.fixture={client,secrets:{},db};
+  globalThis.fixture={client,secrets:{USER_OPERATION_LOCK_IDS:JSON.stringify(db.UserOperationLock.map(row=>row.id))},db};
   return db;
 }
 async function call(name, body, userId = '') {
@@ -281,4 +283,35 @@ test('Callback rejects absent or malformed expiry before contacting Mercado Pago
   const handler=(await load('base44/functions/driverPaymentsCallback/entry.ts')).default;
   const response=await handler(new Request('https://example.test/callback?state=state&code=code'));
   assert.equal(response.status,400);
+});
+
+test('user coordination fails closed without its fixed manifest', async () => {
+  setup({RideQuote:[{id:'quote'}]});
+  delete fixture.secrets.USER_OPERATION_LOCK_IDS;
+  assert.equal((await call('createRide',{quote_id:'quote',payment_method:'cash'})).status,503);
+  assert.equal(fixture.db.Ride?.length || 0,0);
+});
+
+test('private user locks serialize overlapping operations and release on failure', async () => {
+  setup();
+  const {withUserLock}=await load('base44/shared/userLock.ts');
+  let entered, finish;
+  const started=new Promise(resolve=>{entered=resolve;});
+  const pending=new Promise(resolve=>{finish=resolve;});
+  const first=withUserLock(fixture.client,'passenger',async()=>{entered();await pending;throw new Error('controlled failure');});
+  await started;
+  await assert.rejects(withUserLock(fixture.client,'passenger',async()=>{}),e=>e.status===409);
+  finish();
+  await assert.rejects(first,/controlled failure/);
+  await withUserLock(fixture.client,'passenger',async()=>{});
+  assert.ok(fixture.db.UserOperationLock.every(row=>row.operation_lock===null));
+});
+
+test('payment readiness requires admin and returns no credential values', async () => {
+  setup({User:[{id:'admin',role:'admin'},{id:'passenger'}]},'passenger');
+  assert.equal((await call('getPaymentReadiness',{})).status,403);
+  const result=await call('getPaymentReadiness',{},'admin');
+  assert.equal(result.status,200);
+  assert.equal(result.data.checks.find(c=>c.name==='Coordinación de viajes').ok,true);
+  assert.equal(result.data.checks.find(c=>c.name==='Receptor del cargo diario').ok,false);
 });
