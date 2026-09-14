@@ -7,10 +7,10 @@ export default async function(req) {
   const state=url.searchParams.get('state'),code=url.searchParams.get('code');
   if(!state||!code) fail('Vinculación cancelada o inválida');
   const accounts=await e.PaymentAccount.filter({state}),account=accounts[0];
-  if(!account||Date.parse(account.state_expires_at)<Date.now()) fail('La vinculación venció');
+  if(!account||!(Date.parse(account.state_expires_at)>Date.now())) fail('La vinculación venció');
   await withLock(e.PaymentAccount,account.id,async()=>{
    const current=await e.PaymentAccount.get(account.id);
-   if(current.state!==state) fail('Enlace ya utilizado');
+   if(current.state!==state||!(Date.parse(current.state_expires_at)>Date.now())||!current.verifier) fail('Enlace utilizado o vencido');
    const tokens=await mp('/oauth/token','',{client_id:requiredSecret('MP_CLIENT_ID'),client_secret:requiredSecret('MP_CLIENT_SECRET'),code,grant_type:'authorization_code',redirect_uri:requiredSecret('MP_REDIRECT_URI'),code_verifier:current.verifier});
    if(!tokens.access_token||!tokens.user_id) fail('Respuesta inválida del proveedor',502);
    if (current.seller_id && current.seller_id !== String(tokens.user_id)) fail('La cuenta receptora ya está vinculada. Contactá soporte para cambiarla.',409);

@@ -24,6 +24,7 @@ export default function DriverProfile() {
   const [application, setApplication] = useState(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [paymentAccount, setPaymentAccount] = useState(null);
+  const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -38,10 +39,13 @@ export default function DriverProfile() {
   }, []);
 
   const connectPayments = async () => {
+    if (connecting) return;
+    setConnecting(true);
     try {
       const res = await base44.functions.invoke("connectDriverPayments", {});
+      if (!res.data?.url) throw new Error("No se recibió el enlace de vinculación");
       window.location.assign(res.data.url);
-    } catch (e) { toast({ title: e.response?.data?.error || e.message, variant: "destructive" }); }
+    } catch (e) { toast({ title: e.response?.data?.error || e.message, variant: "destructive" }); } finally { setConnecting(false); }
   };
 
   const handlePhotoUpload = async (e) => {
@@ -78,11 +82,9 @@ export default function DriverProfile() {
           const apps = await base44.entities.DriverApplication.filter({ user_id: user.id }, "-created_date", 1);
           if (apps.length > 0) setApplication(apps[0]);
         }
-        const accs = await base44.entities.PaymentAccount.filter({ driver_id: user.id });
-        if (accs.length > 0 && accs[0].seller_id) {
-          setPaymentAccount(accs[0]);
-        }
-      } catch (err) {}
+        const accountResponse = await base44.functions.invoke("getDriverPaymentAccount", {});
+        setPaymentAccount(accountResponse.data.account?.status === "connected" ? accountResponse.data.account : null);
+      } catch (err) { toast({ title: "No se pudo cargar la información", description: err.response?.data?.error || err.message, variant: "destructive" }); }
     };
     load();
   }, [user]);
@@ -112,10 +114,10 @@ export default function DriverProfile() {
             </div>
             <div>
               <p className="font-bold text-sm text-foreground">Mercado Pago vinculado</p>
-              <p className="text-xs text-muted-foreground">ID Vendedor: {paymentAccount.seller_id} · Pagos activos</p>
+              <p className="text-xs text-muted-foreground">ID Vendedor: {paymentAccount.seller_id} · Cuenta vinculada</p>
             </div>
           </div>
-          <Button onClick={connectPayments} variant="ghost" size="sm" className="text-xs text-emerald-400 hover:text-emerald-300">
+          <Button disabled={connecting} onClick={connectPayments} variant="ghost" size="sm" className="text-xs text-emerald-400 hover:text-emerald-300">
             Reconectar
           </Button>
         </div>
@@ -130,7 +132,7 @@ export default function DriverProfile() {
               <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                 Vinculá tu cuenta para cobrar viajes directamente con QR y tarjetas sin comisiones de la app.
               </p>
-              <Button onClick={connectPayments} className="w-full mt-3 h-10 bear-gold-gradient text-foreground font-bold text-xs">
+              <Button disabled={connecting} onClick={connectPayments} className="w-full mt-3 h-10 bear-gold-gradient text-foreground font-bold text-xs">
                 Vincular mi cuenta de Mercado Pago
               </Button>
             </div>

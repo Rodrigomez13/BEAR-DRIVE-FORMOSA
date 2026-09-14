@@ -141,7 +141,7 @@ test('driver can reserve only one next ride; activation waits for completion',as
   assert.equal((await call('activateQueuedRide',{ride_id:'ride'})).status,200);
 });
 test('cash completion retry produces one daily charge and one points entry',async()=>{
-  const db=setup({Ride:[ride({status:'PAYMENT_PENDING',payment_method:'cash'})]},'driver');
+  const db=setup({Ride:[ride({status:'PAYMENT_PENDING',payment_method:'cash'})],DailyChargeConfig:[{id:'daily-config',active:true,amount:5000,currency:'ARS'}]},'driver');
   assert.equal((await call('completeRide',{ride_id:'ride'})).status,200);
   assert.equal((await call('completeRide',{ride_id:'ride'})).status,200);
   assert.equal(db.DriverDailyCharge.length,1);assert.equal(db.DriverDailyCharge[0].amount,5000);assert.equal(db.BearPointsLedger.length,1);
@@ -237,4 +237,48 @@ test('Mercado Pago signature rejects unsigned, tampered and expired requests',as
   assert.equal(await verifyMP(new Request(url,{headers})),true);
   assert.equal(await verifyMP(new Request('https://local.test?data.id=999',{headers})),false);
   assert.equal(await verifyMP(new Request(url,{headers:await signed(1)})),false);
+});
+
+test('OAuth uses a supported lock and returns a PKCE URL without leaking secrets', async () => {
+  const db=setup(driverSeed(), 'driver');
+  Object.assign(fixture.secrets,{MP_CLIENT_ID:'123456',MP_CLIENT_SECRET:'private',MP_REDIRECT_URI:'https://example.test/callback'});
+  const original=fixture.client.asServiceRole.entities;
+  fixture.client.asServiceRole.entities=new Proxy(original,{get(target,name){
+    if(name==='User') return {...target.User,updateMany:async()=>{throw new Error('Bulk user update not allowed');}};
+    return target[name];
+  }});
+  const result=await call('connectDriverPayments',{});
+  assert.equal(result.status,200);
+  const url=new URL(result.data.url);
+  assert.equal(url.searchParams.get('code_challenge_method'),'S256');
+  assert.equal(url.searchParams.get('state'),db.PaymentAccount[0].state);
+  assert.equal(url.searchParams.get('code_challenge').length,43);
+  assert.ok(!JSON.stringify(result.data).includes('private'));
+  assert.equal(db.DriverApplication[0].operation_lock,null);
+});
+
+test('Payment account status exposes only the current driver metadata', async () => {
+  setup({PaymentAccount:[{id:'a',driver_id:'driver',seller_id:'seller',access_token:'secret',refresh_token:'secret2',state:'secret3',verifier:'secret4',expires_at:'2099-01-01'},{id:'b',driver_id:'other',access_token:'other-secret'}]},'driver');
+  const result=await call('getDriverPaymentAccount',{});
+  assert.equal(result.status,200);
+  assert.equal(result.data.account.status,'connected');
+  assert.ok(!JSON.stringify(result.data).includes('secret'));
+  assert.equal(result.data.account.id,'a');
+});
+
+test('Payments admin rejects non-admins and never returns OAuth credentials', async () => {
+  setup({User:[{id:'admin',role:'admin'},{id:'driver',role:'user'}],PaymentAccount:[{id:'a',driver_id:'driver',access_token:'sensitive',verifier:'sensitive'}]},'driver');
+  assert.equal((await call('adminPayments',{})).status,403);
+  const result=await call('adminPayments',{},'admin');
+  assert.equal(result.status,200);
+  assert.ok(!JSON.stringify(result.data).includes('sensitive'));
+  assert.equal((await call('adminPayments',{section:'User'},'admin')).status,400);
+  assert.equal((await call('adminPayments',{page:-1},'admin')).status,400);
+});
+
+test('Callback rejects absent or malformed expiry before contacting Mercado Pago', async () => {
+  setup({PaymentAccount:[{id:'a',state:'state',verifier:'verifier',state_expires_at:'invalid'}]});
+  const handler=(await load('base44/functions/driverPaymentsCallback/entry.ts')).default;
+  const response=await handler(new Request('https://example.test/callback?state=state&code=code'));
+  assert.equal(response.status,400);
 });

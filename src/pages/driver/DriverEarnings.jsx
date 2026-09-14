@@ -16,6 +16,7 @@ export default function DriverEarnings() {
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [paymentAccount, setPaymentAccount] = useState(null);
+  const [connecting, setConnecting] = useState(false);
 
   const load = async () => {
     try {
@@ -23,20 +24,21 @@ export default function DriverEarnings() {
       setRides(r);
       const c = await base44.entities.DriverDailyCharge.filter({ driver_id: user.id }, "-business_day", 50);
       setCharges(c);
-      const accs = await base44.entities.PaymentAccount.filter({ driver_id: user.id });
-      if (accs.length > 0 && accs[0].seller_id) {
-        setPaymentAccount(accs[0]);
-      }
-    } catch (err) {} finally { setLoading(false); }
+      const accountResponse = await base44.functions.invoke("getDriverPaymentAccount", {});
+      setPaymentAccount(accountResponse.data.account?.status === "connected" ? accountResponse.data.account : null);
+    } catch (err) { toast({ title: "No se pudo cargar la información", description: err.response?.data?.error || err.message, variant: "destructive" }); } finally { setLoading(false); }
   };
 
   const connectPayments = async () => {
+    if (connecting) return;
+    setConnecting(true);
     try {
       const res = await base44.functions.invoke("connectDriverPayments", {});
+      if (!res.data?.url) throw new Error("No se recibió el enlace de vinculación");
       window.location.assign(res.data.url);
     } catch (e) {
       toast({ title: e.response?.data?.error || e.message, variant: "destructive" });
-    }
+    } finally { setConnecting(false); }
   };
 
   useEffect(() => { load(); }, [user]);
@@ -104,10 +106,10 @@ export default function DriverEarnings() {
             </div>
             <div>
               <p className="font-bold text-xs text-foreground">Mercado Pago conectado</p>
-              <p className="text-[11px] text-muted-foreground">ID Vendedor: {paymentAccount.seller_id} · Cobros activos</p>
+              <p className="text-[11px] text-muted-foreground">ID Vendedor: {paymentAccount.seller_id} · Cuenta vinculada</p>
             </div>
           </div>
-          <Button onClick={connectPayments} variant="ghost" size="sm" className="text-xs text-emerald-400 hover:text-emerald-300 h-8 px-2">
+          <Button disabled={connecting} onClick={connectPayments} variant="ghost" size="sm" className="text-xs text-emerald-400 hover:text-emerald-300 h-8 px-2">
             Reconectar
           </Button>
         </div>
@@ -122,7 +124,7 @@ export default function DriverEarnings() {
               <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
                 Necesario para recibir pagos digitales de viajes por QR y tarjetas directamente a tu cuenta.
               </p>
-              <Button onClick={connectPayments} className="w-full mt-2.5 h-9 bear-gold-gradient text-foreground font-bold text-xs">
+              <Button disabled={connecting} onClick={connectPayments} className="w-full mt-2.5 h-9 bear-gold-gradient text-foreground font-bold text-xs">
                 Vincular mi Mercado Pago
               </Button>
             </div>

@@ -18,6 +18,7 @@ export default function AdminShell() {
     { path: "/admin/drivers", label: "Conductores", icon: Users },
     { path: "/admin/operations", label: "Soporte", icon: Headphones },
     { path: "/admin/pricing", label: "Tarifas", icon: DollarSign },
+    { path: "/admin/payments", label: "Pagos y wallet", icon: DollarSign },
   ];
 
   return (

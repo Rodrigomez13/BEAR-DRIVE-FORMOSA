@@ -2,6 +2,8 @@
   "name": "DriverApplication",
   "type": "object",
   "properties": {
+    "operation_lock": { "type": "string" },
+    "operation_started_at": { "type": "string" },
     "user_id": {
       "type": "string",
       "description": "Applicant user id"
