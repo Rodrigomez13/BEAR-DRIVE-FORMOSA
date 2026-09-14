@@ -151,8 +151,8 @@ export default function Login() {
               <img
                 src="/assets/beardrive-login-pin.png"
                 alt="Logo BearDrive Formosa"
-                className="relative z-10 w-full h-full object-contain filter drop-shadow-[0_8px_16px_rgba(233,183,78,0.25)]"
-              />
+                className="relative w-full h-full object-contain filter z-10 drop-shadow-[0_8px_2px_rgba(233,183,78,0.25)]" />
+              
             </div>
           </div>
 
