@@ -1,7 +1,7 @@
 import React from "react";
 import { Outlet, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import { LayoutDashboard, Users, DollarSign, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, DollarSign, LogOut, Headphones } from "lucide-react";
 import Logo from "@/components/bear/Logo";
 
 export default function AdminShell() {
@@ -16,7 +16,7 @@ export default function AdminShell() {
   const navItems = [
     { path: "/admin", label: "Dashboard", icon: LayoutDashboard },
     { path: "/admin/drivers", label: "Conductores", icon: Users },
-    { path: "/admin/operations", label: "Soporte", icon: LayoutDashboard },
+    { path: "/admin/operations", label: "Soporte", icon: Headphones },
     { path: "/admin/pricing", label: "Tarifas", icon: DollarSign },
   ];
 
