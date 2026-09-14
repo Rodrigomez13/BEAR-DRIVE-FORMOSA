@@ -1,0 +1,11 @@
+{
+  "name": "UserOperationLock",
+  "type": "object",
+  "properties": {
+    "slot": { "type": "integer" },
+    "operation_lock": { "type": "string" },
+    "operation_started_at": { "type": "string" }
+  },
+  "required": ["slot"],
+  "rls": { "create": false, "read": false, "update": false, "delete": false }
+}
