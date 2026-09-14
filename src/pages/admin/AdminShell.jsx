@@ -16,6 +16,7 @@ export default function AdminShell() {
   const navItems = [
     { path: "/admin", label: "Dashboard", icon: LayoutDashboard },
     { path: "/admin/drivers", label: "Conductores", icon: Users },
+    { path: "/admin/operations", label: "Soporte", icon: LayoutDashboard },
     { path: "/admin/pricing", label: "Tarifas", icon: DollarSign },
   ];
 

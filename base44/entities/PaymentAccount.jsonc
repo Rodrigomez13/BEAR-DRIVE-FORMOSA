@@ -1,0 +1,39 @@
+{
+  "name": "PaymentAccount",
+  "type": "object",
+  "properties": {
+    "driver_id": {
+      "type": "string"
+    },
+    "seller_id": {
+      "type": "string"
+    },
+    "access_token": {
+      "type": "string"
+    },
+    "refresh_token": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "verifier": {
+      "type": "string"
+    },
+    "state_expires_at": {
+      "type": "string"
+    },
+    "operation_lock": {
+      "type": "string"
+    }
+  },
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}

@@ -1,3 +1,4 @@
+import RideDestinationChange from "@/components/bear/RideDestinationChange";
 import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -15,14 +16,11 @@ import {
   Check,
   Power,
   Loader2,
-  MapPin,
-  Clock,
   Navigation,
   KeyRound,
   AlertTriangle,
   Wallet,
   CreditCard,
-  Banknote,
   QrCode,
   Bell,
   ChevronUp,
@@ -33,7 +31,6 @@ import {
   Moon,
   Radio,
   Zap,
-  ShieldCheck,
 } from "lucide-react";
 import {
   getCurrentPosition,
@@ -107,6 +104,7 @@ export default function DriverConducir() {
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [availableRides, setAvailableRides] = useState([]);
   const [activeRide, setActiveRide] = useState(null);
+  const [queuedRide, setQueuedRide] = useState(null);
   const [pinInput, setPinInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
@@ -149,9 +147,10 @@ export default function DriverConducir() {
         const active = await base44.entities.Ride.filter(
           { driver_id: user.id, status: { $in: ACTIVE_RIDE_STATUSES } },
           "-created_date",
-          1
+          3
         );
-        if (active.length > 0) setActiveRide(active[0]);
+        setActiveRide(active.find(r => r.status !== "ASSIGNED") || null);
+        setQueuedRide(active.find(r => r.status === "ASSIGNED") || null);
 
         const locations = await base44.entities.DriverLocation.filter({ driver_id: user.id });
         if (locations.length > 0) {
@@ -185,19 +184,33 @@ export default function DriverConducir() {
         const rides = res.data?.rides || [];
         setAvailableRides(rides.filter((ride) => !silencedRides.current.has(ride.id)));
       } catch {
-        // Se mantiene la lista anterior ante errores transitorios de red.
+        setAvailableRides([]);
+        throw new Error("No se pudieron actualizar las ofertas");
       }
     },
-    { enabled: online && !activeRide, baseDelay: 10000, maxDelay: 30000 }
+    { enabled: online && !queuedRide && activeRide?.status !== "PAYMENT_PENDING", baseDelay: 10000, maxDelay: 30000 }
   );
 
   // Realtime ride status subscription — primary sync mechanism (replaces 3s polling).
   // A 15s fallback poll inside the hook covers recovery if a realtime event is missed.
   useRideSubscription(activeRide?.id, (updated) => {
-    if (updated) setActiveRide(updated);
+    if (!updated) return;
+    if (["COMPLETED", "RATED", "CANCELLED"].includes(updated.status)) setActiveRide(null);
+    else setActiveRide(updated);
   });
 
-  useActiveRideGuard(!!activeRide);
+  useRideSubscription(queuedRide?.id, updated => {
+    if (!updated) return;
+    if (updated.status === "DRIVER_APPROACHING") { setActiveRide(updated); setQueuedRide(null); }
+    else if (["CANCELLED", "NO_DRIVERS"].includes(updated.status)) setQueuedRide(null);
+    else setQueuedRide(updated);
+  });
+  useEffect(() => {
+    if (activeRide || !queuedRide) return;
+    base44.functions.invoke("activateQueuedRide", { ride_id: queuedRide.id })
+      .then(res => { setActiveRide(res.data.ride); setQueuedRide(null); }).catch(() => {});
+  }, [activeRide, queuedRide?.id]);
+  useActiveRideGuard(!!activeRide || !!queuedRide);
 
   // Cuando cambia la fase de navegación, fijamos el punto de partida de la ruta una sola vez.
   // Esto evita recalcular Directions con cada actualización GPS.
@@ -210,8 +223,8 @@ export default function DriverConducir() {
       return;
     }
 
-    if (phaseRef.current === `${activeRide.id}:${phase}`) return;
-    phaseRef.current = `${activeRide.id}:${phase}`;
+    if (phaseRef.current === `${activeRide.id}:${phase}:${activeRide.destination_revision || 0}`) return;
+    phaseRef.current = `${activeRide.id}:${phase}:${activeRide.destination_revision || 0}`;
     setRouteInfo(null);
 
     // Snapshot inmediato para no dejar origin en null durante el cambio de fase
@@ -238,7 +251,7 @@ export default function DriverConducir() {
     return () => {
       cancelled = true;
     };
-  }, [activeRide?.id, activeRide?.status]);
+  }, [activeRide?.id, activeRide?.status, activeRide?.destination_revision]);
 
   useEffect(() => {
     arrivalHitsRef.current = { pickup: 0, destination: 0 };
@@ -271,7 +284,7 @@ export default function DriverConducir() {
       lastLocationPersistRef.current = now;
 
       try {
-        await base44.entities.DriverLocation.update(driverLocationId, {
+        await base44.functions.invoke("updateDriverLocation", {
           lat: position.lat,
           lng: position.lng,
           online: true,
@@ -496,12 +509,12 @@ export default function DriverConducir() {
         vehicle_color: selectedVehicle.color,
       });
 
-      phaseRef.current = `${ride.id}:pickup`;
-      setActiveRide(res.data.ride);
+      if (res.data.queued) setQueuedRide(res.data.ride);
+      else { phaseRef.current = null; setActiveRide(res.data.ride); }
       setAvailableRides([]);
       toast({
         title: "Viaje aceptado",
-        description: "Te guiamos hasta el punto de encuentro.",
+        description: res.data.queued ? "Quedó reservado detrás del viaje actual." : "Te guiamos hasta el punto de encuentro.",
       });
     } catch (error) {
       const msg = error?.response?.data?.error || error.message;
@@ -584,7 +597,7 @@ export default function DriverConducir() {
           title: "Viaje completado",
           description: `Ganaste $${(activeRide.final_fare || activeRide.quoted_fare).toLocaleString("es-AR")}`,
         });
-        setActiveRide(null);
+        setActiveRide(current => current?.id === activeRide?.id ? null : current);
         setNavigationStart(null);
         setRouteInfo(null);
         setQrCheckoutUrl(null);
@@ -595,7 +608,7 @@ export default function DriverConducir() {
         toast({ title: "Pago requiere autenticación", description: res.data.message, variant: "destructive" });
       } else {
         toast({ title: "Viaje completado" });
-        setActiveRide(null);
+        setActiveRide(current => current?.id === activeRide?.id ? null : current);
         setNavigationStart(null);
         setRouteInfo(null);
       }
@@ -695,6 +708,7 @@ export default function DriverConducir() {
 
     return (
       <div className="absolute inset-0">
+        {!queuedRide && availableRides[0] && <RideRequestModal ride={availableRides[0]} driverPos={driverPos} onAccept={() => handleAcceptRide(availableRides[0])} onReject={() => handleRejectRide(availableRides[0])} onSilence={() => handleSilenceRide(availableRides[0])} />}
         <MapView
           origin={navigationOrigin}
           destination={navigationDestination}
@@ -845,8 +859,10 @@ export default function DriverConducir() {
                 <div className="pt-2.5 border-t border-white/10 space-y-2 text-xs animate-in fade-in duration-200">
                   <div className="flex items-center justify-between text-white/70">
                     <span>Pasajero: <strong className="text-white">{activeRide.passenger_name || "Pasajero"}</strong></span>
-                    <span className="text-accent font-bold">{formatPrice(activeRide.quoted_fare)}</span>
+                    <span className="text-accent font-bold">{formatPrice(activeRide.final_fare || activeRide.quoted_fare)}</span>
                   </div>
+                  {queuedRide && <p className="text-accent text-sm">Próximo viaje: {queuedRide.origin_address} → {queuedRide.destination_address}</p>}
+                  {activeRide.status === "IN_PROGRESS" && <RideDestinationChange ride={activeRide} onUpdated={setActiveRide} readOnly />}
                   {activeRide.notes && (
                     <p className="p-2 rounded-xl bg-white/5 text-white/85 border border-white/10 italic text-[11px]">
                       {activeRide.notes}
@@ -887,7 +903,7 @@ export default function DriverConducir() {
                 <span className="text-xs font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent capitalize">
                   {status.replace(/_/g, " ")}
                 </span>
-                <span className="font-bold text-lg text-accent">{formatPrice(activeRide.quoted_fare)}</span>
+                <span className="font-bold text-lg text-accent">{formatPrice(activeRide.final_fare || activeRide.quoted_fare)}</span>
               </div>
 
               <div className="flex items-center gap-3 mb-4 pb-3 border-b border-border">

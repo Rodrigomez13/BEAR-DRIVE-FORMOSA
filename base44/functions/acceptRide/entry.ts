@@ -1,74 +1,26 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-
-// Atomic ride acceptance — the backend is the sole authority for this transition.
-// Prevents two drivers from accepting the same ride: the status check happens
-// server-side, and only a SEARCHING ride can be accepted. If another driver
-// already accepted between the client's poll and this call, the status will
-// no longer be SEARCHING and the request is rejected.
-export default async function(req) {
-  try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-
-    const body = await req.json();
-    const { ride_id, vehicle_id, vehicle_plate, vehicle_model, vehicle_color, driver_lat, driver_lng } = body;
-    if (!ride_id) return Response.json({ error: "ride_id es obligatorio" }, { status: 400 });
-
-    // Verify driver is eligible to accept rides
-    if (user.driver_capability !== "APPROVED_ELIGIBLE") {
-      return Response.json({ error: "No estás habilitado para conducir" }, { status: 403 });
-    }
-
-    // Pre-fetch for validation (passenger check) — not authoritative for the race
-    const ride = await base44.asServiceRole.entities.Ride.get(ride_id);
-    if (!ride) return Response.json({ error: "Viaje no encontrado" }, { status: 404 });
-
-    // Driver cannot accept their own ride
-    if (ride.passenger_id === user.id) {
-      return Response.json({ error: "No podés aceptar tu propio viaje" }, { status: 403 });
-    }
-
-    // Atomic conditional update — only succeeds if the ride is STILL SEARCHING.
-    // The DB-level filter { id, status: "SEARCHING" } eliminates the race window
-    // entirely: if another driver already transitioned the ride between our fetch
-    // and this call, the filter won't match and nothing gets modified.
-    await base44.asServiceRole.entities.Ride.updateMany(
-      { id: ride_id, status: "SEARCHING" },
-      { $set: {
-        status: "DRIVER_APPROACHING",
-        driver_id: user.id,
-        driver_name: user.full_name || user.email,
-        vehicle_id: vehicle_id || null,
-        vehicle_plate: vehicle_plate || null,
-        vehicle_model: vehicle_model || null,
-        vehicle_color: vehicle_color || null,
-      }}
-    );
-
-    // Re-fetch to verify we won the race (our driver_id is set)
-    const updated = await base44.asServiceRole.entities.Ride.get(ride_id);
-    if (!updated || updated.driver_id !== user.id) {
-      return Response.json({ error: "El viaje ya fue tomado por otro conductor", reason: "already_assigned" }, { status: 409 });
-    }
-
-    // Audit log
-    try {
-      await base44.asServiceRole.entities.AuditLog.create({
-        actor_id: user.id,
-        actor_name: user.full_name || user.email,
-        action: "ride_accepted",
-        entity_type: "Ride",
-        entity_id: ride_id,
-        old_value: "SEARCHING",
-        new_value: "DRIVER_APPROACHING",
-      });
-    } catch (e) {
-      console.error("Audit log failed:", e?.message);
-    }
-
-    return Response.json({ ride: updated });
-  } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
-  }
-}
+import { api, fail, all, ACTIVE, requireNoDebt, eligibleVehicle, premiumEligible, withLock, cas, publicRide } from '../../shared/domain.ts';
+import { haversineKm } from '../../shared/pricing.ts';
+export default req => api(req,createClientFromRequest,async (client,user,body) => {
+ const e=client.asServiceRole.entities;
+ return withLock(e.User,user.id,async()=>{
+  await requireNoDebt(client,user.id);
+  const vehicle=await eligibleVehicle(client,user,body.vehicle_id);
+  const ride=await e.Ride.get(body.ride_id);
+  if(ride.driver_id===user.id && ['ASSIGNED','DRIVER_APPROACHING'].includes(ride.status)) return {ride:publicRide(ride,user.id),queued:ride.status==='ASSIGNED'};
+  if(ride.status!=='SEARCHING' || ride.passenger_id===user.id) fail('El viaje ya no está disponible',409);
+  if(Date.now()-Date.parse(ride.search_started_at || ride.created_date)>=90000) fail('La búsqueda finalizó',409);
+  const locations=await e.DriverLocation.filter({driver_id:user.id,online:true});
+  const pos=locations[0];
+  if(!pos || pos.vehicle_id!==vehicle.id || Date.now()-Date.parse(pos.updated_date||pos.created_date)>90000) fail('Actualizá tu ubicación antes de aceptar');
+  if(haversineKm(pos.lat,pos.lng,ride.origin_lat,ride.origin_lng)>(ride.search_radius_km||10)) fail('Fuera del radio de búsqueda');
+  if(ride.category==='premium'&&!premiumEligible(vehicle)) fail('El vehículo no cumple la antigüedad Premium',403);
+  const active=await all(e.Ride,{driver_id:user.id,status:{$in:ACTIVE}});
+  if(active.length>=2 || active.some(r=>r.status==='ASSIGNED')) fail('Ya tenés un viaje comprometido',409);
+  if(ride.payment_method!=='cash' && !(await e.PaymentAccount.filter({driver_id:user.id})).some(a=>a.access_token)) fail('Vinculá Mercado Pago para aceptar viajes digitales',403);
+  const queued=active.length>0;
+  await cas(e.Ride,{id:ride.id,status:'SEARCHING'}, {status:queued?'ASSIGNED':'DRIVER_APPROACHING',queued_after_ride_id:active[0]?.id||null,
+   driver_id:user.id,driver_name:user.full_name||'',vehicle_id:vehicle.id,vehicle_plate:vehicle.plate,vehicle_model:`${vehicle.make} ${vehicle.model}`,vehicle_color:vehicle.color});
+  return {ride:publicRide(await e.Ride.get(ride.id),user.id),queued};
+ });
+});

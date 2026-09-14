@@ -9,7 +9,7 @@ import StarRating from "@/components/bear/StarRating";
 import BearAvatar from "@/components/bear/BearAvatar";
 import ThemeToggle from "@/components/bear/ThemeToggle";
 import ModeSwitcher from "@/components/bear/ModeSwitcher";
-import { Car, LogOut, User, FileText, ChevronRight, Shield, HelpCircle, CheckCircle2, AlertTriangle, Camera, Loader2, Clock, Trash2 } from "lucide-react";
+import { Car, LogOut, FileText, ChevronRight, Shield, HelpCircle, CheckCircle2, AlertTriangle, Camera, Loader2, Clock, Trash2 } from "lucide-react";
 import { businessDaysUntil } from "@/lib/businessDays";
 import { validateFile, optimizeForWeb } from "@/lib/imageUtils";
 import DeleteAccountDialog from "@/components/bear/DeleteAccountDialog";
@@ -23,6 +23,13 @@ export default function DriverProfile() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [application, setApplication] = useState(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const connectPayments = async () => {
+    try {
+      const res = await base44.functions.invoke("connectDriverPayments", {});
+      window.location.assign(res.data.url);
+    } catch (e) { toast({ title: e.response?.data?.error || e.message, variant: "destructive" }); }
+  };
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
@@ -76,10 +83,11 @@ export default function DriverProfile() {
   return (
     <div className="max-w-md mx-auto px-4 pt-6 pb-8 h-full overflow-y-auto scrollbar-hide">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Perfil</h1>
+      <h1 className="text-2xl font-bold">Perfil</h1>
         <ThemeToggle />
       </div>
 
+        <Button onClick={connectPayments} variant="outline" className="w-full mb-4">Vincular mi Mercado Pago para recibir pagos</Button>
       <Card className="p-5 mb-4 bear-gradient text-white">
         <div className="flex items-center gap-4">
           <div className="relative">

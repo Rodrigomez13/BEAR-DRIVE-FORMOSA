@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-import { Upload, Car, FileText, CheckCircle2, Loader2, ArrowLeft, ArrowRight, User, Shield, X, AlertTriangle, Clock } from "lucide-react";
+import { Upload, Car, CheckCircle2, Loader2, ArrowLeft, ArrowRight, Shield, X, AlertTriangle, Clock } from "lucide-react";
 import { sanitizeString, sanitizePhone, sanitizeDNI, sanitizePlate, sanitizeInt } from "@/lib/sanitize";
 import { validateFile, optimizeForWeb } from "@/lib/imageUtils";
 import { businessDaysUntil } from "@/lib/businessDays";
@@ -21,6 +21,11 @@ const STEPS = [
   { key: "vehicle_docs", label: "Documentación del vehículo" },
   { key: "review", label: "Revisión" },
 ];
+
+async function saveSubmission(entity, data, id) {
+  const res = await base44.functions.invoke("saveDriverSubmission", { entity, data, id });
+  return res.data.record;
+}
 
 export default function DriverOnboarding() {
   const { user } = useAuth();
@@ -123,9 +128,9 @@ export default function DriverOnboarding() {
         ...cleanPersonal,
       };
       if (appId) {
-        await base44.entities.DriverApplication.update(appId, appData);
+        await saveSubmission("DriverApplication", appData, appId);
       } else {
-        const created = await base44.entities.DriverApplication.create(appData);
+        const created = await saveSubmission("DriverApplication", appData);
         appId = created.id;
         setApplication(created);
       }
@@ -133,9 +138,9 @@ export default function DriverOnboarding() {
       // Update or create vehicle (avoid duplicates on resubmission)
       const existingVehicles = await base44.entities.Vehicle.filter({ driver_id: user.id });
       if (existingVehicles.length > 0) {
-        await base44.entities.Vehicle.update(existingVehicles[0].id, { ...cleanVehicle, status: "pending" });
+        await saveSubmission("Vehicle", cleanVehicle, existingVehicles[0].id);
       } else {
-        await base44.entities.Vehicle.create({ driver_id: user.id, ...cleanVehicle, status: "pending", category: "basic" });
+        await saveSubmission("Vehicle", cleanVehicle);
       }
 
       // Delete old documents for this application (in case of resubmission)
@@ -147,7 +152,7 @@ export default function DriverOnboarding() {
       for (const req of requirements) {
         const doc = documents[req.code];
         if (doc && doc.file_url) {
-          await base44.entities.DriverDocument.create({
+          await saveSubmission("DriverDocument", {
             driver_id: user.id,
             application_id: appId,
             subject: req.subject,

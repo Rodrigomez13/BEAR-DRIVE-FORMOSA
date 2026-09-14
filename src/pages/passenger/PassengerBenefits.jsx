@@ -30,7 +30,7 @@ export default function PassengerBenefits() {
     <PullToRefresh onRefresh={load}>
     <div className="max-w-md mx-auto px-4 pt-6 pb-8">
       <h1 className="text-2xl font-bold mb-2">Beneficios</h1>
-      <p className="text-sm text-muted-foreground mb-6">Acumulá BearPoints y canjealos por descuentos</p>
+      <p className="text-sm text-muted-foreground mb-6">Consultá tus BearPoints y los beneficios disponibles</p>
 
       <Card className="p-5 mb-6 bear-gold-gradient text-foreground">
         <div className="flex items-center justify-between">

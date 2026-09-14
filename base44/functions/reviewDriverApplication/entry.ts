@@ -1,3 +1,4 @@
+import { premiumEligible } from '../../shared/domain.ts';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
 export default async function(req) {
@@ -21,6 +22,15 @@ export default async function(req) {
     const application = await base44.asServiceRole.entities.DriverApplication.get(application_id);
     if (!application) return Response.json({ error: "Solicitud no encontrada" }, { status: 404 });
 
+    if (action === "approve" || action === "reactivate") {
+      const [requirements, documents] = await Promise.all([
+        base44.asServiceRole.entities.DocumentRequirement.filter({ enabled: true, required: true }),
+        base44.asServiceRole.entities.DriverDocument.filter({ application_id }),
+      ]);
+      if (!requirements.length || requirements.some(r => !documents.some(d => d.code === r.code && d.file_url && (!r.requires_expiration || (d.expires_at && d.expires_at >= new Date().toISOString().slice(0,10)))))) {
+        return Response.json({ error: "Faltan documentos obligatorios vigentes" }, { status: 400 });
+      }
+    }
     const now = new Date().toISOString();
     let newStatus, driverStatus, capability, logAction;
 
@@ -82,7 +92,7 @@ export default async function(req) {
       // Approve pending vehicles
       const vehicles = await base44.asServiceRole.entities.Vehicle.filter({ driver_id: application.user_id, status: "pending" });
       for (const v of vehicles) {
-        await base44.asServiceRole.entities.Vehicle.update(v.id, { status: "approved" });
+        await base44.asServiceRole.entities.Vehicle.update(v.id, { status: "approved", premium_eligible: premiumEligible(v), premium_approved_by: user.id });
       }
     }
 

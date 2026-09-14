@@ -30,7 +30,7 @@ export default function SosDialog({ open, onOpenChange, ride, userPos }) {
       try {
         await navigator.share({
           title: "Mi ubicación — BearDrive",
-          text: "Seguí mi ubicación en tiempo real:",
+          text: "Esta es mi ubicación al momento de compartir:",
           url: link,
         });
       } catch {
@@ -57,7 +57,7 @@ export default function SosDialog({ open, onOpenChange, ride, userPos }) {
         description: `Alerta SOS desde viaje ${ride?.id || "desconocido"}. Ubicación: ${userPos ? `${userPos.lat},${userPos.lng}` : "no disponible"}`,
         ride_id: ride?.id,
       });
-      toast({ title: "Soporte notificado", description: "El equipo de BearDrive fue alertado" });
+      toast({ title: "Solicitud registrada", description: "El equipo de soporte podrá atenderla desde su panel. Ante una emergencia, llamá al 911." });
       onOpenChange(false);
     } catch (err) {
       toast({ title: "No se pudo notificar", description: err.message, variant: "destructive" });

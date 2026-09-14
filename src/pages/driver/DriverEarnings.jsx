@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
-import { DollarSign, TrendingUp, Car, AlertCircle, Receipt, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { DollarSign, AlertCircle, Receipt, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { displayAddress } from "@/lib/geo";
 import LoadingScreen from "@/components/bear/LoadingScreen";
 import PullToRefresh from "@/components/bear/PullToRefresh";
@@ -52,9 +52,8 @@ export default function DriverEarnings() {
 
   const handlePayDebt = async (chargeId) => {
     try {
-      await base44.entities.DriverDailyCharge.update(chargeId, { status: "paid", paid_date: new Date().toISOString() });
-      setCharges(c => c.map(ch => ch.id === chargeId ? { ...ch, status: "paid" } : ch));
-      toast({ title: "Deuda regularizada" });
+      const res = await base44.functions.invoke("createDailyChargePayment", { charge_id: chargeId });
+      window.location.assign(res.data.checkout_url);
     } catch (err) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
