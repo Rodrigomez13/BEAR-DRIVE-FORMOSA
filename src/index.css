@@ -226,3 +226,15 @@
     width: min(100%, 38rem);
   }
 }
+
+/* Keep map controls and the app navigation outside the request panel scroll. */
+.map-sheet-content {
+  max-height: min(58vh, 36rem);
+  max-height: min(58dvh, 36rem);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-padding-block: 1rem;
+}
+@media (max-height: 550px) {
+  .map-sheet-content { max-height: 42dvh; }
+}

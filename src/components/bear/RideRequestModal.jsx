@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Star, MapPin, Clock, DollarSign, X, BellOff, VolumeX, Check, Navigation, Flame } from "lucide-react";
+import { Star, MapPin, Clock, DollarSign, X, BellOff, VolumeX, Check, Flame } from "lucide-react";
 import { displayAddress } from "@/lib/geo";
 import BearAvatar from "@/components/bear/BearAvatar";
 import Haptics from "@/lib/haptics";
@@ -12,48 +12,52 @@ const TOTAL_SECONDS = 15;
 export default function RideRequestModal({ ride, driverPos, onAccept, onReject, onSilence }) {
   const [timeLeft, setTimeLeft] = useState(TOTAL_SECONDS);
   const [isMuted, setIsMuted] = useState(false);
-  const timerRef = useRef(null);
+  const callbacks = useRef({ onSilence, onAccept, onReject });
+  callbacks.current = { onSilence, onAccept, onReject };
+  const busyRef = useRef(false);
+  const [accepting, setAccepting] = useState(false);
+  const [acceptError, setAcceptError] = useState(false);
+  const deadline = useRef(0);
 
-  // Iniciar alerta acústica y cuenta regresiva de 15 segundos
   useEffect(() => {
+    deadline.current = Date.now() + TOTAL_SECONDS * 1000;
+    setTimeLeft(TOTAL_SECONDS);
+    setIsMuted(false);
+    setAcceptError(false);
     soundAlert.startIncomingAlert(1800);
-
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          soundAlert.stopIncomingAlert();
-          // Auto-silenciar o declinar al expirar el tiempo
-          if (onSilence) onSilence();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      soundAlert.stopIncomingAlert();
-    };
-  }, [onSilence]);
+    const timer = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((deadline.current - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining === 0 && !busyRef.current) {
+        clearInterval(timer);
+        soundAlert.stopIncomingAlert();
+        callbacks.current.onSilence?.();
+      }
+    }, 250);
+    return () => { clearInterval(timer); soundAlert.stopIncomingAlert(); };
+  }, [ride.id]);
 
   const handleSilence = () => {
     soundAlert.stopIncomingAlert();
     setIsMuted(true);
     Haptics.light();
-    if (onSilence) onSilence();
   };
-
-  const handleAccept = () => {
+  const handleAccept = async () => {
+    if (busyRef.current || Date.now() >= deadline.current) return;
+    busyRef.current = true;
+    setAccepting(true);
+    setAcceptError(false);
     soundAlert.stopIncomingAlert();
     Haptics.success();
-    onAccept();
+    try { await callbacks.current.onAccept(); }
+    catch { setAcceptError(true); }
+    finally { busyRef.current = false; setAccepting(false); }
   };
-
   const handleReject = () => {
+    if (busyRef.current) return;
     soundAlert.stopIncomingAlert();
     Haptics.warning();
-    onReject();
+    callbacks.current.onReject();
   };
 
   const haversineKm = (lat1, lng1, lat2, lng2) => {
@@ -65,7 +69,7 @@ export default function RideRequestModal({ ride, driverPos, onAccept, onReject, 
     return 2 * R * Math.asin(Math.sqrt(a));
   };
 
-  const pickupDist = driverPos ? haversineKm(driverPos.lat, driverPos.lng, ride.origin_lat, ride.origin_lng) : 0;
+  const pickupDist = driverPos ? haversineKm(driverPos.lat, driverPos.lng, ride.origin_lat, ride.origin_lng) : null;
   const formatPrice = (v) => `$${(v || 0).toLocaleString("es-AR")}`;
   const paymentLabel = ride.payment_method === "card" ? "Tarjeta" : ride.payment_method === "cash" ? "Efectivo" : "QR";
 
@@ -77,7 +81,7 @@ export default function RideRequestModal({ ride, driverPos, onAccept, onReject, 
 
   return (
     <div className="absolute inset-0 z-50 flex items-end bg-black/70 backdrop-blur-md animate-fade-in">
-      <Card className="w-full max-w-md mx-auto rounded-t-3xl p-5 border-0 shadow-2xl relative overflow-hidden bg-card/95 backdrop-blur-xl max-h-[88%] overflow-y-auto scrollbar-hide border-t-2 border-accent/40">
+      <Card className="w-full max-w-md mx-auto rounded-t-3xl p-5 border-0 shadow-2xl relative overflow-hidden bg-card/95 backdrop-blur-xl max-h-[88%] flex flex-col border-t-2 border-accent/40">
         
         {/* Barra superior de progreso continuo */}
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-muted overflow-hidden">
@@ -146,6 +150,7 @@ export default function RideRequestModal({ ride, driverPos, onAccept, onReject, 
           </div>
         </div>
 
+        <div className="min-h-0 overflow-y-auto overscroll-contain">
         {/* Datos del Pasajero */}
         <div className="flex items-center gap-3 mb-4 pb-3 border-b border-border/40">
           <BearAvatar size={48} />
@@ -153,7 +158,7 @@ export default function RideRequestModal({ ride, driverPos, onAccept, onReject, 
             <p className="font-semibold text-foreground text-base">{ride.passenger_name || "Pasajero BearDrive"}</p>
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Star className="w-3.5 h-3.5 fill-accent text-accent" />
-              <span className="font-semibold text-foreground">{ride.passenger_rating || "5.0"}</span>
+              <span className="font-semibold text-foreground">{ride.passenger_rating ?? "Sin calificaciones"}</span>
               <span className="text-xs text-muted-foreground">• Formosa</span>
             </div>
           </div>
@@ -165,14 +170,14 @@ export default function RideRequestModal({ ride, driverPos, onAccept, onReject, 
             <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 shrink-0 mt-1 shadow-sm" />
             <div className="flex-1 min-w-0">
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Punto de Recogida</p>
-              <p className="text-sm font-medium text-foreground truncate">{displayAddress(ride.origin_address)}</p>
+              <p className="text-sm font-medium text-foreground break-words">{displayAddress(ride.origin_address)}</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
             <span className="w-3.5 h-3.5 rounded-full bg-accent shrink-0 mt-1 shadow-sm" />
             <div className="flex-1 min-w-0">
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Destino</p>
-              <p className="text-sm font-medium text-foreground truncate">{displayAddress(ride.destination_address)}</p>
+              <p className="text-sm font-medium text-foreground break-words">{displayAddress(ride.destination_address)}</p>
             </div>
           </div>
         </div>
@@ -181,12 +186,12 @@ export default function RideRequestModal({ ride, driverPos, onAccept, onReject, 
         <div className="grid grid-cols-3 gap-2 mb-4">
           <div className="text-center p-3 rounded-xl bg-secondary/50 border border-border/30">
             <MapPin className="w-4 h-4 text-accent mx-auto mb-1" />
-            <p className="text-lg font-extrabold text-foreground">{pickupDist.toFixed(1)}</p>
-            <p className="text-[11px] text-muted-foreground font-medium">km llegada</p>
+            <p className="text-lg font-extrabold text-foreground">{Number.isFinite(pickupDist) ? pickupDist.toFixed(1) : "—"}</p>
+            <p className="text-[11px] text-muted-foreground font-medium">km en línea recta</p>
           </div>
           <div className="text-center p-3 rounded-xl bg-secondary/50 border border-border/30">
             <Clock className="w-4 h-4 text-accent mx-auto mb-1" />
-            <p className="text-lg font-extrabold text-foreground">{ride.duration_min || 12}</p>
+            <p className="text-lg font-extrabold text-foreground">{ride.duration_min ?? "—"}</p>
             <p className="text-[11px] text-muted-foreground font-medium">min viaje</p>
           </div>
           <div className="text-center p-3 rounded-xl bg-accent/15 border border-accent/30 shadow-inner">
@@ -205,19 +210,22 @@ export default function RideRequestModal({ ride, driverPos, onAccept, onReject, 
           )}
         </div>
 
+        </div>
         {/* Acciones principales del Conductor */}
-        <div className="space-y-2.5">
+        <div className="space-y-2.5 shrink-0 border-t border-border pt-3">
+          {acceptError && <p role="alert" className="text-sm text-destructive">No se pudo aceptar. Intentá nuevamente si la solicitud sigue disponible.</p>}
           <Button
+            disabled={accepting || timeLeft === 0}
             onClick={handleAccept}
             className="w-full h-14 bear-gold-gradient text-foreground border-0 font-extrabold text-base shadow-xl active:scale-95 transition-transform"
           >
             <Check className="w-6 h-6 mr-2" />
-            Aceptar viaje ({timeLeft}s)
+            {accepting ? "Aceptando viaje…" : timeLeft === 0 ? "Solicitud vencida" : `Aceptar viaje (${timeLeft}s)`}
           </Button>
 
           <div className="flex gap-2">
             <Button
-              onClick={handleReject}
+              disabled={accepting} onClick={handleReject}
               variant="outline"
               className="flex-1 h-11 text-destructive border-destructive/30 hover:bg-destructive/10 font-semibold"
             >

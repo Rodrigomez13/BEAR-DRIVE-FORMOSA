@@ -61,3 +61,22 @@ Pendiente: mapa y solicitud de viaje del informe, detalle visual de viajes/Ganan
 - Detalle desplegable de pago, participante, distancia y duración; importes finales usan nullish coalescing para conservar cero. Acceso al módulo principal para retomar un viaje activo.
 - Errores de consulta visibles y reintento, diferenciados del historial vacío. Respuestas antiguas o posteriores al desmontaje no reemplazan la información actual.
 - Build, lint de archivos modificados y 30 pruebas existentes correctos. Fixture local ampliado con viajes de varios estados, importe final cero y fallo de carga simulado. No prueba de dispositivo ni publicación.
+
+
+## Etapa 4 — Panel de solicitud del pasajero (2026-09-15)
+
+- Panel de mapa reutilizable con altura máxima, scroll contenido, cabecera y control para mostrar más mapa. Integrado en selección y cotización del pasajero.
+- Selección explícita Origen / Destino con foco en búsqueda, objetivos táctiles de 48 px y avance a destino después de elegir el origen.
+- Búsqueda con descarte de respuestas antiguas, indicador coherente al borrar el texto y mensaje de resultados vacíos. Cotización continúa siendo explícita; no se agregan llamadas de rutas al escribir.
+- Resumen de origen/destino en confirmación y guía cuando falta un punto. Conserva categoría, preferencias de pago y campos existentes.
+- Validación: build, lint enfocado y 30 pruebas existentes pasan; panel expandido/contraído revisado en fixture móvil con contenido largo. Falta validar Google Maps, teclado nativo, solicitud real y conductor en dispositivo. Esta etapa no cambia el backend ni publica.
+
+
+## Etapa 5 — Operación del conductor
+
+- Panel acotado y desplazable para PIN, llegada y cobro; estados legibles, control de chat de 48 px y PIN con etiqueta accesible.
+- Solicitudes con detalles desplazables y acciones separadas al pie. Temporizador por ID y tiempo transcurrido, independiente de la identidad de callbacks del padre. Aceptación bloqueada mientras está en curso o tras vencer.
+- Silenciar ahora apaga el sonido sin descartar la solicitud. Rechazar sigue siendo una acción independiente.
+- No se inventan calificaciones o duración faltantes. Distancia al origen identificada como línea recta. Importe final cero preservado.
+- Solicitud entrante tiene prioridad sobre aviso de notificaciones. Se elimina el safe-area inferior duplicado de la espera y se simplifica su mensaje.
+- Pendiente validación del conductor en dispositivo con solicitudes reales, PIN y cobro; no se publica ni modifica el backend en esta etapa.

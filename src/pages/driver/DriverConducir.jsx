@@ -1,3 +1,4 @@
+import MapBottomSheet from "@/components/bear/MapBottomSheet";
 import RideDestinationChange from "@/components/bear/RideDestinationChange";
 import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
@@ -898,12 +899,12 @@ export default function DriverConducir() {
         {/* FOCUSED ACTION CARDS (when arrived, validating PIN, or payment pending) */}
         {!isNavigating && (
           <div className="absolute inset-x-0 bottom-0 z-20 p-3">
-            <Card className="rounded-3xl p-5 max-w-md mx-auto shadow-2xl border-border bg-card">
+            <div className="max-w-md mx-auto"><MapBottomSheet title={status === "DRIVER_ARRIVED" ? "Encuentro con el pasajero" : status === "PAYMENT_PENDING" ? "Cobro del viaje" : "Llegada al destino"}>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent capitalize">
-                  {status.replace(/_/g, " ")}
+                  {status === "DRIVER_ARRIVED" ? "Validar PIN" : status === "PAYMENT_PENDING" ? "Pago pendiente" : "Llegaste"}
                 </span>
-                <span className="font-bold text-lg text-accent">{formatPrice(activeRide.final_fare || activeRide.quoted_fare)}</span>
+                <span className="font-bold text-lg text-accent">{formatPrice(activeRide.final_fare ?? activeRide.quoted_fare)}</span>
               </div>
 
               <div className="flex items-center gap-3 mb-4 pb-3 border-b border-border">
@@ -914,7 +915,7 @@ export default function DriverConducir() {
                 </div>
                 <button
                   onClick={() => setShowChat(true)}
-                  className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center no-select shrink-0"
+                  className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center no-select shrink-0"
                   aria-label="Chat con pasajero"
                 >
                   <MessageCircle className="w-5 h-5 text-accent" />
@@ -930,6 +931,7 @@ export default function DriverConducir() {
                     <Input
                       value={pinInput}
                       onChange={(event) => setPinInput(event.target.value.replace(/\D/g, ""))}
+                      aria-label="PIN de inicio del pasajero"
                       inputMode="numeric"
                       placeholder="PIN de 4 dígitos"
                       maxLength={4}
@@ -963,7 +965,7 @@ export default function DriverConducir() {
                 {qrCheckoutUrl ? (
                   <QrPaymentDisplay
                     checkoutUrl={qrCheckoutUrl}
-                    amount={activeRide.final_fare || activeRide.quoted_fare}
+                    amount={activeRide.final_fare ?? activeRide.quoted_fare}
                     rideId={activeRide.id}
                     onClose={() => setQrCheckoutUrl(null)}
                   />
@@ -1024,7 +1026,7 @@ export default function DriverConducir() {
                 )}
               </div>
             )}
-          </Card>
+          </MapBottomSheet></div>
         </div>
         )}
 
@@ -1063,19 +1065,19 @@ export default function DriverConducir() {
           <div className="flex items-center justify-between max-w-md mx-auto">
             <div className="flex items-center gap-2 px-4 py-2 rounded-full glass-navy">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-sm font-semibold text-white">Online</span>
+              <span className="text-sm font-semibold text-white">Conectado</span>
             </div>
             <Button
               onClick={handleGoOffline}
               size="sm"
-              className="rounded-full glass-navy border-0 text-white hover:text-white"
+              className="min-h-12 rounded-full glass-navy border-0 text-white hover:text-white"
             >
               Desconectarme
             </Button>
           </div>
         </div>
 
-        {!notifAsked && (
+        {!notifAsked && !incomingRide && (
           <div className="absolute inset-x-0 top-16 z-10 p-3">
             <Card className="p-4 max-w-md mx-auto">
               <div className="flex items-start gap-3">
@@ -1139,7 +1141,7 @@ export default function DriverConducir() {
 
         {/* HUD de Espera Activa con Radar 15km y WakeLock */}
         {!incomingRide && (
-          <div className="absolute inset-x-0 bottom-0 z-10 p-3 pb-5 safe-bottom">
+          <div className="absolute inset-x-0 bottom-0 z-10 p-3 pb-5">
             <Card className="rounded-3xl p-4 max-w-md mx-auto border border-accent/20 bg-card/90 backdrop-blur-xl shadow-2xl">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2.5">
@@ -1148,11 +1150,11 @@ export default function DriverConducir() {
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5">
-                      Radar de Viajes Activo
+                      Esperando solicitudes
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                     </h3>
                     <p className="text-[11px] text-muted-foreground font-medium">
-                      Escaneando en Formosa • Cobertura 15 km
+                      Te avisaremos cuando haya un viaje disponible
                     </p>
                   </div>
                 </div>
@@ -1182,6 +1184,7 @@ export default function DriverConducir() {
 
         {incomingRide && (
           <RideRequestModal
+            key={incomingRide.id}
             ride={incomingRide}
             driverPos={driverPos}
             onAccept={() => handleAcceptRide(incomingRide)}

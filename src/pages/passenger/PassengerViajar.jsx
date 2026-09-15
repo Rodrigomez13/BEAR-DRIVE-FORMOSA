@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import MapView from "@/components/bear/MapView";
+import MapBottomSheet from "@/components/bear/MapBottomSheet";
 import RideMapView from "@/components/bear/RideMapView";
 import StarRating from "@/components/bear/StarRating";
 import FavoriteModal from "@/components/bear/FavoriteModal";
@@ -14,12 +15,11 @@ import { searchPlaces, geocodePlace, reverseGeocode, getCurrentPosition, FORMOSA
 import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import SosDialog from "@/components/bear/SosDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
-import { useBackoffPoll } from "@/hooks/useBackoffPoll";
 import { useRideSubscription } from "@/hooks/useRideSubscription";
 import { sanitizeString } from "@/lib/sanitize";
 import Haptics from "@/lib/haptics";
 import BearAvatar from "@/components/bear/BearAvatar";
-import { Navigation, MapPin, Search, Crosshair, Loader2, Car, Star, Phone, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown, Share2, MessageCircle, Sparkles } from "lucide-react";
+import { MapPin, Search, Crosshair, Loader2, Star, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown, Share2, MessageCircle, Sparkles } from "lucide-react";
 import { Image } from "@/components/ui/image";
 import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
 import LoadingScreen from "@/components/bear/LoadingScreen";
@@ -43,6 +43,8 @@ export default function PassengerViajar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searchingPlace, setSearchingPlace] = useState(false);
+  const [searchError, setSearchError] = useState(false);
+  const searchInputRef = useRef(null);
   const [geocoding, setGeocoding] = useState(false);
   const [selectingTarget, setSelectingTarget] = useState("destination");
   const [quote, setQuote] = useState(null);
@@ -233,28 +235,43 @@ export default function PassengerViajar() {
     }
   };
 
-  // Instant place search — predictions only, no geocoding delay
+  // Ignore obsolete predictions when the query or target changes.
   useEffect(() => {
-    if (searchQuery.trim().length < 3) { setSearchResults([]); return; }
+    let current = true;
+    setSearchResults([]);
+    setSearchError(false);
+    if (searchQuery.trim().length < 3) { setSearchingPlace(false); return; }
     setSearchingPlace(true);
-    const t = setTimeout(async () => {
-      const results = await searchPlaces(searchQuery);
-      setSearchResults(results);
-      setSearchingPlace(false);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [searchQuery]);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchPlaces(searchQuery.trim());
+        if (current) setSearchResults(results);
+      } catch { if (current) setSearchError(true); }
+      finally { if (current) setSearchingPlace(false); }
+    }, 350);
+    return () => { current = false; clearTimeout(timer); };
+  }, [searchQuery, selectingTarget]);
+
+  const chooseTarget = (target) => {
+    setSelectingTarget(target);
+    setSearchQuery("");
+    setPanelExpanded(true);
+    searchInputRef.current?.focus();
+  };
 
   const handleSelectPlace = async (place) => {
+    if (geocoding) return;
+    const target = selectingTarget;
     setSearchQuery("");
     setSearchResults([]);
     setGeocoding(true);
     try {
       const geo = await geocodePlace(place.place_id);
       if (!geo) { toast({ title: "No se pudo obtener la ubicación", variant: "destructive" }); return; }
-      if (selectingTarget === "origin") {
+      if (target === "origin") {
         setOrigin({ lat: geo.lat, lng: geo.lng });
         setOriginAddress(geo.label);
+        setSelectingTarget("destination");
       } else {
         setDestination({ lat: geo.lat, lng: geo.lng });
         setDestinationAddress(geo.label);
@@ -868,12 +885,18 @@ export default function PassengerViajar() {
       {/* Bottom panel with search + collapsibles + quote */}
       <div className="absolute inset-x-0 bottom-0 z-10 p-3">
         <div className="max-w-md mx-auto relative">
-        <button onClick={handleGPS} className="absolute -top-14 right-0 w-11 h-11 rounded-full bg-card shadow-lg flex items-center justify-center hover:bg-secondary no-select">
+        <button aria-label="Centrar en mi ubicación" onClick={handleGPS} className="absolute -top-14 right-0 w-12 h-12 rounded-full bg-card shadow-lg flex items-center justify-center hover:bg-secondary no-select">
           <Crosshair className="w-5 h-5 text-accent" />
         </button>
-        <Card className="rounded-2xl p-4">
+        <MapBottomSheet
+          title={quote ? "Confirmá tu viaje" : "¿A dónde vamos?"}
+          subtitle={quote ? "Revisá el recorrido y cómo vas a pagar" : "Elegí tu destino y revisá el punto de encuentro"}
+          expanded={panelExpanded}
+          onToggle={quote ? undefined : () => setPanelExpanded(value => !value)}
+        >
           {quote ? (
             <div>
+              <div className="rounded-xl bg-secondary/60 p-3 mb-4 space-y-2 text-sm"><p><span className="text-muted-foreground">Desde: </span>{displayAddress(originAddress, "Origen seleccionado")}</p><p><span className="text-muted-foreground">Hasta: </span>{displayAddress(destinationAddress, "Destino seleccionado")}</p></div>
               {(() => {
                 const ptsDiscount = (usePoints && (user?.bear_points || 0) >= 50)
                   ? Math.min(Math.floor((user?.bear_points || 0) / 10) * 100, Math.floor(quote.price * 0.3))
@@ -1079,17 +1102,24 @@ export default function PassengerViajar() {
             </div>
           ) : (
             <div>
+              <div className="flex gap-2 mb-3" role="group" aria-label="Elegir punto del recorrido">
+                {[['origin', 'Origen'], ['destination', 'Destino']].map(([target, label]) => <button type="button" key={target} disabled={geocoding} aria-pressed={selectingTarget === target} onClick={() => chooseTarget(target)} className={`flex-1 min-h-12 rounded-xl text-sm font-semibold border ${selectingTarget === target ? 'border-accent bg-accent/10' : 'border-border text-muted-foreground'}`}>{label}</button>)}
+              </div>
               <div className="relative mb-3">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
+                  ref={searchInputRef}
+                  aria-label={selectingTarget === "origin" ? "Buscar origen" : "Buscar destino"}
+                  autoComplete="off"
+                  disabled={geocoding}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setPanelExpanded(true)}
                   placeholder={selectingTarget === "origin" ? "Buscar origen..." : "¿A dónde vas?"}
-                  className="pl-10 h-11"
+                  className="pl-10 pr-12 h-12"
                 />
                 {panelExpanded && !searchingPlace && !geocoding ? (
-                  <button onClick={() => setPanelExpanded(false)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <button aria-label="Mostrar más mapa" onClick={() => setPanelExpanded(false)} className="absolute right-0 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center text-muted-foreground hover:text-foreground">
                     <ChevronUp className="w-4 h-4" />
                   </button>
                 ) : (searchingPlace || geocoding) ? (
@@ -1098,10 +1128,11 @@ export default function PassengerViajar() {
               </div>
               {panelExpanded && (
                 <>
+              {searchQuery.trim().length >= 3 && !searchingPlace && !geocoding && searchResults.length === 0 && <p role="status" className="text-sm text-muted-foreground rounded-xl bg-secondary p-3 mb-3">{searchError ? "No pudimos buscar lugares. Cambiá el texto para volver a intentar." : "No encontramos ese lugar. Probá con una calle, altura o punto conocido."}</p>}
               {searchResults.length > 0 && (
                 <div className="mb-3 max-h-48 overflow-y-auto rounded-xl border border-border">
                   {searchResults.map((r, i) => (
-                    <button key={i} onClick={() => handleSelectPlace(r)} className="w-full text-left p-3 hover:bg-secondary/50 border-b border-border last:border-0">
+                    <button key={i} disabled={geocoding} onClick={() => handleSelectPlace(r)} className="w-full text-left p-3 hover:bg-secondary/50 border-b border-border last:border-0">
                       <p className="text-sm font-medium truncate">{r.main_text}</p>
                       <p className="text-xs text-muted-foreground truncate">{r.secondary_text || r.label}</p>
                     </button>
@@ -1144,7 +1175,7 @@ export default function PassengerViajar() {
 
               <div className="mb-2">
                 <button
-                  onClick={() => { setOriginExpanded(!originExpanded); setSelectingTarget("origin"); }}
+                  onClick={() => { setOriginExpanded(!originExpanded); chooseTarget("origin"); }}
                   className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${selectingTarget === "origin" ? "border-accent bg-accent/5" : "border-border bg-secondary/50"}`}
                 >
                   <span className="w-3 h-3 rounded-full bg-foreground shrink-0" />
@@ -1162,7 +1193,7 @@ export default function PassengerViajar() {
 
               <div className="mb-2">
                 <button
-                  onClick={() => { setDestExpanded(!destExpanded); setSelectingTarget("destination"); }}
+                  onClick={() => { setDestExpanded(!destExpanded); chooseTarget("destination"); }}
                   className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${selectingTarget === "destination" ? "border-accent bg-accent/5" : "border-border bg-secondary/50"}`}
                 >
                   <span className="w-3 h-3 rounded-full bg-accent shrink-0" />
@@ -1198,16 +1229,17 @@ export default function PassengerViajar() {
                 )}
               </div>
 
+              {(!origin || !destination) && <p className="text-xs text-muted-foreground py-2">{!origin ? "Seleccioná el origen o usá tu ubicación actual." : "Elegí el destino para consultar el precio."}</p>}
               {origin && destination && (
                 <Button onClick={handleQuote} disabled={quoteLoading} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold">
-                  {quoteLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cotizando...</> : "Cotizar viaje"}
+                  {quoteLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cotizando...</> : "Ver precio del viaje"}
                 </Button>
               )}
                 </>
               )}
             </div>
           )}
-        </Card>
+        </MapBottomSheet>
         </div>
       </div>
     </div>
