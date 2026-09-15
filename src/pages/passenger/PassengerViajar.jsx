@@ -555,7 +555,7 @@ export default function PassengerViajar() {
   // ---- RENDER STATES ----
 
   if (loading) {
-    return <LoadingScreen className="h-full" label="Preparando tu mapa..." />;
+    return <LoadingScreen className="h-full" label="Preparando tu mapa en Formosa..." mascotImage="/assets/mascot/bear_cruz_running_hd.jpg" />;
   }
 
   // Active ride view

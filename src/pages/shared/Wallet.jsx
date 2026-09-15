@@ -124,7 +124,7 @@ export default function Wallet() {
     });
   };
 
-  if (loading) return <LoadingScreen className="h-full" label="Cargando billetera..." />;
+  if (loading) return <LoadingScreen className="h-full min-h-[60vh]" label="Cargando tu billetera digital..." mascotImage="/assets/mascot/bear_cruz_cheer_hd.jpg" />;
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>

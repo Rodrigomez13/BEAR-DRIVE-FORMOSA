@@ -646,7 +646,7 @@ export default function DriverConducir() {
   const formatPrice = (value) => `$${(value || 0).toLocaleString("es-AR")}`;
 
   if (loading) {
-    return <LoadingScreen className="absolute inset-0" label="Preparando..." />;
+    return <LoadingScreen className="absolute inset-0" label="Conectando al radar de viajes en Formosa..." mascotImage="/assets/mascot/bear_smile_closeup_hd.jpg" />;
   }
 
   if (!eligible) {

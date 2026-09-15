@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -41,7 +41,16 @@ import AccountSettings from '@/pages/shared/AccountSettings';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
-  const isLoading = isLoadingPublicSettings || isLoadingAuth;
+  const [minSplashDone, setMinSplashDone] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinSplashDone(true);
+    }, 1600);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const isLoading = isLoadingPublicSettings || isLoadingAuth || !minSplashDone;
 
   if (!isLoading && authError) {
     if (authError.type === 'user_not_registered') return <UserNotRegisteredError />;
