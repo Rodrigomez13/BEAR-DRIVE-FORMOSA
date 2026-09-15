@@ -853,7 +853,7 @@ export default function PassengerViajar() {
       />
 
       {/* Top header */}
-      <div className="absolute inset-x-0 top-0 z-10 p-3 safe-top">
+      <div className="absolute inset-x-0 top-0 z-10 p-3">
         <div className="max-w-md mx-auto flex items-center gap-3 px-4 py-2.5 rounded-2xl glass-navy">
           <div className="w-9 h-9 shrink-0 flex items-center justify-center">
             <Image src={BEAR_LOGO_SVG} alt="BearDrive" className="w-full h-full object-contain" />

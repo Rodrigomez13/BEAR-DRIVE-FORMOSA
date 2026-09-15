@@ -1059,7 +1059,7 @@ export default function DriverConducir() {
           className="absolute inset-0"
         />
 
-        <div className="absolute inset-x-0 top-0 z-10 p-3 safe-top">
+        <div className="absolute inset-x-0 top-0 z-10 p-3">
           <div className="flex items-center justify-between max-w-md mx-auto">
             <div className="flex items-center gap-2 px-4 py-2 rounded-full glass-navy">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />

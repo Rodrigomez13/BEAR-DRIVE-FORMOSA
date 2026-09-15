@@ -1,6 +1,6 @@
 import React from "react";
 import { useOutlet, useLocation } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 // Smooth crossfade between nested routes (tabs) while the shell and its
 // bottom nav stay fixed. Uses useOutlet() so the exiting page is frozen
@@ -8,8 +8,10 @@ import { AnimatePresence, motion } from "framer-motion";
 export default function AnimatedOutlet() {
   const location = useLocation();
   const outlet = useOutlet();
+  const reduceMotion = useReducedMotion();
+  if (reduceMotion) return <div className="absolute inset-0 min-w-0">{outlet}</div>;
   return (
-    <AnimatePresence initial={false}>
+    <AnimatePresence initial={false} mode="wait">
       <motion.div
         key={location.pathname}
         initial={{ opacity: 0 }}
