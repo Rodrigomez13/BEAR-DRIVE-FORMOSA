@@ -1,3 +1,4 @@
+import { openPayment } from "@/lib/payment-navigation";
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
@@ -17,6 +18,7 @@ export default function DriverEarnings() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [paymentAccount, setPaymentAccount] = useState(null);
   const [connecting, setConnecting] = useState(false);
+  const [payingCharge, setPayingCharge] = useState(false);
 
   const load = async () => {
     try {
@@ -33,9 +35,7 @@ export default function DriverEarnings() {
     if (connecting) return;
     setConnecting(true);
     try {
-      const res = await base44.functions.invoke("connectDriverPayments", {});
-      if (!res.data?.url) throw new Error("No se recibió el enlace de vinculación");
-      window.location.assign(res.data.url);
+      await openPayment(async () => (await base44.functions.invoke("connectDriverPayments", {})).data.url);
     } catch (e) {
       toast({ title: e.response?.data?.error || e.message, variant: "destructive" });
     } finally { setConnecting(false); }
@@ -50,6 +50,13 @@ export default function DriverEarnings() {
       window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
     }
   }, []);
+
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible' && user?.id) load(); };
+    window.addEventListener('focus', refresh);
+    window.addEventListener('bear-payment-return', refresh);
+    return () => { window.removeEventListener('focus', refresh); window.removeEventListener('bear-payment-return', refresh); };
+  }, [user?.id]);
 
   const today = new Date().toISOString().slice(0, 10);
   const todayRides = rides.filter(r => r.completed_date && r.completed_date.slice(0, 10) === today);
@@ -75,12 +82,13 @@ export default function DriverEarnings() {
   const formatDate = (d) => d ? new Date(d).toLocaleDateString("es-AR", { day: "2-digit", month: "short" }) : "";
 
   const handlePayDebt = async (chargeId) => {
+    if (payingCharge) return;
+    setPayingCharge(true);
     try {
-      const res = await base44.functions.invoke("createDailyChargePayment", { charge_id: chargeId });
-      window.location.assign(res.data.checkout_url);
+      await openPayment(async () => (await base44.functions.invoke("createDailyChargePayment", { charge_id: chargeId })).data.checkout_url);
     } catch (err) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
+      toast({ title: "Error", description: err.response?.data?.error || err.message, variant: "destructive" });
+    } finally { setPayingCharge(false); }
   };
 
   if (loading) return <LoadingScreen className="h-full" label="Cargando..." />;
@@ -150,7 +158,7 @@ export default function DriverEarnings() {
                 {pendingCharges.map(c => (
                   <div key={c.id} className="flex items-center justify-between text-[14px]">
                     <span>{c.business_day} · {formatPrice(c.total_due || c.amount)}</span>
-                    <Button size="sm" onClick={() => handlePayDebt(c.id)} className="min-h-11 text-[14px] bear-gold-gradient text-foreground border-0">Pagar</Button>
+                    <Button size="sm" disabled={payingCharge} onClick={() => handlePayDebt(c.id)} className="min-h-11 text-[14px] bear-gold-gradient text-foreground border-0">Pagar</Button>
                   </div>
                 ))}
               </div>
