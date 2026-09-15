@@ -25,6 +25,26 @@ function cleanMpId(value) {
   return text;
 }
 
+function assertFreshTestCandidate(user, label) {
+  if (user.role === 'admin') {
+    throw Object.assign(new Error(`${label} no puede ser una cuenta admin.`), { status: 409 });
+  }
+  if (user.is_test_account === true) return;
+
+  const established =
+    Number(user.total_rides || 0) > 0 ||
+    Number(user.bearpoints_balance || 0) !== 0 ||
+    (user.driver_status && user.driver_status !== 'NOT_APPLIED') ||
+    (user.driver_capability && user.driver_capability !== 'NO_DRIVER');
+
+  if (established) {
+    throw Object.assign(
+      new Error(`${label} ya tiene actividad o estado productivo. Por seguridad no se convertirá en cuenta de prueba.`),
+      { status: 409 }
+    );
+  }
+}
+
 async function oneOrNone(entity, query, label) {
   const rows = await entity.filter(query);
   if (rows.length > 1) {
@@ -46,26 +66,21 @@ async function ensureRequirements(e) {
   return e.DocumentRequirement.filter({ enabled: true, required: true });
 }
 
-async function provisionPaymentExpectation(e, driverId, expectedSellerId) {
-  if (!expectedSellerId) return null;
-
+async function paymentExpectation(e, driverId, expectedSellerId) {
   const current = await oneOrNone(e.PaymentAccount, { driver_id: driverId }, 'PaymentAccount del Driver Test');
-  if (!current) {
-    return e.PaymentAccount.create({ driver_id: driverId, seller_id: expectedSellerId });
-  }
+  if (!expectedSellerId) return current;
 
-  if (current.access_token && current.seller_id && String(current.seller_id) !== expectedSellerId) {
+  if (current?.access_token && current.seller_id && String(current.seller_id) !== expectedSellerId) {
     throw Object.assign(
       new Error('El Driver Test ya tiene otra cuenta de Mercado Pago autorizada. No se reemplazó ninguna credencial.'),
       { status: 409 }
     );
   }
 
-  if (current.seller_id && String(current.seller_id) !== expectedSellerId) {
-    await e.PaymentAccount.update(current.id, { seller_id: expectedSellerId });
-    return e.PaymentAccount.get(current.id);
+  if (!current) return e.PaymentAccount.create({ driver_id: driverId, seller_id: expectedSellerId });
+  if (String(current.seller_id || '') !== expectedSellerId) {
+    return e.PaymentAccount.update(current.id, { seller_id: expectedSellerId });
   }
-
   return current;
 }
 
@@ -113,6 +128,21 @@ export default async function provisionTestEnvironment(req) {
       }, 409);
     }
 
+    assertFreshTestCandidate(passenger, 'Passenger Test');
+    assertFreshTestCandidate(driver, 'Driver Test');
+
+    // Preflight the account before mutating profile/driver records. Existing OAuth
+    // credentials are never replaced with credentials from another Mercado Pago seller.
+    const existingPaymentAccount = await oneOrNone(e.PaymentAccount, { driver_id: driver.id }, 'PaymentAccount del Driver Test');
+    if (
+      driverMpId &&
+      existingPaymentAccount?.access_token &&
+      existingPaymentAccount.seller_id &&
+      String(existingPaymentAccount.seller_id) !== driverMpId
+    ) {
+      return json({ error: 'El Driver Test ya tiene otro seller de Mercado Pago autorizado. Desvinculalo explícitamente antes de continuar.' }, 409);
+    }
+
     const now = new Date();
     const nowIso = now.toISOString();
     const expires = new Date(now);
@@ -122,7 +152,7 @@ export default async function provisionTestEnvironment(req) {
     await e.User.update(passenger.id, {
       is_test_account: true,
       test_persona: 'passenger',
-      mercadopago_test_user_id: passengerMpId,
+      ...(passengerMpId ? { mercadopago_test_user_id: passengerMpId } : {}),
       last_active_mode: 'passenger',
       driver_status: 'NOT_APPLIED',
       driver_capability: 'NO_DRIVER',
@@ -131,7 +161,7 @@ export default async function provisionTestEnvironment(req) {
     await e.User.update(driver.id, {
       is_test_account: true,
       test_persona: 'driver',
-      mercadopago_test_user_id: driverMpId,
+      ...(driverMpId ? { mercadopago_test_user_id: driverMpId } : {}),
       last_active_mode: 'driver',
       driver_status: 'APPROVED',
       driver_capability: 'APPROVED_ELIGIBLE',
@@ -202,7 +232,7 @@ export default async function provisionTestEnvironment(req) {
       await upsert(e.DriverDocument, { driver_id: driver.id, code: requirement.code }, values, `DriverDocument ${requirement.code}`);
     }
 
-    const paymentAccount = await provisionPaymentExpectation(e, driver.id, driverMpId);
+    const paymentAccount = await paymentExpectation(e, driver.id, driverMpId);
 
     const locations = await e.DriverLocation.filter({ driver_id: driver.id });
     for (const location of locations) {
@@ -228,9 +258,9 @@ export default async function provisionTestEnvironment(req) {
       },
       safeguards: {
         driver_starts_offline: true,
-        oauth_tokens_created: false,
+        oauth_tokens_created_by_seed: false,
         mercadopago_passwords_stored: false,
-        production_users_modified: false,
+        existing_financial_history_reset: false,
       },
       next_step: driverMpId
         ? 'Iniciá sesión como Driver Test y usá Conectar Mercado Pago. OAuth solo aceptará el seller TEST esperado.'
