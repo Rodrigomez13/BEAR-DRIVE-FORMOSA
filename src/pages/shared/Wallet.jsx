@@ -164,6 +164,17 @@ export default function Wallet() {
         {/* Driver Financial Summary */}
         {isDriver ? (
           <div className="space-y-4 mb-6">
+            {/* Direct Model Transparency Banner */}
+            <div className="p-3.5 rounded-xl border border-accent/30 bg-accent/10 flex items-start gap-3">
+              <ShieldCheck className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+              <div className="flex-1 text-xs">
+                <p className="font-bold text-foreground">Modelo 100% Directo · 0% Comisión por Viaje</p>
+                <p className="text-muted-foreground mt-0.5 leading-relaxed">
+                  Tus cobros por viajes van directo a tu cuenta de Mercado Pago o en efectivo. La cuenta de la empresa (<strong>CentralWallet</strong>) nunca retiene tarifas de tus traslados; únicamente recauda el cargo diario de servicio por tus jornadas activas.
+                </p>
+              </div>
+            </div>
+
             {/* Primary Balance Card */}
             <Card className="p-5 bear-gradient text-white shadow-lg relative overflow-hidden">
               <div className="absolute right-3 top-3 opacity-10 pointer-events-none">
@@ -257,6 +268,17 @@ export default function Wallet() {
         ) : (
           /* Passenger Summary */
           <div className="space-y-4 mb-6">
+            {/* Passenger Transparency Banner */}
+            <div className="p-3.5 rounded-xl border border-border bg-secondary/60 flex items-start gap-3">
+              <ShieldCheck className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+              <div className="flex-1 text-xs">
+                <p className="font-bold text-foreground">Tarifas Claras y Pago Directo al Conductor</p>
+                <p className="text-muted-foreground mt-0.5 leading-relaxed">
+                  Tu dinero va 100% al conductor asignado sin recargos ocultos de plataforma (<strong>CentralWallet</strong>). Además, cada viaje completado te premia con BearPoints para futuros beneficios.
+                </p>
+              </div>
+            </div>
+
             <Card className="p-5 bear-gold-gradient text-foreground shadow-md relative overflow-hidden">
               <div className="flex items-center justify-between">
                 <div>

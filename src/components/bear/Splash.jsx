@@ -44,7 +44,7 @@ export default function Splash() {
       </motion.div>
 
       {/* Main Center Composition */}
-      <div className="flex flex-col items-center px-6 max-w-sm text-center z-10 my-auto">
+      <div className="flex flex-col items-center px-6 max-w-md text-center z-10 my-auto">
         {/* Mascot Hero with Formosa Landmarks + Gold Glow Ring */}
         <motion.div
           initial={{ opacity: 0, scale: 0.82, y: 15 }}
@@ -53,12 +53,12 @@ export default function Splash() {
           className="relative mb-6 flex items-center justify-center"
         >
           {/* Pulsing golden aura */}
-          <div className="absolute w-36 h-36 rounded-full bg-[#E9B74E]/25 blur-2xl animate-pulse" />
-          <div className="absolute w-44 h-44 rounded-full border border-[#E9B74E]/20 animate-ping opacity-40" style={{ animationDuration: "3s" }} />
+          <div className="absolute w-64 h-64 rounded-full bg-[#E9B74E]/30 blur-3xl animate-pulse" />
+          <div className="absolute w-72 h-72 rounded-full border border-[#E9B74E]/25 animate-ping opacity-30" style={{ animationDuration: "3.5s" }} />
 
           {/* Double ring frame featuring 3D Formosa mascot */}
-          <div className="relative w-32 h-32 rounded-3xl p-1 bg-gradient-to-tr from-[#E9B74E] via-[#ffdf88] to-[#996f1e] shadow-[0_0_35px_rgba(233,183,78,0.35)]">
-            <div className="w-full h-full rounded-[22px] bg-[#0f1422] overflow-hidden relative flex items-center justify-center">
+          <div className="relative w-56 h-56 sm:w-64 sm:h-64 rounded-3xl p-1.5 bg-gradient-to-tr from-[#E9B74E] via-[#ffdf88] to-[#996f1e] shadow-[0_0_45px_rgba(233,183,78,0.4)]">
+            <div className="w-full h-full rounded-[20px] bg-[#0f1422] overflow-hidden relative flex items-center justify-center">
               <img
                 src="/assets/mascot/bear_costanera_wave_hd.jpg"
                 alt="BearDrive en Formosa"
@@ -75,7 +75,7 @@ export default function Splash() {
               initial={{ scale: 0, rotate: -20 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ delay: 0.45, duration: 0.5, type: "spring", stiffness: 260 }}
-              className="absolute -bottom-2 -right-2 w-11 h-11 rounded-2xl bg-[#0f1422] border-2 border-[#E9B74E] shadow-xl p-1 flex items-center justify-center overflow-hidden"
+              className="absolute -bottom-2.5 -right-2.5 w-14 h-14 rounded-2xl bg-[#0f1422] border-2 border-[#E9B74E] shadow-2xl p-1.5 flex items-center justify-center overflow-hidden"
             >
               <img
                 src="/assets/mascot/bear_pin_emblem.png"

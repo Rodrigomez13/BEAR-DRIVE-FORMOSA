@@ -4,8 +4,8 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  // Rutas relativas para que los assets carguen correctamente dentro del WebView de Capacitor (APK)
-  base: './',
+  // Rutas raíz '/' para que al recargar en subrutas (/passenger/profile, /wallet, etc.) no dé 404 ni pantalla blanca
+  base: process.env.VITE_CAPACITOR === 'true' ? './' : '/',
   plugins: [
     base44({
       // Support for legacy code that imports the base44 SDK with @/integrations, @/entities, etc.

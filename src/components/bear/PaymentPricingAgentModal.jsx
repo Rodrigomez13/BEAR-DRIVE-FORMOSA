@@ -269,6 +269,9 @@ export default function PaymentPricingAgentModal({ open, onOpenChange }) {
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Para recibir pagos de pasajeros vía QR dinámico o transferencias directas sin comisiones de intermediarios, debés tener vinculada tu cuenta de Mercado Pago.
                   </p>
+                  <p className="text-[11px] text-accent font-semibold mt-1">
+                    CentralWallet recauda únicamente el canon diario fijo; el 100% de la tarifa del viaje ingresa a tu cuenta personal.
+                  </p>
                 </div>
 
                 {driverAccount?.status === "connected" ? (
@@ -358,6 +361,10 @@ export default function PaymentPricingAgentModal({ open, onOpenChange }) {
         {activeTab === "faq" && (
           <div className="p-5 space-y-3">
             {[
+              {
+                q: "¿Cómo se separan los fondos entre la empresa (CentralWallet) y los conductores?",
+                a: "En BearDrive existe una estricta separación: 'CentralWallet' es la cuenta de la empresa que recauda únicamente el canon diario fijo de servicio que abonan los choferes en sus jornadas activas. Las tarifas de los viajes van 100% directas al conductor asignado (0% comisión por viaje), acreditadas en su cuenta personal de Mercado Pago o en efectivo.",
+              },
               {
                 q: "¿Por qué dio error al ingresar a un enlace en el navegador?",
                 a: "Los endpoints seguros del servidor (como connectDriverPayments) requieren una sesión activa iniciada desde la aplicación BearDrive. Si abrís la URL directamente en el navegador sin iniciar sesión, el sistema bloquea el acceso por seguridad devolviendo 'Authentication required'.",

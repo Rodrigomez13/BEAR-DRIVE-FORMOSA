@@ -17,19 +17,19 @@ export default function LoadingScreen({
     >
       <div className="relative mb-5 flex items-center justify-center">
         {/* Pulsing ambient gold radar glow rings */}
-        <div className="absolute w-32 h-32 rounded-full bg-[#E9B74E]/20 blur-2xl animate-pulse" />
+        <div className="absolute w-56 h-56 rounded-full bg-[#E9B74E]/25 blur-2xl animate-pulse" />
         <div
-          className="absolute w-36 h-36 rounded-full border border-[#E9B74E]/25 animate-ping opacity-40 pointer-events-none"
-          style={{ animationDuration: "2.8s" }}
+          className="absolute w-60 h-60 rounded-full border border-[#E9B74E]/25 animate-ping opacity-40 pointer-events-none"
+          style={{ animationDuration: "3s" }}
         />
 
         {/* Mascot badge container with smooth float */}
         <motion.div
           animate={{ y: [0, -6, 0], scale: [1, 1.02, 1] }}
           transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          className="relative w-24 h-24 rounded-3xl p-1 bg-gradient-to-tr from-[#cca03f] via-[#E9B74E] to-[#ffd470] shadow-[0_10px_30px_rgba(233,183,78,0.25)] flex items-center justify-center"
+          className="relative w-44 h-44 sm:w-48 sm:h-48 rounded-3xl p-1.5 bg-gradient-to-tr from-[#cca03f] via-[#E9B74E] to-[#ffd470] shadow-[0_12px_35px_rgba(233,183,78,0.3)] flex items-center justify-center"
         >
-          <div className="w-full h-full rounded-[20px] bg-[#141b2d] overflow-hidden relative flex items-center justify-center">
+          <div className="w-full h-full rounded-[22px] bg-[#141b2d] overflow-hidden relative flex items-center justify-center">
             <img
               src={mascotImage}
               alt="BearDrive"
@@ -43,7 +43,7 @@ export default function LoadingScreen({
 
           {/* Mini Pin Emblem Badge Accent */}
           {showPinBadge && (
-            <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-xl bg-[#0f1422] border border-[#E9B74E] shadow-md p-0.5 flex items-center justify-center overflow-hidden">
+            <div className="absolute -bottom-2 -right-2 w-12 h-12 rounded-2xl bg-[#0f1422] border-2 border-[#E9B74E] shadow-xl p-1 flex items-center justify-center overflow-hidden">
               <img
                 src="/assets/mascot/bear_pin_emblem.png"
                 alt="Bear Pin"

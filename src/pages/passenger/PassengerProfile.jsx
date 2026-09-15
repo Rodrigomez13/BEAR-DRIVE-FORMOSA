@@ -44,6 +44,15 @@ export default function PassengerProfile() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [agentOpen, setAgentOpen] = useState(false);
 
+  useEffect(() => {
+    if (user) {
+      if (user.phone !== undefined) setPhone(user.phone || "");
+      if (user.city !== undefined) setCity(user.city || "Formosa");
+      if (user.dni !== undefined) setDni(user.dni || "");
+      if (user.profile_photo_url !== undefined) setPhotoUrl(user.profile_photo_url || "");
+    }
+  }, [user]);
+
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;

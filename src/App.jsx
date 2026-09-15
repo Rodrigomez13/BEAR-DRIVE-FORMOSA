@@ -54,7 +54,7 @@ const AuthenticatedApp = () => {
 
   if (!isLoading && authError) {
     if (authError.type === 'user_not_registered') return <UserNotRegisteredError />;
-    if (authError.type === 'auth_required') { navigateToLogin(); return null; }
+    if (authError.type === 'auth_required') return <Navigate to="/login" replace />;
   }
 
   return (
