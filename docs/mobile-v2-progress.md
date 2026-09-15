@@ -52,3 +52,12 @@ locks y prueba OAuth/webhook no quedan certificadas por este refactor visual.
 Validación: build correcto, lint enfocado sin errores y 30 pruebas de dominio/animación correctas. Revisión de Cuenta pasajero/conductor y navegación a Billetera mediante fixture local a 390 × 844. Datos simulados; no prueba de OAuth ni cobros reales. Lint global conserva 26 errores de imports sin usar; typecheck sigue fallando en componentes y tipos SDK preexistentes.
 
 Pendiente: mapa y solicitud de viaje del informe, detalle visual de viajes/Ganancias, separación adicional de documentos y vehículos, revisión integral del asistente y validación en dispositivo con backend y pagos de prueba. Esta etapa no publica la aplicación ni genera un APK.
+
+
+## Etapa 3 — Navegación inmediata y Viajes (2026-09-15)
+
+- Eliminado el fundido secuencial de 220 ms de salida + 220 ms de entrada entre rutas. Outlet ahora cambia directamente sin retener la pantalla anterior; la barra permanece montada.
+- Historial compartido para ambos modos, con consulta por passenger_id o driver_id según la ruta. Filtros Todos / En curso / Completados / Cancelados sobre los últimos 50 registros.
+- Detalle desplegable de pago, participante, distancia y duración; importes finales usan nullish coalescing para conservar cero. Acceso al módulo principal para retomar un viaje activo.
+- Errores de consulta visibles y reintento, diferenciados del historial vacío. Respuestas antiguas o posteriores al desmontaje no reemplazan la información actual.
+- Build, lint de archivos modificados y 30 pruebas existentes correctos. Fixture local ampliado con viajes de varios estados, importe final cero y fallo de carga simulado. No prueba de dispositivo ni publicación.
