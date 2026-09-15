@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,9 +13,7 @@ import {
   CreditCard,
   HelpCircle,
   QrCode,
-  DollarSign,
   AlertCircle,
-  ExternalLink,
   CheckCircle2,
   Sparkles,
   ArrowRight

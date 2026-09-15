@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
@@ -14,16 +14,11 @@ import {
   Lock,
   Bell,
   Shield,
-  Phone,
-  User,
   LogOut,
   Trash2,
-  CheckCircle2,
-  ExternalLink,
   ChevronRight,
   Wallet,
   CreditCard,
-  HelpCircle,
   Volume2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";

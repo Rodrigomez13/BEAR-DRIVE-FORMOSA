@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
-import StarRating from "@/components/bear/StarRating";
-import { CheckCircle2, XCircle, Loader2, FileText, Car, User, Clock, MoreHorizontal, Search, Pause, Play } from "lucide-react";
+import { CheckCircle2, XCircle, FileText, Car, User, Clock, Search, Pause, Play } from "lucide-react";
 import { businessDaysUntil } from "@/lib/businessDays";
 import LoadingScreen from "@/components/bear/LoadingScreen";
 

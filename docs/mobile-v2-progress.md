@@ -80,3 +80,35 @@ Pendiente: mapa y solicitud de viaje del informe, detalle visual de viajes/Ganan
 - No se inventan calificaciones o duración faltantes. Distancia al origen identificada como línea recta. Importe final cero preservado.
 - Solicitud entrante tiene prioridad sobre aviso de notificaciones. Se elimina el safe-area inferior duplicado de la espera y se simplifica su mensaje.
 - Pendiente validación del conductor en dispositivo con solicitudes reales, PIN y cobro; no se publica ni modifica el backend en esta etapa.
+
+
+## Etapa 6 — Ayuda y soporte
+
+- Accesos contextuales a Viajes y Billetera/Ganancias. Preguntas frecuentes alineadas con la navegación actual.
+- Eliminado el simulador de tarifas de Ayuda; soporte se concentra en orientación y registro de consultas.
+- Confirmación con referencia del caso creado, protección contra doble envío, límite de 3000 caracteres y controles accesibles.
+- Altura adaptada al shell, sin un segundo viewport vertical. Validación local de build y lint enfocado; pendiente probar registro real con sesión y permisos del backend.
+
+
+## Etapa 7 — Administración integrada y entrega a GitHub
+
+- Conectadas /admin/operations y /admin/payments, que tenían enlaces en el menú pero no rutas en App.
+- Soporte: indicadores, búsqueda por usuario/viaje/texto, filtro de categoría, seguridad primero, resolución obligatoria, bloqueo de doble envío y estados de carga/error/vacío. Las escrituras siguen usando supportOperations y su control administrativo.
+- Pagos: contenido operativo prioritario, diagnóstico con error independiente de la tabla y conservación de importes/puntos con valor cero.
+- Lint general correcto tras eliminar imports sin usar. Build y 30 pruebas correctos. Typecheck continúa fallando por tipos de componentes UI, ImportMeta y otros errores del proyecto; no es un gate aprobado.
+- Navegador: revisión del soporte con datos locales simulados y búsqueda sin coincidencias. No se usaron casos reales.
+
+### Estado del roadmap original
+
+| Fase | Estado actual |
+| --- | --- |
+| Baseline | Parcial: build/lint/pruebas disponibles; typecheck pendiente |
+| Shell móvil | Implementado; falta validación completa en dispositivos |
+| Navegación | Implementada, incluyendo rutas administrativas |
+| Cuenta/Finanzas | UI integrada; pagos reales y conciliación pendientes |
+| Operación | Paneles e historial implementados; falta recorrido completo pasajero/conductor |
+| Engagement | Ayuda implementada; onboarding/notificaciones/BearBot pendientes de revisión integral |
+| Seguridad | Funciones y pruebas existentes; falta auditoría integral del frontend contra backend |
+| Release | Código preparado para GitHub; publicación y prueba de dispositivo pendientes |
+
+Las etapas numeradas describen entregas de código, no fases del roadmap cerradas. No se considera terminada la aplicación por pasar el build.
