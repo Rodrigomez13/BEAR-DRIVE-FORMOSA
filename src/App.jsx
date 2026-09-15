@@ -2,7 +2,7 @@ import { lazy, Suspense, useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -39,8 +39,27 @@ import Wallet from '@/pages/shared/Wallet';
 import PaymentMethods from '@/pages/shared/PaymentMethods';
 import AccountSettings from '@/pages/shared/AccountSettings';
 
+import AccountHome from '@/pages/shared/AccountHome';
+
+function LegacyRedirect({ to }) {
+  const { search, hash } = useLocation();
+  const target = to === '/driver/account' && new URLSearchParams(search).has('payments') ? '/driver/earnings' : to;
+  return <Navigate replace to={`${target}${search}${hash}`} />;
+}
+
+function LegacyAccountRedirect({ page }) {
+  const { user } = useAuth();
+  const base = sessionStorage.getItem('bear_active_surface') === '/driver' || (!sessionStorage.getItem('bear_active_surface') && user?.last_active_mode === 'driver') ? '/driver' : '/passenger';
+  const suffix = page === 'wallet' ? (base === '/driver' ? '/earnings' : '/wallet') : page === 'payment-methods' ? (base === '/driver' ? '/earnings' : '/wallet/payment-methods') : `/account/${page}`;
+  return <LegacyRedirect to={base + suffix} />;
+}
+
+function AccountPage({ children }) {
+  return <div className="h-full overflow-y-auto">{children}</div>;
+}
+
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError } = useAuth();
   const [minSplashDone, setMinSplashDone] = useState(false);
 
   useEffect(() => {
@@ -75,22 +94,38 @@ const AuthenticatedApp = () => {
               <Route path="/" element={<ModeRouter />} />
               <Route path="/passenger" element={<PassengerShell />}>
                 <Route index element={<PassengerViajar />} />
-                <Route path="activity" element={<PassengerActivity />} />
-                <Route path="benefits" element={<PassengerBenefits />} />
-                <Route path="profile" element={<PassengerProfile />} />
+                <Route path="rides" element={<PassengerActivity />} />
+                <Route path="activity" element={<LegacyRedirect to="/passenger/rides" />} />
+                <Route path="benefits" element={<LegacyRedirect to="/passenger/wallet/benefits" />} />
+                <Route path="wallet" element={<Wallet />} />
+                <Route path="wallet/benefits" element={<PassengerBenefits />} />
+                <Route path="wallet/payment-methods" element={<AccountPage><PaymentMethods /></AccountPage>} />
+                <Route path="profile" element={<LegacyRedirect to="/passenger/account" />} />
+                <Route path="account" element={<AccountHome />} />
+                <Route path="account/personal" element={<PassengerProfile />} />
+                <Route path="account/preferences" element={<AccountPage><AccountSettings /></AccountPage>} />
+                <Route path="account/security" element={<AccountPage><SecurityPrivacy /></AccountPage>} />
+                <Route path="account/help" element={<AccountPage><HelpSupport /></AccountPage>} />
               </Route>
               <Route path="/driver" element={<DriverShell />}>
                 <Route index element={<DriverConducir />} />
-                <Route path="activity" element={<DriverActivity />} />
+                <Route path="rides" element={<DriverActivity />} />
+                <Route path="activity" element={<LegacyRedirect to="/driver/rides" />} />
                 <Route path="earnings" element={<DriverEarnings />} />
-                <Route path="profile" element={<DriverProfile />} />
+                <Route path="account/documents" element={<DriverProfile />} />
+                <Route path="profile" element={<LegacyRedirect to="/driver/account" />} />
+                <Route path="account" element={<AccountHome />} />
+                <Route path="account/personal" element={<PassengerProfile />} />
+                <Route path="account/preferences" element={<AccountPage><AccountSettings /></AccountPage>} />
+                <Route path="account/security" element={<AccountPage><SecurityPrivacy /></AccountPage>} />
+                <Route path="account/help" element={<AccountPage><HelpSupport /></AccountPage>} />
               </Route>
               <Route path="/onboarding" element={<DriverOnboarding />} />
-              <Route path="/security-privacy" element={<SecurityPrivacy />} />
-              <Route path="/help-support" element={<HelpSupport />} />
-              <Route path="/wallet" element={<Wallet />} />
-              <Route path="/payment-methods" element={<PaymentMethods />} />
-              <Route path="/settings" element={<AccountSettings />} />
+              <Route path="/security-privacy" element={<LegacyAccountRedirect page="security" />} />
+              <Route path="/help-support" element={<LegacyAccountRedirect page="help" />} />
+              <Route path="/wallet" element={<LegacyAccountRedirect page="wallet" />} />
+              <Route path="/payment-methods" element={<LegacyAccountRedirect page="payment-methods" />} />
+              <Route path="/settings" element={<LegacyAccountRedirect page="preferences" />} />
               <Route path="/admin" element={<AdminShell />}>
                 <Route index element={<AdminDashboard />} />
                 <Route path="drivers" element={<AdminDrivers />} />

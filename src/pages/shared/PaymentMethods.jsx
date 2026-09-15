@@ -24,9 +24,7 @@ import {
   ChevronLeft,
   Bot,
   ShieldCheck,
-  AlertCircle,
   Loader2,
-  Sparkles,
   Info
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -50,7 +48,7 @@ export default function PaymentMethods() {
   const [savingCard, setSavingCard] = useState(false);
 
   // Driver Mercado Pago status
-  const isDriver = user?.driver_capability === "APPROVED_ELIGIBLE" || user?.driver_status === "APPROVED";
+  const isDriver = window.location.pathname.startsWith("/driver");
   const [driverAccount, setDriverAccount] = useState(null);
   const [connectingDriver, setConnectingDriver] = useState(false);
 

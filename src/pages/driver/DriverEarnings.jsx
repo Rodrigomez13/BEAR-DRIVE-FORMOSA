@@ -41,7 +41,15 @@ export default function DriverEarnings() {
     } finally { setConnecting(false); }
   };
 
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => { if (user?.id) load(); }, [user?.id]);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("payments") === "connected") {
+      toast({ title: "Mercado Pago conectado", description: "Tu cuenta quedó vinculada para cobrar tus viajes." });
+      url.searchParams.delete("payments");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
+  }, []);
 
   const today = new Date().toISOString().slice(0, 10);
   const todayRides = rides.filter(r => r.completed_date && r.completed_date.slice(0, 10) === today);

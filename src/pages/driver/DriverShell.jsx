@@ -5,9 +5,9 @@ import { Car, Activity, DollarSign, User } from "lucide-react";
 export default function DriverShell() {
   const items = [
     { path: "", label: "Conducir", icon: Car },
-    { path: "activity", label: "Actividad", icon: Activity },
+    { path: "rides", label: "Viajes", icon: Activity },
     { path: "earnings", label: "Ganancias", icon: DollarSign },
-    { path: "profile", label: "Perfil", icon: User },
+    { path: "account", label: "Cuenta", icon: User },
   ];
   return <MobileAppShell items={items} basePath="/driver" />;
 }

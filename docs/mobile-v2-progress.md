@@ -38,3 +38,17 @@ pagos siguen pendientes. No se publica este cambio como una Mobile V2 completa.
 
 Los cambios recientes de pagos se conservan. Su publicación, inicialización de
 locks y prueba OAuth/webhook no quedan certificadas por este refactor visual.
+
+
+## Etapa 2 — Cuenta y Billetera (2026-09-15)
+
+- Navegación: pasajero Viajar / Viajes / Billetera / Cuenta; conductor Conducir / Viajes / Ganancias / Cuenta.
+- Cuenta tiene identidad, datos personales, preferencias, seguridad, soporte y cambio de modo. Documentación y vehículos del conductor quedan en una pantalla secundaria.
+- Datos personales conserva carga de foto, edición y eliminación de cuenta. Los cobros se gestionan en Ganancias, sin consultar PaymentAccount desde Documentación.
+- Billetera del pasajero muestra BearPoints, preferencia de pago y los últimos 20 viajes finalizados con su estado de pago informado. No representa saldo monetario. Incluye estados vacíos y reintento de carga.
+- Rutas anteriores activity/profile/benefits redirigen conservando consulta y fragmento. Los accesos compartidos antiguos usan el último modo abierto. El retorno de vinculación del perfil del conductor llega a Ganancias.
+- Las pantallas compartidas quedan dentro de la barra de navegación cuando se accede por las nuevas rutas.
+
+Validación: build correcto, lint enfocado sin errores y 30 pruebas de dominio/animación correctas. Revisión de Cuenta pasajero/conductor y navegación a Billetera mediante fixture local a 390 × 844. Datos simulados; no prueba de OAuth ni cobros reales. Lint global conserva 26 errores de imports sin usar; typecheck sigue fallando en componentes y tipos SDK preexistentes.
+
+Pendiente: mapa y solicitud de viaje del informe, detalle visual de viajes/Ganancias, separación adicional de documentos y vehículos, revisión integral del asistente y validación en dispositivo con backend y pagos de prueba. Esta etapa no publica la aplicación ni genera un APK.

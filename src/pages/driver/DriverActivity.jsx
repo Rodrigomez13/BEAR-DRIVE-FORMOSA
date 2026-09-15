@@ -34,7 +34,7 @@ export default function DriverActivity() {
   return (
     <PullToRefresh onRefresh={load}>
     <div className="max-w-md mx-auto px-4 pt-6 pb-8">
-      <h1 className="text-2xl font-bold mb-6">Actividad</h1>
+      <h1 className="text-2xl font-bold mb-6">Viajes</h1>
       {loading ? <SkeletonList count={4} /> :
        rides.length === 0 ? (
         <EmptyState

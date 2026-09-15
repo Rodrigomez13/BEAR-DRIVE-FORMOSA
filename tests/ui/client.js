@@ -1,6 +1,6 @@
 const listeners = new Set();
 const state = { cases: [{id:'case',user_name:'Pasajero de prueba',user_id:'passenger',category:'safety',status:'open',description:'SOS de prueba local',ride_id:'ride'}], rides:[{id:'ride',status:'IN_PROGRESS',passenger_name:'Pasajero de prueba',driver_name:'Conductor de prueba',quoted_fare:8000}], charges:[] };
-export const base44 = { entities:new Proxy({}, {get:()=>({subscribe:fn=>{listeners.add(fn);return()=>listeners.delete(fn);}})}), functions:{invoke:async(name,body)=>{
+export const base44 = { entities:new Proxy({}, {get:()=>({filter:async()=>[],subscribe:fn=>{listeners.add(fn);return()=>listeners.delete(fn);}})}), functions:{invoke:async(name,body)=>{
  if(name==='adminPayments') {
  const samples={accounts:[{id:'account',driver_id:'Conductor de prueba',seller_id:'123456',status:'connected',expires_at:'2027-01-01'}],rides:[{id:'ride',driver_name:'Conductor de prueba',passenger_name:'Pasajero de prueba',payment_status:'paid',final_fare:8000,payment_id:'123'}],charges:[{id:'charge',driver_name:'Conductor de prueba',status:'pending',amount:5000,business_day:'2026-09-14'}],points:[]};
  return {data:{rows:samples[body.section],has_more:false,configuration:[{name:'MP_CLIENT_ID',configured:true},{name:'MP_WEBHOOK_SECRET',configured:false}]}};
