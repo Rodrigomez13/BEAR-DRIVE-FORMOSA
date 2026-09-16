@@ -36,7 +36,7 @@ export default function RideHistory({ mode = "passenger" }) {
   }, [mode, user?.id]);
   useEffect(() => { setLoading(true); load(); return () => { generation.current++; }; }, [load]);
   const visible = rides.filter(ride => filter === "all" || (filter === "active" ? active : filter === "completed" ? finished : cancelled).has(ride.status));
-  return <PullToRefresh onRefresh={load}><div className="max-w-md mx-auto px-5 pt-6 pb-8 space-y-5">
+  return <PullToRefresh onRefresh={load}><div className="responsive-content mx-auto px-5 pt-6 pb-8 space-y-5">
     <header><p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Cada recorrido, a mano</p><h1 className="text-3xl font-bold">Viajes</h1><p className="text-sm text-muted-foreground mt-2">{mode === "driver" ? "Revisá tus recorridos y sus importes." : "Consultá tus recorridos y el estado de cada viaje."}</p></header>
     <div role="group" aria-label="Filtrar viajes" className="flex gap-2 overflow-x-auto pb-1">{filters.map(([value, label]) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className={`shrink-0 rounded-full px-4 min-h-12 text-xs font-semibold border ${filter === value ? "bg-accent text-accent-foreground border-accent" : "bg-card text-muted-foreground border-border"}`}>{label}</button>)}</div>
     {error && <div role="alert" className="rounded-2xl border border-destructive/30 p-4"><p className="text-sm">No pudimos actualizar tus viajes. {rides.length > 0 && "Mostramos la última información cargada."}</p><button type="button" onClick={load} className="flex items-center gap-2 min-h-12 text-sm font-semibold"><RefreshCw className="w-4 h-4" />Reintentar</button></div>}

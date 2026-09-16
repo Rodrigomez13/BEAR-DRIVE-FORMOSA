@@ -17,7 +17,7 @@ export default function AccountHome() {
     { icon: LifeBuoy, title: "Ayuda y soporte", detail: "Encontrá respuestas o pedí ayuda", path: "help" },
   ];
   return <div className="h-full overflow-y-auto bg-background">
-    <div className="max-w-md mx-auto px-5 pt-6 pb-8 space-y-6">
+    <div className="responsive-content mx-auto px-5 pt-6 pb-8 space-y-6">
       <header className="flex justify-between items-center"><div><p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Tu espacio en BearDrive</p><h1 className="text-3xl font-bold">Cuenta</h1></div><ThemeToggle /></header>
       <Link to={`${base}/personal`} className="block rounded-3xl border border-accent/25 bg-gradient-to-br from-accent/15 via-card to-card p-5 focus-visible:ring-2 focus-visible:ring-accent">
         <div className="flex items-center gap-4"><BearAvatar photoUrl={user?.profile_photo_url} size={64} /><div className="min-w-0 flex-1"><h2 className="text-xl font-bold truncate">{user?.full_name || "Mi cuenta"}</h2><p className="text-sm text-muted-foreground truncate">{user?.email}</p></div><ChevronRight className="w-5 h-5 shrink-0" /></div>

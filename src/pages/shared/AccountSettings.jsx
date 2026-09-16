@@ -105,7 +105,7 @@ export default function AccountSettings() {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 pt-6 pb-20 min-h-screen bg-background">
+    <div className="responsive-content mx-auto px-4 pt-6 pb-20 min-h-full bg-background">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <button

@@ -68,7 +68,7 @@ export default function HelpSupport() {
 
   return (
     <div className="min-h-full bg-background">
-      <div className="max-w-md mx-auto px-5 pt-8 pb-10">
+      <div className="responsive-content mx-auto px-5 pt-8 pb-10">
         <button onClick={() => navigate(`${base}/account`)} className="flex items-center gap-1 text-sm text-muted-foreground mb-4 min-h-12">
           <ChevronLeft className="w-4 h-4" />Volver
         </button>

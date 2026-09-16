@@ -315,3 +315,23 @@ test('payment readiness requires admin and returns no credential values', async 
   assert.equal(result.data.checks.find(c=>c.name==='Coordinación de viajes').ok,true);
   assert.equal(result.data.checks.find(c=>c.name==='Receptor del cargo diario').ok,false);
 });
+
+test('test payment mode refuses real sellers and stale checkouts before creating payment', async()=>{
+  const originalFetch=globalThis.fetch;
+  const {checkout}=await load('base44/shared/payments.ts');
+  try {
+    for (const scenario of ['real','wrong-seller','stale','valid']) {
+      setup(); Object.assign(globalThis.fixture.secrets,{MP_PAYMENT_MODE:'test',APP_PUBLIC_URL:'https://app.test',MP_WEBHOOK_URL:'https://api.test/hook'});
+      const calls=[];
+      globalThis.fetch=async(url)=>{
+        calls.push(url);
+        if(url.endsWith('/users/me')) return Response.json({id:scenario==='wrong-seller'?'other':'seller',site_id:'MLA',tags:scenario==='real'?[]:['test_user']});
+        return Response.json({collector_id:scenario==='stale'?'other':'seller'});
+      };
+      const run=()=>checkout(globalThis.fixture.client,'Ride',{id:'ride',mp_preference_id:'pref',payment_checkout_url:'https://www.mercadopago.com.ar/checkout'}, {access_token:'test',seller_id:'seller'},'ride');
+      if(scenario==='valid') assert.ok((await run()).checkout_url);
+      else await assert.rejects(run);
+      assert.equal(calls.length,['real','wrong-seller'].includes(scenario)?1:2);
+    }
+  } finally {globalThis.fetch=originalFetch;}
+});

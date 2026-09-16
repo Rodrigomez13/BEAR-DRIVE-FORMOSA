@@ -40,3 +40,22 @@ https://capacitorjs.com/docs/ios/deploying-to-app-store
 https://capacitorjs.com/docs/android/deploying-to-google-play
 
 Validado: build, 34 pruebas locales (incluyen navegación segura de pagos), cap sync Android/iOS. No se afirma cobro real ni binarios de tienda validados.
+
+### Pruebas aisladas de Mercado Pago
+
+El backend admite el secreto `MP_PAYMENT_MODE=test`: antes de generar o reutilizar
+un checkout verifica que el receptor sea un usuario de prueba argentino y que una
+preferencia existente pertenezca a ese mismo receptor. Sin el secreto se mantiene
+el comportamiento de producción; un build frontend no activa un sandbox.
+
+Para habilitar pruebas falta guardar el token del vendedor de prueba en
+`.private/mercadopago-test.env` (`MP_DAILY_CHARGE_ACCESS_TOKEN=...`). No subir ese
+archivo a Git. Luego validar `/users/me`, configurar el receptor correspondiente
+y `MP_PAYMENT_MODE=test` en el backend destinado a pruebas, publicar desde Base44
+y pagar con un comprador de prueba distinto. Para viajes, el conductor también
+debe vincular un vendedor de prueba. No reutilizar deudas o viajes reales.
+
+Pendiente de evidencia: publicación de esta revisión, conexión OAuth de prueba,
+pago aprobado y webhook conciliado, cancelación/rechazo, Android e iOS reales.
+Los ajustes responsive conservan el diseño, amplían las pantallas de cuenta en
+tablet y eliminan alturas de viewport anidadas en ajustes y seguridad.

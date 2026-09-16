@@ -95,7 +95,7 @@ export default function DriverEarnings() {
 
   return (
     <PullToRefresh onRefresh={load}>
-    <div className="max-w-md mx-auto px-4 pt-6 pb-8">
+    <div className="responsive-content mx-auto px-4 pt-6 pb-8">
       <h1 className="text-2xl font-bold mb-4">Ganancias</h1>
 
       {/* 0% Commission Value Prop Banner */}
