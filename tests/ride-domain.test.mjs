@@ -217,11 +217,11 @@ test('digital checkout uses driver token, reuses stored checkout and never compa
   const db=setup({Ride:[ride({status:'PAYMENT_PENDING',payment_method:'qr'})],PaymentAccount:[{id:'account',driver_id:'driver',access_token:'seller-token',seller_id:'seller',expires_at:'2099-01-01'}]});
   Object.assign(globalThis.fixture.secrets,{APP_PUBLIC_URL:'https://app.test',MP_WEBHOOK_URL:'https://api.test/hook',MERCADO_PAGO_ACCESS_TOKEN:'forbidden-company-token'});
   let requests=0;
-  globalThis.fetch=async(url,options)=>{requests++;assert.equal(options.headers.Authorization,'Bearer seller-token');const body=JSON.parse(options.body);assert.equal(body.marketplace_fee,0);return Response.json({id:'preference',init_point:'https://mp.test/pay',collector_id:'seller'});};
+  globalThis.fetch=async(url,options)=>{requests++;assert.equal(options.headers.Authorization,'Bearer seller-token');if(options.body){const body=JSON.parse(options.body);assert.equal(body.marketplace_fee,0);}return Response.json({id:'preference',init_point:'https://mp.test/pay',collector_id:'seller'});};
   try {
     assert.equal((await call('createRidePayment',{ride_id:'ride'})).status,200);
     assert.equal((await call('createRidePayment',{ride_id:'ride'})).status,200);
-    assert.equal(requests,1);assert.equal(db.Ride[0].status,'PAYMENT_PENDING');
+    assert.equal(requests,2);assert.equal(db.Ride[0].status,'PAYMENT_PENDING');
   } finally {globalThis.fetch=originalFetch;}
 });
 test('Mercado Pago signature rejects unsigned, tampered and expired requests',async()=>{
@@ -353,4 +353,13 @@ test('driver with overdue charges and an unpaid past ride can accept a new ride'
  const db=setup(driverSeed({DriverDailyCharge:[{driver_id:'driver',status:'pending',business_day:'2020-01-01'}],Ride:[ride({id:'old',status:'PAYMENT_PENDING'}),ride({id:'new',driver_id:null,status:'SEARCHING',payment_method:'cash',origin_lat:-26,origin_lng:-58,created_date:new Date().toISOString()})]}),'driver');
  const result=await call('acceptRide',{ride_id:'new',vehicle_id:'car'});
  assert.equal(result.status,200);assert.equal(result.data.queued,false);assert.equal(db.Ride[0].status,'PAYMENT_PENDING');
+});
+
+test('production also refuses a cached checkout for a different seller',async()=>{
+ setup(); const originalFetch=globalThis.fetch;
+ const {checkout}=await load('base44/shared/payments.ts');
+ globalThis.fetch=async()=>Response.json({collector_id:'old-seller'});
+ try {
+  await assert.rejects(()=>checkout(globalThis.fixture.client,'DriverDailyCharge',{id:'charge',payment_checkout_url:'https://www.mercadopago.com.ar/checkout',mp_preference_id:'pref'},{access_token:'new-token',seller_id:'new-seller'},'daily'),/otra cuenta receptora/);
+ } finally { globalThis.fetch=originalFetch; }
 });

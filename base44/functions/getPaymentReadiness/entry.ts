@@ -6,7 +6,9 @@ import { mp } from '../../shared/payments.ts';
 export default req => api(req, createClientFromRequest, async (client, user) => {
   if (user.role !== 'admin') fail('Acceso exclusivo para administradores', 403);
   const checks = [];
+  const paymentMode = secrets.get('MP_PAYMENT_MODE') || 'production';
   const add = (name, ok, detail) => checks.push({ name, ok, detail });
+  add('Modo de pagos de prueba', paymentMode === 'test', paymentMode === 'test' ? 'El backend exige receptores de prueba.' : 'El backend no está configurado en modo de prueba.');
   let manifest;
   try { manifest = JSON.parse(secrets.get('USER_OPERATION_LOCK_IDS') || 'null'); } catch { manifest = null; }
   const e = client.asServiceRole.entities;
@@ -27,5 +29,5 @@ export default req => api(req, createClientFromRequest, async (client, user) => 
   } catch {
     add('Receptor del cargo diario', false, 'No se pudo verificar la credencial de Mercado Pago.');
   }
-  return { checks, checked_at: new Date().toISOString() };
+  return { payment_mode: paymentMode, checks, checked_at: new Date().toISOString() };
 });

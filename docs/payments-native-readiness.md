@@ -59,3 +59,21 @@ Pendiente de evidencia: publicación de esta revisión, conexión OAuth de prueb
 pago aprobado y webhook conciliado, cancelación/rechazo, Android e iOS reales.
 Los ajustes responsive conservan el diseño, amplían las pantallas de cuenta en
 tablet y eliminan alturas de viewport anidadas en ajustes y seguridad.
+
+### Diagnóstico de token y checkout de prueba
+
+Ejecutar `node scripts/check-mp-test.mjs` antes de sincronizar credenciales.
+Consulta `/users/me` y rechaza vendedores reales, aunque el archivo se llame
+mercadopago-test.env. No alcanza con cambiar el nombre ni con mirar el prefijo
+del token. Si pasa, `node scripts/check-mp-test.mjs --prepare` escribe un archivo
+privado con token, collector derivado y MP_PAYMENT_MODE=test, sin modificar el
+backend. Usar ese archivo solo en el entorno destinado a pruebas.
+
+Un checkout existente conserva su vendedor original. No reutilizar un enlace
+anterior al cambio de receptor. Antes de reemplazarlo hay que conciliar su estado
+con Mercado Pago; nunca borrar deudas o marcar pagos aprobados para destrabarlo.
+El mensaje "Una de las partes ... es de prueba" indica mezcla de participantes;
+los avisos CSP del checkout no demuestran un fallo de nuestra política de scripts.
+Usar vendedor y comprador de prueba distintos; abrir el comprador en incógnito.
+
+Guía oficial: https://www.mercadopago.com.ar/developers/es/docs/checkout-pro-preferences/integration-test/test-purchases

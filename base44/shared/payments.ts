@@ -81,13 +81,12 @@ export async function checkout(client, entityName, record, account, kind) {
     if (!seller.tags?.includes('test_user') || seller.site_id !== 'MLA' || String(seller.id) !== String(account.seller_id)) {
       fail('Modo de prueba: vinculá una cuenta vendedora de prueba de Argentina.', 409);
     }
-    if (record.payment_checkout_url) {
-      if (!record.mp_preference_id) fail('El checkout anterior debe revisarse antes de probar pagos.', 409);
-      const previous = await mp(`/checkout/preferences/${encodeURIComponent(record.mp_preference_id)}`, account.access_token);
-      if (String(previous.collector_id) !== String(seller.id)) fail('El checkout pertenece a otra cuenta receptora.', 409);
-    }
   }
   if (record.payment_checkout_url) {
+    if (!record.mp_preference_id) fail('El checkout anterior requiere revisión antes de reutilizarlo.', 409);
+    // A token change cannot transfer an existing checkout to another seller.
+    const previous = await mp(`/checkout/preferences/${encodeURIComponent(record.mp_preference_id)}`, account.access_token);
+    if (String(previous.collector_id) !== String(account.seller_id)) fail('El checkout pertenece a otra cuenta receptora. Contactá soporte para conciliarlo y generar uno nuevo.', 409);
     return {
       checkout_url: record.payment_checkout_url,
       payment_status: 'qr_pending',
