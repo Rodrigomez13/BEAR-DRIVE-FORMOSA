@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@base44/sdk": "^0.8.48",
-    "@base44/vite-plugin": "^1.0.37",
+    "@base44/vite-plugin": "^1.0.39",
     "@capacitor/android": "^8.5.1",
     "@capacitor/app": "^8.1.1",
     "@capacitor/browser": "^8.0.4",
