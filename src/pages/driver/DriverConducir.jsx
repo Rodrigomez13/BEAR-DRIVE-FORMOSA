@@ -60,7 +60,6 @@ const ACTIVE_RIDE_STATUSES = [
   "PIN_VALIDATION",
   "IN_PROGRESS",
   "ARRIVED",
-  "PAYMENT_PENDING",
 ];
 
 function haversineKm(lat1, lng1, lat2, lng2) {
@@ -189,7 +188,7 @@ export default function DriverConducir() {
         throw new Error("No se pudieron actualizar las ofertas");
       }
     },
-    { enabled: online && !queuedRide && activeRide?.status !== "PAYMENT_PENDING", baseDelay: 10000, maxDelay: 30000 }
+    { enabled: online && !queuedRide, baseDelay: 10000, maxDelay: 30000 }
   );
 
   // Realtime ride status subscription — primary sync mechanism (replaces 3s polling).
@@ -962,6 +961,7 @@ export default function DriverConducir() {
 
             {status === "PAYMENT_PENDING" && (
               <div className="text-center">
+                <button className="min-h-12 underline" onClick={() => setActiveRide(null)}>Continuar conduciendo; cobrar después</button>
                 {qrCheckoutUrl ? (
                   <QrPaymentDisplay
                     checkoutUrl={qrCheckoutUrl}

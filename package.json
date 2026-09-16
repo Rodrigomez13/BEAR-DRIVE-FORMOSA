@@ -15,7 +15,9 @@
     "cap:run": "vite build && cap run android",
     "android": "vite build && cap sync android && cap open android",
     "ios:open": "cap open ios",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "android:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android.ps1 -Target apk",
+    "android:bundle": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android.ps1 -Target bundle"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.48",

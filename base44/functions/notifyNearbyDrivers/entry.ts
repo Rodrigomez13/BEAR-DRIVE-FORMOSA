@@ -1,4 +1,4 @@
-import { eligibleVehicle, requireNoDebt, premiumEligible } from '../../shared/domain.ts';
+import { eligibleVehicle, premiumEligible } from '../../shared/domain.ts';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
 function haversineKm(lat1, lng1, lat2, lng2) {
@@ -60,7 +60,6 @@ export default async function(req) {
       try {
         const candidate = await base44.asServiceRole.entities.User.get(dl.driver_id);
         const vehicle = await eligibleVehicle(base44, candidate, dl.vehicle_id);
-        await requireNoDebt(base44, candidate.id);
         if (ride.category === 'premium' && !premiumEligible(vehicle)) continue;
         await base44.asServiceRole.integrations.Core.SendPushNotification({
           user_id: dl.driver_id,

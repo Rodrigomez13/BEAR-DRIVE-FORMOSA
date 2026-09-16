@@ -17,15 +17,15 @@ export default function AccountDebtNotice({ children }) {
     window.addEventListener('focus', refresh);
     return () => { live = false; offRide(); offCharge(); window.removeEventListener('focus', refresh); };
   }, [user?.id, pathname]);
-  if (!status?.blocked || user?.role === 'admin') return children;
+  if (!status?.has_debt || user?.role === 'admin') return children;
   return <>
     <div className="fixed top-0 inset-x-0 z-[60] bg-destructive text-white p-3 text-sm safe-top shadow-lg">
       <p>Tenés pagos pendientes. Las nuevas solicitudes, reservas y beneficios están suspendidos.</p>
       <div className="flex gap-4 underline mt-1">
-        <Link to={status.unpaid_rides?.length ? '/passenger' : '/driver/earnings'}>Regularizar pagos</Link>
+        <Link to={status.unpaid_rides?.length ? '/passenger/wallet' : '/driver/earnings'}>Regularizar pagos</Link>
         <Link to="/help-support">Contactar soporte</Link>
       </div>
     </div>
-    {pathname === '/passenger/benefits' ? <div className="p-6 pt-28">Regularizá tus pagos para acceder a los beneficios.</div> : children}
+    {children}
   </>;
 }

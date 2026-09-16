@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { api, fail, all, ACTIVE, requireNoDebt } from '../../shared/domain.ts';
+import { api, fail, all, ACTIVE } from '../../shared/domain.ts';
 import { withUserLock } from '../../shared/userLock.ts';
 export default req => api(req, createClientFromRequest, async (client, user, body) => {
   const e = client.asServiceRole.entities;
@@ -7,7 +7,6 @@ export default req => api(req, createClientFromRequest, async (client, user, bod
     if (!body.quote_id) fail('Cotizá el viaje primero');
     const previous = await e.Ride.filter({ passenger_id: user.id, quote_id: body.quote_id });
     if (previous.length) return { ride: previous[0] };
-    await requireNoDebt(client, user.id);
     if ((await all(e.Ride, { passenger_id: user.id, status: { $in: ACTIVE } })).length) fail('Ya tenés un viaje activo', 409);
     const q = await e.RideQuote.get(body.quote_id);
     if (!q || q.passenger_id !== user.id || q.consumed || Date.parse(q.expires_at) <= Date.now()) fail('La cotización venció. Volvé a cotizar.', 409);

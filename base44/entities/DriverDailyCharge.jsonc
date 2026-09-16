@@ -65,6 +65,14 @@
     },
     "operation_lock": {
       "type": "string"
+    },
+    "late_fee_coefficient": {
+      "type": "number",
+      "default": 0
+    },
+    "grace_days": {
+      "type": "number",
+      "default": 0
     }
   },
   "required": [

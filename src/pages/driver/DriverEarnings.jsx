@@ -25,7 +25,9 @@ export default function DriverEarnings() {
       const r = await base44.entities.Ride.filter({ driver_id: user.id, status: { $in: ["COMPLETED", "RATED"] } }, "-created_date", 100);
       setRides(r);
       const c = await base44.entities.DriverDailyCharge.filter({ driver_id: user.id }, "-business_day", 50);
-      setCharges(c);
+      const status = await base44.functions.invoke("getAccountStatus", {});
+      const balances = new Map(status.data.charges.map(charge => [charge.id, charge]));
+      setCharges(c.map(charge => balances.get(charge.id) || charge));
       const accountResponse = await base44.functions.invoke("getDriverPaymentAccount", {});
       setPaymentAccount(accountResponse.data.account?.status === "connected" ? accountResponse.data.account : null);
     } catch (err) { toast({ title: "No se pudo cargar la información", description: err.response?.data?.error || err.message, variant: "destructive" }); } finally { setLoading(false); }
@@ -272,7 +274,7 @@ export default function DriverEarnings() {
                   <p className="text-[14px] text-muted-foreground">Cargo diario</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-medium">{formatPrice(c.total_due || c.amount)}</p>
+                  <p className="font-medium">{formatPrice(c.total_due || c.amount)}</p><p className="text-xs text-muted-foreground">Capital {formatPrice(c.amount)} · Mora {formatPrice(c.late_fee || 0)}</p>
                   <span className={`text-[14px] ${c.status === "paid" ? "text-green-600" : c.status === "waived" ? "text-blue-600" : "text-destructive"}`}>
                     {c.status === "paid" ? "Pagado" : c.status === "waived" ? "Condonado" : "Pendiente"}
                   </span>

@@ -1,11 +1,10 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { api, fail, all, ACTIVE, requireNoDebt, eligibleVehicle, premiumEligible, cas, publicRide } from '../../shared/domain.ts';
+import { api, fail, all, ACTIVE, eligibleVehicle, premiumEligible, cas, publicRide } from '../../shared/domain.ts';
 import { withUserLock } from '../../shared/userLock.ts';
 import { haversineKm } from '../../shared/pricing.ts';
 export default req => api(req,createClientFromRequest,async (client,user,body) => {
  const e=client.asServiceRole.entities;
  return withUserLock(client,user.id,async()=>{
-  await requireNoDebt(client,user.id);
   const vehicle=await eligibleVehicle(client,user,body.vehicle_id);
   const ride=await e.Ride.get(body.ride_id);
   if(ride.driver_id===user.id && ['ASSIGNED','DRIVER_APPROACHING'].includes(ride.status)) return {ride:publicRide(ride,user.id),queued:ride.status==='ASSIGNED'};

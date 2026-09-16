@@ -29,6 +29,10 @@
     "effective_from": {
       "type": "string",
       "format": "date-time"
+    },
+    "late_fee_enabled": {
+      "type": "boolean",
+      "default": false
     }
   },
   "required": [

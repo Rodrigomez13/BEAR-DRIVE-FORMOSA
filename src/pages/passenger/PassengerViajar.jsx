@@ -33,7 +33,7 @@ const CATEGORIES = [
   { code: "premium", name: "BearPremium", eta: "5 min", desc: "Confort premium", badge: "Confort" },
 ];
 
-const ACTIVE_STATUSES = ["SEARCHING", "ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING", "PIN_VALIDATION", "IN_PROGRESS", "ARRIVED", "PAYMENT_PENDING"];
+const ACTIVE_STATUSES = ["SEARCHING", "ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING", "PIN_VALIDATION", "IN_PROGRESS", "ARRIVED"];
 
 export default function PassengerViajar() {
   const { user } = useAuth();
@@ -684,6 +684,7 @@ export default function PassengerViajar() {
               <div className="text-center py-2">
                 {status === "ARRIVED" && <><CheckCircle2 className="w-10 h-10 text-accent mx-auto mb-2" /><p className="font-semibold">Llegaste a destino</p></>}
                 {status === "PAYMENT_PENDING" && <>
+                  <button className="min-h-12 underline" onClick={() => setActiveRide(null)}>Pagar después y pedir otro viaje</button>
                   <Wallet className="w-10 h-10 text-accent mx-auto mb-2" />
                   <p className="font-semibold">Pago pendiente</p>
                   {activeRide.payment_method === "card" ? (
