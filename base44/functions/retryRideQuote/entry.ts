@@ -1,8 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { api, participant, fail } from '../../shared/domain.ts';
+import { api, participant, fail, requireNoDebt } from '../../shared/domain.ts';
 export default req => api(req, createClientFromRequest, async (client,user,body) => {
  const ride = await participant(client,user,body.ride_id);
  if (ride.passenger_id !== user.id || ride.status !== 'NO_DRIVERS') fail('Solo se puede reintentar una búsqueda agotada');
+ await requireNoDebt(client,user.id);
  const configs = await client.asServiceRole.entities.PricingConfig.filter({active:true});
  const percent = Math.min(20, Math.max(0, configs[0]?.retry_increase_percent ?? 5));
  const radius = Math.min(40, (ride.search_radius_km || 10) + (configs[0]?.retry_radius_step_km ?? 5));

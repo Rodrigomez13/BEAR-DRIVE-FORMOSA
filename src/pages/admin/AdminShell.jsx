@@ -14,7 +14,7 @@ export default function AdminShell() {
   }
 
   const navItems = [
-    { path: "/admin", label: "Resumen", icon: LayoutDashboard },
+    { path: "/admin", label: "Dashboard", icon: LayoutDashboard },
     { path: "/admin/drivers", label: "Conductores", icon: Users },
     { path: "/admin/operations", label: "Soporte", icon: Headphones },
     { path: "/admin/pricing", label: "Tarifas", icon: DollarSign },
@@ -27,7 +27,7 @@ export default function AdminShell() {
       <aside className="hidden md:flex w-60 bear-gradient text-white flex-col shrink-0">
         <div className="p-5 border-b border-white/10">
           <Logo size="sm" className="[&_span]:text-white" />
-          <p className="text-[14px] text-white/50 mt-2">Administración</p>
+          <p className="text-[14px] text-white/50 mt-2">Panel Operations</p>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {navItems.map(item => {
@@ -35,7 +35,6 @@ export default function AdminShell() {
             return (
               <button
                 key={item.path}
-                aria-current={active ? "page" : undefined}
                 onClick={() => navigate(item.path)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors no-select ${active ? "bg-accent text-foreground font-semibold" : "text-white/70 hover:bg-white/10"}`}
               >
@@ -60,16 +59,15 @@ export default function AdminShell() {
           return (
             <button
               key={item.path}
-                aria-current={active ? "page" : undefined}
               onClick={() => navigate(item.path)}
-              className={`flex items-center gap-1.5 px-3 min-h-12 rounded-full text-sm whitespace-nowrap no-select ${active ? "bg-accent text-foreground font-semibold" : "text-white/70"}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm whitespace-nowrap no-select ${active ? "bg-accent text-foreground font-semibold" : "text-white/70"}`}
             >
               <item.icon className="w-4 h-4" />
               {item.label}
             </button>
           );
         })}
-        <button onClick={() => logout()} className="flex items-center gap-1.5 px-3 min-h-12 rounded-full text-sm text-white/70 whitespace-nowrap no-select ml-auto">
+        <button onClick={() => logout()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm text-white/70 whitespace-nowrap no-select ml-auto">
           <LogOut className="w-4 h-4" />Salir
         </button>
       </div>

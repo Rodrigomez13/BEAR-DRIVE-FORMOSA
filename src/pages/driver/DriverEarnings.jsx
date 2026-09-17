@@ -1,4 +1,3 @@
-import { openPayment } from "@/lib/payment-navigation";
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
@@ -18,16 +17,13 @@ export default function DriverEarnings() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [paymentAccount, setPaymentAccount] = useState(null);
   const [connecting, setConnecting] = useState(false);
-  const [payingCharge, setPayingCharge] = useState(false);
 
   const load = async () => {
     try {
       const r = await base44.entities.Ride.filter({ driver_id: user.id, status: { $in: ["COMPLETED", "RATED"] } }, "-created_date", 100);
       setRides(r);
       const c = await base44.entities.DriverDailyCharge.filter({ driver_id: user.id }, "-business_day", 50);
-      const status = await base44.functions.invoke("getAccountStatus", {});
-      const balances = new Map(status.data.charges.map(charge => [charge.id, charge]));
-      setCharges(c.map(charge => balances.get(charge.id) || charge));
+      setCharges(c);
       const accountResponse = await base44.functions.invoke("getDriverPaymentAccount", {});
       setPaymentAccount(accountResponse.data.account?.status === "connected" ? accountResponse.data.account : null);
     } catch (err) { toast({ title: "No se pudo cargar la información", description: err.response?.data?.error || err.message, variant: "destructive" }); } finally { setLoading(false); }
@@ -37,7 +33,9 @@ export default function DriverEarnings() {
     if (connecting) return;
     setConnecting(true);
     try {
-      await openPayment(async () => (await base44.functions.invoke("connectDriverPayments", {})).data.url);
+      const res = await base44.functions.invoke("connectDriverPayments", {});
+      if (!res.data?.url) throw new Error("No se recibió el enlace de vinculación");
+      window.location.assign(res.data.url);
     } catch (e) {
       toast({ title: e.response?.data?.error || e.message, variant: "destructive" });
     } finally { setConnecting(false); }
@@ -52,13 +50,6 @@ export default function DriverEarnings() {
       window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
     }
   }, []);
-
-  useEffect(() => {
-    const refresh = () => { if (document.visibilityState === 'visible' && user?.id) load(); };
-    window.addEventListener('focus', refresh);
-    window.addEventListener('bear-payment-return', refresh);
-    return () => { window.removeEventListener('focus', refresh); window.removeEventListener('bear-payment-return', refresh); };
-  }, [user?.id]);
 
   const today = new Date().toISOString().slice(0, 10);
   const todayRides = rides.filter(r => r.completed_date && r.completed_date.slice(0, 10) === today);
@@ -84,20 +75,19 @@ export default function DriverEarnings() {
   const formatDate = (d) => d ? new Date(d).toLocaleDateString("es-AR", { day: "2-digit", month: "short" }) : "";
 
   const handlePayDebt = async (chargeId) => {
-    if (payingCharge) return;
-    setPayingCharge(true);
     try {
-      await openPayment(async () => (await base44.functions.invoke("createDailyChargePayment", { charge_id: chargeId })).data.checkout_url);
+      const res = await base44.functions.invoke("createDailyChargePayment", { charge_id: chargeId });
+      window.location.assign(res.data.checkout_url);
     } catch (err) {
-      toast({ title: "Error", description: err.response?.data?.error || err.message, variant: "destructive" });
-    } finally { setPayingCharge(false); }
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   };
 
   if (loading) return <LoadingScreen className="h-full" label="Cargando..." />;
 
   return (
     <PullToRefresh onRefresh={load}>
-    <div className="responsive-content mx-auto px-4 pt-6 pb-8">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8">
       <h1 className="text-2xl font-bold mb-4">Ganancias</h1>
 
       {/* 0% Commission Value Prop Banner */}
@@ -160,7 +150,7 @@ export default function DriverEarnings() {
                 {pendingCharges.map(c => (
                   <div key={c.id} className="flex items-center justify-between text-[14px]">
                     <span>{c.business_day} · {formatPrice(c.total_due || c.amount)}</span>
-                    <Button size="sm" disabled={payingCharge} onClick={() => handlePayDebt(c.id)} className="min-h-11 text-[14px] bear-gold-gradient text-foreground border-0">Pagar</Button>
+                    <Button size="sm" onClick={() => handlePayDebt(c.id)} className="min-h-11 text-[14px] bear-gold-gradient text-foreground border-0">Pagar</Button>
                   </div>
                 ))}
               </div>
@@ -274,7 +264,7 @@ export default function DriverEarnings() {
                   <p className="text-[14px] text-muted-foreground">Cargo diario</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-medium">{formatPrice(c.total_due || c.amount)}</p><p className="text-xs text-muted-foreground">Capital {formatPrice(c.amount)} · Mora {formatPrice(c.late_fee || 0)}</p>
+                  <p className="font-medium">{formatPrice(c.total_due || c.amount)}</p>
                   <span className={`text-[14px] ${c.status === "paid" ? "text-green-600" : c.status === "waived" ? "text-blue-600" : "text-destructive"}`}>
                     {c.status === "paid" ? "Pagado" : c.status === "waived" ? "Condonado" : "Pendiente"}
                   </span>

@@ -1,4 +1,4 @@
-import { eligibleVehicle } from '../../shared/domain.ts';
+import { requireNoDebt, eligibleVehicle } from '../../shared/domain.ts';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
 // Server-authoritative driver go-online — validates eligibility before allowing
@@ -20,6 +20,8 @@ export default async function(req) {
     if (!vehicle_id) {
       return Response.json({ error: "vehicle_id es obligatorio" }, { status: 400 });
     }
+
+    await requireNoDebt(base44, user.id);
     await eligibleVehicle(base44, user, vehicle_id);
 
     // 4. Create or update DriverLocation

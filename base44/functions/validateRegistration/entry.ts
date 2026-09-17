@@ -1,40 +1,42 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
-// In-memory rate limiter per authenticated user to prevent DNI enumeration.
-// Uses user.id as key so rotating HTTP headers (like X-Forwarded-For) cannot bypass it.
+// In-memory rate limiter to slow down DNI enumeration.
+// Best-effort: persists across warm invocations only.
 const attempts = new Map<string, { count: number; resetAt: number }>();
-const MAX_ATTEMPTS = 10;
+const MAX_ATTEMPTS = 15;
 const WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
-function isBlocked(userId: string): boolean {
-  const entry = attempts.get(userId);
+function getClientIp(req): string {
+  const fwd = req.headers?.get?.("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0].trim();
+  return "unknown";
+}
+
+function isBlocked(ip: string): boolean {
+  const entry = attempts.get(ip);
   if (!entry) return false;
   if (Date.now() > entry.resetAt) {
-    attempts.delete(userId);
+    attempts.delete(ip);
     return false;
   }
   return entry.count >= MAX_ATTEMPTS;
 }
 
-function recordAttempt(userId: string) {
+function recordAttempt(ip: string) {
   const now = Date.now();
-  const entry = attempts.get(userId);
+  const entry = attempts.get(ip);
   if (!entry || now > entry.resetAt) {
-    attempts.set(userId, { count: 1, resetAt: now + WINDOW_MS });
+    attempts.set(ip, { count: 1, resetAt: now + WINDOW_MS });
     return;
   }
   entry.count++;
 }
 
-export default async function(req: Request): Promise<Response> {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (isBlocked(user.id)) {
+    const ip = getClientIp(req);
+    if (isBlocked(ip)) {
       return Response.json({ available: false, message: "Demasiadas consultas. Intentá nuevamente en unos minutos." }, { status: 429 });
     }
 
@@ -48,15 +50,15 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ available: false, message: "El DNI debe tener 7 u 8 dígitos" }, { status: 400 });
     }
 
-    recordAttempt(user.id);
+    recordAttempt(ip);
 
     const existing = await base44.asServiceRole.entities.User.filter({ dni: cleanDni }, undefined, 1);
-    if (existing.length > 0 && existing[0].id !== user.id) {
+    if (existing.length > 0) {
       return Response.json({ available: false, message: "Ya existe una cuenta con este DNI" });
     }
 
     return Response.json({ available: true });
-  } catch (error: any) {
+  } catch (error) {
     return Response.json({ available: false, message: error.message }, { status: 500 });
   }
 }

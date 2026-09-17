@@ -69,7 +69,7 @@ export default function PassengerProfile() {
   };
 
   return (
-    <div className="responsive-content mx-auto px-4 pt-6 pb-20 h-full overflow-y-auto scrollbar-hide">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-20 h-full overflow-y-auto scrollbar-hide">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Datos personales</h1>
         <Button variant="ghost" onClick={() => navigate(accountPath)}>Volver</Button>

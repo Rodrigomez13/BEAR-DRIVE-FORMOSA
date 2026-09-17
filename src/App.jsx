@@ -32,8 +32,6 @@ const DriverOnboarding = lazy(() => import('@/pages/driver/DriverOnboarding'));
 const AdminShell = lazy(() => import('@/pages/admin/AdminShell'));
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'));
 const AdminDrivers = lazy(() => import('@/pages/admin/AdminDrivers'));
-const AdminPayments = lazy(() => import('@/pages/admin/AdminPayments'));
-const AdminOperations = lazy(() => import('@/pages/admin/AdminOperations'));
 const AdminPricing = lazy(() => import('@/pages/admin/AdminPricing'));
 import SecurityPrivacy from '@/pages/shared/SecurityPrivacy';
 import HelpSupport from '@/pages/shared/HelpSupport';
@@ -132,8 +130,6 @@ const AuthenticatedApp = () => {
                 <Route index element={<AdminDashboard />} />
                 <Route path="drivers" element={<AdminDrivers />} />
                 <Route path="pricing" element={<AdminPricing />} />
-                <Route path="payments" element={<AdminPayments />} />
-                <Route path="operations" element={<AdminOperations />} />
               </Route>
             </Route>
             <Route path="*" element={<PageNotFound />} />

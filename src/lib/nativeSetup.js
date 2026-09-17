@@ -1,7 +1,6 @@
 // Inicialización de plugins nativos de Capacitor.
 // En web (navegador) los plugins no hacen nada (no-op), así que esto es seguro
 // tanto en el preview web como dentro del APK Android.
-import { App } from "@capacitor/app";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 
 const StatusBar = registerPlugin("StatusBar");
@@ -26,15 +25,8 @@ export async function updateStatusBarStyle(theme) {
   }
 }
 
-let initialized = false;
 export async function initNative() {
-  if (!Capacitor.isNativePlatform() || initialized) return;
-  initialized = true;
-  try {
-    await App.addListener("appStateChange", ({ isActive }) => {
-      if (isActive) window.dispatchEvent(new Event("bear-payment-return"));
-    });
-  } catch (error) { console.warn("[nativeSetup] No se pudo registrar el regreso a la app", error); }
+  if (!Capacitor.isNativePlatform()) return;
 
   try {
     // El WebView queda debajo de las barras del sistema para evitar que contenido,

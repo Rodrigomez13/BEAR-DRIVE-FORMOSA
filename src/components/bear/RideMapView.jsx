@@ -1,18 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { loadMapsSDK, getAuthFailure, resetSdkPromise } from "@/lib/mapsConfig";
 import { getCachedRoute, setCachedRoute } from "@/lib/routeCache";
-import { getCurrentPosition, FORMOSA_CENTER } from "@/lib/geo";
+import { getCurrentPosition, FORMOSA_CENTER, displayAddress } from "@/lib/geo";
+import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
 import {
   Navigation,
   Car,
   Star,
+  MapPin,
   Clock,
   Compass,
   AlertTriangle,
   Plus,
   Minus,
   X,
+  Layers,
+  CheckCircle2,
   ChevronRight,
+  Shield,
   RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";

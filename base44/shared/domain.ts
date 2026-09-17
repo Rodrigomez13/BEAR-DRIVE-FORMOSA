@@ -1,4 +1,4 @@
-export const ACTIVE = ['SEARCHING', 'ASSIGNED', 'DRIVER_APPROACHING', 'DRIVER_ARRIVED', 'WAITING', 'PIN_VALIDATION', 'IN_PROGRESS', 'ARRIVED'];
+export const ACTIVE = ['SEARCHING', 'ASSIGNED', 'DRIVER_APPROACHING', 'DRIVER_ARRIVED', 'WAITING', 'PIN_VALIDATION', 'IN_PROGRESS', 'ARRIVED', 'PAYMENT_PENDING'];
 export const FINISHED = ['COMPLETED', 'RATED', 'CANCELLED', 'NO_DRIVERS', 'NO_SHOW'];
 export function fail(message, status = 400) { throw Object.assign(new Error(message), { status }); }
 export async function api(req, createClient, handler) {
@@ -48,9 +48,11 @@ export async function debtStatus(client, userId) {
     all(e.Ride, { passenger_id: userId, status: 'PAYMENT_PENDING' }),
   ]);
   const overdue = charges.filter(c => Date.now() >= Date.parse(c.due_at || chargeDue(c.business_day)));
-  return { blocked: false, has_debt: charges.length > 0 || rides.length > 0, overdue_count: overdue.length, charges: charges.map(c => chargeBalance(c)), unpaid_rides: rides };
+  return { blocked: overdue.length > 0 || rides.length > 0, charges, unpaid_rides: rides };
 }
-
+export async function requireNoDebt(client, id) {
+  if ((await debtStatus(client, id)).blocked) fail('Tenés pagos pendientes. Regularizalos para solicitar o aceptar nuevos viajes.', 403);
+}
 export async function eligibleVehicle(client, user, vehicleId) {
   const e = client.asServiceRole.entities;
   // Approval is verified from administrator-reviewed records, not editable profile flags.
@@ -74,16 +76,4 @@ export function publicRide(ride, userId) {
   delete result.operation_lock;
   if (ride.passenger_id !== userId) delete result.start_pin;
   return result;
-}
-
-// Simple interest on the original principal, never compounded. Existing checkouts
-// retain their agreed amount so a delayed webhook can still settle the debt.
-export function chargeBalance(charge, now = Date.now()) {
-  if (charge.status !== 'pending' || charge.payment_checkout_url) return charge;
-  const due = Date.parse(charge.due_at || chargeDue(charge.business_day));
-  const days = Number.isFinite(due) ? Math.max(0, Math.floor((now - due) / 86400000) - (charge.grace_days || 0)) : 0;
-  const rate = Number(charge.late_fee_coefficient || 0);
-  const principal = Number(charge.amount || 0);
-  const late_fee = Math.round(principal * (Number.isFinite(rate) && rate >= 0 ? rate : 0) * days * 100) / 100;
-  return {...charge, overdue_days: days, late_fee, total_due: Math.round((principal + late_fee) * 100) / 100};
 }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
@@ -14,11 +14,16 @@ import {
   Lock,
   Bell,
   Shield,
+  Phone,
+  User,
   LogOut,
   Trash2,
+  CheckCircle2,
+  ExternalLink,
   ChevronRight,
   Wallet,
   CreditCard,
+  HelpCircle,
   Volume2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -105,7 +110,7 @@ export default function AccountSettings() {
   };
 
   return (
-    <div className="responsive-content mx-auto px-4 pt-6 pb-20 min-h-full bg-background">
+    <div className="max-w-md mx-auto px-4 pt-6 pb-20 min-h-screen bg-background">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <button

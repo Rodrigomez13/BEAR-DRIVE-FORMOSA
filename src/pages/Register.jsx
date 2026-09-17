@@ -37,7 +37,7 @@ export default function Register() {
     try {
       const res = await base44.functions.invoke("validateRegistration", { dni: dni.trim() });
       if (!res.data.available) setDniError(res.data.message);
-    } catch {
+    } catch (err) {
       // ignore - will validate server-side
     }
   };
@@ -56,15 +56,11 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      try {
-        const res = await base44.functions.invoke("validateRegistration", { dni: dni.trim() });
-        if (res?.data && !res.data.available) {
-          setDniError(res.data.message);
-          setLoading(false);
-          return;
-        }
-      } catch {
-        // Si la validación requiere usuario autenticado, se continúa con el registro
+      const res = await base44.functions.invoke("validateRegistration", { dni: dni.trim() });
+      if (!res.data.available) {
+        setDniError(res.data.message);
+        setLoading(false);
+        return;
       }
       await base44.auth.register({ email, password });
       setShowOtp(true);

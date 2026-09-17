@@ -1,4 +1,4 @@
-import { eligibleVehicle, premiumEligible } from '../../shared/domain.ts';
+import { eligibleVehicle, requireNoDebt, premiumEligible } from '../../shared/domain.ts';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
 function haversineKm(lat1, lng1, lat2, lng2) {
@@ -16,11 +16,6 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const body = await req.json();
     const { ride_id, round } = body;
     if (!ride_id) return Response.json({ error: "ride_id es obligatorio" }, { status: 400 });
@@ -34,17 +29,8 @@ export default async function(req) {
     } catch {
       return Response.json({ skipped: true, reason: "ride_not_found" });
     }
-
-    if (!ride) {
-      return Response.json({ skipped: true, reason: "ride_not_found" });
-    }
-
-    if (user.role !== 'admin' && ride.passenger_id !== user.id) {
-      return Response.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     // Skip if a driver already accepted — later rounds are no-ops.
-    if (ride.status !== "SEARCHING") {
+    if (!ride || ride.status !== "SEARCHING") {
       return Response.json({ skipped: true, reason: "not_searching" });
     }
     if (ride.origin_lat == null || ride.origin_lng == null) {
@@ -74,6 +60,7 @@ export default async function(req) {
       try {
         const candidate = await base44.asServiceRole.entities.User.get(dl.driver_id);
         const vehicle = await eligibleVehicle(base44, candidate, dl.vehicle_id);
+        await requireNoDebt(base44, candidate.id);
         if (ride.category === 'premium' && !premiumEligible(vehicle)) continue;
         await base44.asServiceRole.integrations.Core.SendPushNotification({
           user_id: dl.driver_id,
