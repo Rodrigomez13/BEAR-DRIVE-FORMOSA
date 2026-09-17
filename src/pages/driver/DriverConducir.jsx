@@ -80,7 +80,7 @@ function navigationPhase(status) {
   return null;
 }
 
-function formatManeuverDistance(meters) {
+function _formatManeuverDistance(meters) {
   if (!Number.isFinite(meters)) return "";
   if (meters < 1000) return `${Math.max(10, Math.round(meters / 10) * 10)} m`;
   return `${(meters / 1000).toFixed(1).replace(".", ",")} km`;
