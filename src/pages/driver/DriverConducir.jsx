@@ -1,29 +1,37 @@
+import MapBottomSheet from "@/components/bear/MapBottomSheet";
+import RideDestinationChange from "@/components/bear/RideDestinationChange";
 import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { beardrive } from "@/services/beardrive";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import MapView from "@/components/bear/MapView";
+import Haptics from "@/lib/haptics";
+import navVoice from "@/lib/navVoice";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import {
   Car,
+  Check,
   Power,
   Loader2,
-  MapPin,
-  Clock,
   Navigation,
   KeyRound,
   AlertTriangle,
   Wallet,
   CreditCard,
-  Banknote,
   QrCode,
   Bell,
   ChevronUp,
   ChevronDown,
   Map as MapIcon,
+  MessageCircle,
+  Sun,
+  Moon,
+  Radio,
+  Zap,
 } from "lucide-react";
 import {
   getCurrentPosition,
@@ -33,9 +41,15 @@ import {
 } from "@/lib/geo";
 import CancelRideDialog from "@/components/bear/CancelRideDialog";
 import { useActiveRideGuard } from "@/hooks/useActiveRideGuard";
+import { useBackoffPoll } from "@/hooks/useBackoffPoll";
+import { useRideSubscription } from "@/hooks/useRideSubscription";
 import BearAvatar from "@/components/bear/BearAvatar";
 import RideRequestModal from "@/components/bear/RideRequestModal";
 import TurnByTurnNav from "@/components/bear/TurnByTurnNav";
+import LoadingScreen from "@/components/bear/LoadingScreen";
+import RideChat from "@/components/bear/RideChat";
+import QrPaymentDisplay from "@/components/bear/QrPaymentDisplay";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const PICKUP_STATUSES = ["ASSIGNED", "DRIVER_APPROACHING"];
 const ACTIVE_RIDE_STATUSES = [
@@ -66,7 +80,7 @@ function navigationPhase(status) {
   return null;
 }
 
-function formatManeuverDistance(meters) {
+function _formatManeuverDistance(meters) {
   if (!Number.isFinite(meters)) return "";
   if (meters < 1000) return `${Math.max(10, Math.round(meters / 10) * 10)} m`;
   return `${(meters / 1000).toFixed(1).replace(".", ",")} km`;
@@ -91,6 +105,7 @@ export default function DriverConducir() {
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [availableRides, setAvailableRides] = useState([]);
   const [activeRide, setActiveRide] = useState(null);
+  const [queuedRide, setQueuedRide] = useState(null);
   const [pinInput, setPinInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
@@ -103,15 +118,24 @@ export default function DriverConducir() {
   const [cardMinimized, setCardMinimized] = useState(false);
   const [navMode, setNavMode] = useState("gps");
   const [navHeading, setNavHeading] = useState(0);
+  const [showChat, setShowChat] = useState(false);
+  const [qrCheckoutUrl, setQrCheckoutUrl] = useState(null);
+  const [driverSolarMode, setDriverSolarMode] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("bear_driver_solar") === "true"
+  );
+  const [mapRecenterTrigger, setMapRecenterTrigger] = useState(0);
+  const { isLocked: isScreenAwake } = useWakeLock(online || !!activeRide);
 
-  const pollRef = useRef(null);
   const positionWatchRef = useRef(null);
   const lastLocationPersistRef = useRef(0);
   const silencedRides = useRef(new Set());
   const prevPosRef = useRef(null);
+  const driverPosRef = useRef(null);
   const arrivalHitsRef = useRef({ pickup: 0, destination: 0 });
   const transitionInFlightRef = useRef(false);
   const phaseRef = useRef(null);
+
+  driverPosRef.current = driverPos;
 
   const eligible = user?.driver_capability === "APPROVED_ELIGIBLE";
 
@@ -120,18 +144,19 @@ export default function DriverConducir() {
 
     const load = async () => {
       try {
-        const vehiclesResult = await base44.entities.Vehicle.filter({ driver_id: user.id, status: "approved" });
+        const vehiclesResult = await beardrive.drivers.approvedVehicles(user.id);
         setVehicles(vehiclesResult);
         if (vehiclesResult.length > 0) setSelectedVehicle(vehiclesResult[0]);
 
-        const active = await base44.entities.Ride.filter(
+        const active = await beardrive.rides.list(
           { driver_id: user.id, status: { $in: ACTIVE_RIDE_STATUSES } },
           "-created_date",
-          1
+          3
         );
-        if (active.length > 0) setActiveRide(active[0]);
+        setActiveRide(active.find(r => r.status !== "ASSIGNED") || null);
+        setQueuedRide(active.find(r => r.status === "ASSIGNED") || null);
 
-        const locations = await base44.entities.DriverLocation.filter({ driver_id: user.id });
+        const locations = await beardrive.drivers.locations(user.id);
         if (locations.length > 0) {
           setDriverLocationId(locations[0].id);
           if (locations[0].online) setOnline(true);
@@ -149,50 +174,47 @@ export default function DriverConducir() {
     load();
   }, [user?.id]);
 
-  // Poll temporal de solicitudes. Se reemplazará por Realtime en el siguiente checkpoint.
-  useEffect(() => {
-    if (!online || activeRide) {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-      return;
-    }
-
-    const poll = async () => {
+  // Poll de solicitudes cercanas con backoff exponencial ante fallos de red.
+  // Solo se ofrecen viajes dentro del radio de proximidad al conductor.
+  useBackoffPoll(
+    async () => {
+      if (!driverPos) return;
       try {
-        const rides = await base44.entities.Ride.filter({ status: "SEARCHING" }, "-created_date", 10);
+        const res = await beardrive.rides.offers({
+          lat: driverPos.lat,
+          lng: driverPos.lng,
+          radius_km: 15,
+        });
+        const rides = res.data?.rides || [];
         setAvailableRides(rides.filter((ride) => !silencedRides.current.has(ride.id)));
       } catch {
-        // Realtime reemplazará este fallback.
+        setAvailableRides([]);
+        throw new Error("No se pudieron actualizar las ofertas");
       }
-    };
+    },
+    { enabled: online && !queuedRide && activeRide?.status !== "PAYMENT_PENDING", baseDelay: 10000, maxDelay: 30000 }
+  );
 
-    poll();
-    pollRef.current = setInterval(poll, 4000);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [online, activeRide]);
+  // Realtime ride status subscription — primary sync mechanism (replaces 3s polling).
+  // A 15s fallback poll inside the hook covers recovery if a realtime event is missed.
+  useRideSubscription(activeRide?.id, (updated) => {
+    if (!updated) return;
+    if (["COMPLETED", "RATED", "CANCELLED"].includes(updated.status)) setActiveRide(null);
+    else setActiveRide(updated);
+  });
 
-  // Poll temporal del estado del viaje para reflejar cambios del pasajero/pago.
+  useRideSubscription(queuedRide?.id, updated => {
+    if (!updated) return;
+    if (updated.status === "DRIVER_APPROACHING") { setActiveRide(updated); setQueuedRide(null); }
+    else if (["CANCELLED", "NO_DRIVERS"].includes(updated.status)) setQueuedRide(null);
+    else setQueuedRide(updated);
+  });
   useEffect(() => {
-    if (!activeRide) return;
-
-    const poll = async () => {
-      try {
-        const updated = await base44.entities.Ride.get(activeRide.id);
-        if (updated) setActiveRide(updated);
-      } catch {
-        // Realtime reemplazará este fallback.
-      }
-    };
-
-    const interval = setInterval(poll, 3000);
-    return () => clearInterval(interval);
-  }, [activeRide?.id]);
-
-  useActiveRideGuard(!!activeRide);
+    if (activeRide || !queuedRide) return;
+    beardrive.rides.activateQueued({ ride_id: queuedRide.id })
+      .then(res => { setActiveRide(res.data.ride); setQueuedRide(null); }).catch(() => {});
+  }, [activeRide, queuedRide?.id]);
+  useActiveRideGuard(!!activeRide || !!queuedRide);
 
   // Cuando cambia la fase de navegación, fijamos el punto de partida de la ruta una sola vez.
   // Esto evita recalcular Directions con cada actualización GPS.
@@ -205,9 +227,17 @@ export default function DriverConducir() {
       return;
     }
 
-    if (phaseRef.current === `${activeRide.id}:${phase}`) return;
-    phaseRef.current = `${activeRide.id}:${phase}`;
+    if (phaseRef.current === `${activeRide.id}:${phase}:${activeRide.destination_revision || 0}`) return;
+    phaseRef.current = `${activeRide.id}:${phase}:${activeRide.destination_revision || 0}`;
     setRouteInfo(null);
+
+    // Snapshot inmediato para no dejar origin en null durante el cambio de fase
+    const immediateOrigin = driverPosRef.current || driverPos || (
+      activeRide.origin_lat ? { lat: activeRide.origin_lat, lng: activeRide.origin_lng } : null
+    );
+    if (immediateOrigin) {
+      setNavigationStart({ lat: immediateOrigin.lat, lng: immediateOrigin.lng });
+    }
 
     let cancelled = false;
     getCurrentPosition({ enableHighAccuracy: true, maximumAge: 2000 })
@@ -217,7 +247,7 @@ export default function DriverConducir() {
         setNavigationStart({ lat: position.lat, lng: position.lng });
       })
       .catch(() => {
-        if (!cancelled && driverPos) {
+        if (!cancelled && !immediateOrigin && driverPos) {
           setNavigationStart({ lat: driverPos.lat, lng: driverPos.lng });
         }
       });
@@ -225,18 +255,23 @@ export default function DriverConducir() {
     return () => {
       cancelled = true;
     };
-  }, [activeRide?.id, activeRide?.status]);
+  }, [activeRide?.id, activeRide?.status, activeRide?.destination_revision]);
 
   useEffect(() => {
     arrivalHitsRef.current = { pickup: 0, destination: 0 };
     transitionInFlightRef.current = false;
   }, [activeRide?.id, activeRide?.status]);
 
-  // Auto-minimize info card during navigation so the map is fully visible
+  // Auto-minimize info card during navigation so the map is fully visible.
+  // Expand it again when navigation ends (DRIVER_ARRIVED, ARRIVED, PAYMENT_PENDING)
+  // so the PIN input and payment actions are immediately visible.
   useEffect(() => {
     const phase = navigationPhase(activeRide?.status);
-    if (phase) setCardMinimized(true);
-    if (!activeRide) setCardMinimized(false);
+    if (phase) {
+      setCardMinimized(true);
+    } else if (activeRide) {
+      setCardMinimized(false);
+    }
   }, [activeRide?.status, activeRide?.id]);
 
   // Un único watcher GPS alimenta la UI, detección de llegada y persistencia del Driver.
@@ -248,12 +283,12 @@ export default function DriverConducir() {
     const persistDriverLocation = async (position) => {
       if (!driverLocationId) return;
       const now = Date.now();
-      const persistInterval = activeRide ? 4000 : 15000;
+      const persistInterval = activeRide ? 5000 : 25000;
       if (now - lastLocationPersistRef.current < persistInterval) return;
       lastLocationPersistRef.current = now;
 
       try {
-        await base44.entities.DriverLocation.update(driverLocationId, {
+        await beardrive.drivers.updateLocation({
           lat: position.lat,
           lng: position.lng,
           online: true,
@@ -283,7 +318,11 @@ export default function DriverConducir() {
         if (arrivalHitsRef.current.pickup >= 2) {
           transitionInFlightRef.current = true;
           try {
-            await base44.entities.Ride.update(activeRide.id, { status: "DRIVER_ARRIVED" });
+            await beardrive.rides.transition({
+              ride_id: activeRide.id, target_status: "DRIVER_ARRIVED",
+            });
+            navVoice.announceArrival(true);
+            Haptics.arrival();
             setActiveRide((previous) => previous ? { ...previous, status: "DRIVER_ARRIVED" } : previous);
             setRouteInfo(null);
             toast({
@@ -309,7 +348,11 @@ export default function DriverConducir() {
         if (arrivalHitsRef.current.destination >= 2) {
           transitionInFlightRef.current = true;
           try {
-            await base44.entities.Ride.update(activeRide.id, { status: "ARRIVED" });
+            await beardrive.rides.transition({
+              ride_id: activeRide.id, target_status: "ARRIVED",
+            });
+            navVoice.announceArrival(false);
+            Haptics.arrival();
             setActiveRide((previous) => previous ? { ...previous, status: "ARRIVED" } : previous);
             setRouteInfo(null);
             toast({
@@ -342,10 +385,12 @@ export default function DriverConducir() {
 
             if (prevPosRef.current) {
               const movedKm = haversineKm(prevPosRef.current.lat, prevPosRef.current.lng, position.lat, position.lng);
-              // Solo calcular rumbo si el movimiento supera el radio de exactitud
-              // (evita rotaciones erráticas por ruido del GPS).
               const movedM = movedKm * 1000;
-              if (isAccurate && movedM > Math.max(10, accuracy)) {
+              // Prefer the device GPS heading when valid; fall back to computed bearing
+              // from position deltas once the driver moves enough to be reliable.
+              if (Number.isFinite(position.heading) && position.heading >= 0 && movedM > 3) {
+                setNavHeading(position.heading);
+              } else if (isAccurate && movedM > 10) {
                 const bearing = computeBearing(prevPosRef.current, position);
                 if (Number.isFinite(bearing)) setNavHeading(bearing);
               }
@@ -388,42 +433,37 @@ export default function DriverConducir() {
       return;
     }
 
+    // Optimistic: show online state immediately, roll back on error
+    setOnline(true);
     try {
       const position = await getCurrentPosition({ enableHighAccuracy: true, maximumAge: 1000 });
       setDriverPos(position);
 
-      const locations = await base44.entities.DriverLocation.filter({ driver_id: user.id });
-      if (locations.length > 0) {
-        await base44.entities.DriverLocation.update(locations[0].id, {
-          lat: position.lat,
-          lng: position.lng,
-          online: true,
-          vehicle_id: selectedVehicle.id,
-        });
-        setDriverLocationId(locations[0].id);
-      } else {
-        const created = await base44.entities.DriverLocation.create({
-          driver_id: user.id,
-          lat: position.lat,
-          lng: position.lng,
-          online: true,
-          vehicle_id: selectedVehicle.id,
-        });
-        setDriverLocationId(created.id);
-      }
+      const res = await beardrive.drivers.goOnline({
+        lat: position.lat,
+        lng: position.lng,
+        vehicle_id: selectedVehicle.id,
+      });
 
+      setDriverLocationId(res.data.driver_location.id);
       lastLocationPersistRef.current = Date.now();
-      setOnline(true);
       toast({ title: "Estás online", description: "Buscando viajes..." });
     } catch (error) {
-      toast({ title: "No pudimos activar el modo conductor", description: error.message, variant: "destructive" });
+      setOnline(false);
+      const msg = error?.response?.data?.error || error.message;
+      const reason = error?.response?.data?.reason;
+      if (reason === "blocking_debt") {
+        toast({ title: msg, description: "Regularizá tu deuda para conducir", variant: "destructive" });
+      } else {
+        toast({ title: "No pudimos activar el modo conductor", description: msg, variant: "destructive" });
+      }
     }
   };
 
   const handleGoOffline = async () => {
     try {
       if (driverLocationId) {
-        await base44.entities.DriverLocation.update(driverLocationId, { online: false });
+        await beardrive.drivers.goOffline();
       }
       setOnline(false);
       setAvailableRides([]);
@@ -465,50 +505,50 @@ export default function DriverConducir() {
       setNavigationStart({ lat: position.lat, lng: position.lng });
       setRouteInfo(null);
 
-      const updated = await base44.entities.Ride.update(ride.id, {
-        status: "DRIVER_APPROACHING",
-        driver_id: user.id,
-        driver_name: user.full_name || user.email,
+      const res = await beardrive.rides.acceptOffer({
+        ride_id: ride.id,
         vehicle_id: selectedVehicle.id,
         vehicle_plate: selectedVehicle.plate,
         vehicle_model: `${selectedVehicle.make} ${selectedVehicle.model}`,
         vehicle_color: selectedVehicle.color,
       });
 
-      phaseRef.current = `${ride.id}:pickup`;
-      setActiveRide(updated);
+      if (res.data.queued) setQueuedRide(res.data.ride);
+      else { phaseRef.current = null; setActiveRide(res.data.ride); }
       setAvailableRides([]);
       toast({
         title: "Viaje aceptado",
-        description: "Te guiamos hasta el punto de encuentro.",
+        description: res.data.queued ? "Quedó reservado detrás del viaje actual." : "Te guiamos hasta el punto de encuentro.",
       });
     } catch (error) {
-      toast({ title: "No se pudo aceptar", description: error.message, variant: "destructive" });
+      const msg = error?.response?.data?.error || error.message;
+      toast({ title: "No se pudo aceptar", description: msg, variant: "destructive" });
     }
   };
 
   const handleArrived = async () => {
     if (!activeRide) return;
     try {
-      await base44.entities.Ride.update(activeRide.id, { status: "DRIVER_ARRIVED" });
-      setActiveRide({ ...activeRide, status: "DRIVER_ARRIVED" });
+      const res = await beardrive.rides.transition({
+        ride_id: activeRide.id, target_status: "DRIVER_ARRIVED",
+      });
+      setActiveRide(res.data.ride);
       setRouteInfo(null);
-    } catch {
-      toast({ title: "Error", variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Error", description: error?.message, variant: "destructive" });
     }
   };
 
   const handleValidatePin = async () => {
-    if (pinInput !== activeRide.start_pin) {
-      toast({ title: "PIN incorrecto", variant: "destructive" });
-      return;
-    }
-
     try {
-      await base44.entities.Ride.update(activeRide.id, { status: "IN_PROGRESS" });
-      const nextRide = { ...activeRide, status: "IN_PROGRESS" };
-      setActiveRide(nextRide);
-      setNavigationStart(driverPos ? { lat: driverPos.lat, lng: driverPos.lng } : null);
+      const res = await beardrive.rides.validatePin({
+        ride_id: activeRide.id, pin: pinInput,
+      });
+      const startCoord = driverPos
+        ? { lat: driverPos.lat, lng: driverPos.lng }
+        : (activeRide.origin_lat ? { lat: activeRide.origin_lat, lng: activeRide.origin_lng } : null);
+      setActiveRide(res.data.ride);
+      setNavigationStart(startCoord);
       setRouteInfo(null);
       phaseRef.current = `${activeRide.id}:destination`;
       setPinInput("");
@@ -516,49 +556,74 @@ export default function DriverConducir() {
         title: "Viaje iniciado",
         description: "Ahora te guiamos hasta el destino.",
       });
-    } catch {
-      toast({ title: "Error", variant: "destructive" });
+    } catch (error) {
+      const msg = error?.response?.data?.error || error.message;
+      toast({ title: msg, variant: "destructive" });
     }
   };
 
   const handleDestinationArrived = async () => {
     if (!activeRide) return;
     try {
-      await base44.entities.Ride.update(activeRide.id, { status: "ARRIVED" });
-      setActiveRide({ ...activeRide, status: "ARRIVED" });
+      const res = await beardrive.rides.transition({
+        ride_id: activeRide.id, target_status: "ARRIVED",
+      });
+      setActiveRide(res.data.ride);
       setRouteInfo(null);
-    } catch {
-      toast({ title: "No se pudo confirmar la llegada", variant: "destructive" });
+    } catch (error) {
+      toast({ title: "No se pudo confirmar la llegada", description: error?.message, variant: "destructive" });
     }
   };
 
   const handleProceedToPayment = async () => {
     if (!activeRide) return;
     try {
-      await base44.entities.Ride.update(activeRide.id, { status: "PAYMENT_PENDING" });
-      setActiveRide({ ...activeRide, status: "PAYMENT_PENDING" });
-    } catch {
-      toast({ title: "No se pudo iniciar el cobro", variant: "destructive" });
+      const res = await beardrive.rides.transition({
+        ride_id: activeRide.id, target_status: "PAYMENT_PENDING",
+      });
+      setActiveRide(res.data.ride);
+    } catch (error) {
+      toast({ title: "No se pudo iniciar el cobro", description: error?.message, variant: "destructive" });
     }
   };
 
   const handleComplete = async () => {
     setCompleting(true);
     try {
-      await base44.functions.invoke("completeRide", {
+      const res = await beardrive.rides.complete({
         ride_id: activeRide.id,
-        final_fare: activeRide.quoted_fare,
-        payment_method: activeRide.payment_method,
       });
-      toast({
-        title: "Viaje completado",
-        description: `Ganaste $${activeRide.quoted_fare.toLocaleString("es-AR")}`,
-      });
-      setActiveRide(null);
-      setNavigationStart(null);
-      setRouteInfo(null);
+
+      const paymentStatus = res.data?.payment_status;
+
+      if (paymentStatus === "completed") {
+        toast({
+          title: "Viaje completado",
+          description: `Ganaste $${(activeRide.final_fare || activeRide.quoted_fare).toLocaleString("es-AR")}`,
+        });
+        setActiveRide(current => current?.id === activeRide?.id ? null : current);
+        setNavigationStart(null);
+        setRouteInfo(null);
+        setQrCheckoutUrl(null);
+      } else if (paymentStatus === "qr_pending") {
+        setQrCheckoutUrl(res.data.checkout_url);
+        toast({ title: "QR generado", description: "Mostrale el QR al pasajero" });
+      } else if (paymentStatus === "requires_action") {
+        toast({ title: "Pago requiere autenticación", description: res.data.message, variant: "destructive" });
+      } else {
+        toast({ title: "Viaje completado" });
+        setActiveRide(current => current?.id === activeRide?.id ? null : current);
+        setNavigationStart(null);
+        setRouteInfo(null);
+      }
     } catch (error) {
-      toast({ title: "Error al completar", description: error.message, variant: "destructive" });
+      const msg = error?.response?.data?.error || error.message;
+      const reason = error?.response?.data?.reason;
+      if (reason === "no_card") {
+        toast({ title: "El pasajero no tiene tarjeta vinculada", description: "Sugerile pagar con QR o efectivo", variant: "destructive" });
+      } else {
+        toast({ title: "Error al completar", description: msg, variant: "destructive" });
+      }
     } finally {
       setCompleting(false);
     }
@@ -567,29 +632,25 @@ export default function DriverConducir() {
   const handleCancel = async () => {
     if (!activeRide) return;
     try {
-      await base44.entities.Ride.update(activeRide.id, {
-        status: "CANCELLED",
-        cancelled_date: new Date().toISOString(),
-        cancel_reason: "driver_cancelled",
-      });
+      const res = await beardrive.rides.cancelDriver({ ride_id: activeRide.id });
+      if (res.data?.re_searched) {
+        toast({ title: "Viaje reasignado", description: "Buscando otro conductor para el pasajero" });
+      } else {
+        toast({ title: "Viaje cancelado" });
+      }
       setActiveRide(null);
       setNavigationStart(null);
       setRouteInfo(null);
       setShowCancelDialog(false);
-      toast({ title: "Viaje cancelado" });
-    } catch {
-      toast({ title: "No se pudo cancelar", variant: "destructive" });
+    } catch (error) {
+      toast({ title: "No se pudo cancelar", description: error.message, variant: "destructive" });
     }
   };
 
   const formatPrice = (value) => `$${(value || 0).toLocaleString("es-AR")}`;
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center absolute inset-0">
-        <Loader2 className="w-8 h-8 animate-spin text-accent" />
-      </div>
-    );
+    return <LoadingScreen className="absolute inset-0" label="Conectando al radar de viajes en Formosa..." mascotImage="/assets/mascot/bear_smile_closeup_hd.jpg" />;
   }
 
   if (!eligible) {
@@ -631,16 +692,30 @@ export default function DriverConducir() {
       : navigatingToDestination
         ? { lat: activeRide.destination_lat, lng: activeRide.destination_lng }
         : null;
+
+    const navigationOrigin = isNavigating
+      ? (navigationStart || (driverPos ? { lat: driverPos.lat, lng: driverPos.lng } : (activeRide.origin_lat ? { lat: activeRide.origin_lat, lng: activeRide.origin_lng } : null)))
+      : { lat: activeRide.origin_lat, lng: activeRide.origin_lng };
+
+    const navigationDestination = isNavigating
+      ? (navigationTarget || { lat: activeRide.destination_lat, lng: activeRide.destination_lng })
+      : { lat: activeRide.destination_lat, lng: activeRide.destination_lng };
+
     const navigationTargetLabel = navigatingToPickup ? "Punto de encuentro" : "Destino";
     const navigationAddress = navigatingToPickup
       ? displayAddress(activeRide.origin_address)
       : displayAddress(activeRide.destination_address);
 
+    const etaString = routeInfo?.durationSeconds
+      ? new Date(Date.now() + routeInfo.durationSeconds * 1000).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })
+      : null;
+
     return (
       <div className="absolute inset-0">
+        {!queuedRide && availableRides[0] && <RideRequestModal ride={availableRides[0]} driverPos={driverPos} onAccept={() => handleAcceptRide(availableRides[0])} onReject={() => handleRejectRide(availableRides[0])} onSilence={() => handleSilenceRide(availableRides[0])} />}
         <MapView
-          origin={isNavigating ? navigationStart : { lat: activeRide.origin_lat, lng: activeRide.origin_lng }}
-          destination={isNavigating ? navigationTarget : { lat: activeRide.destination_lat, lng: activeRide.destination_lng }}
+          origin={navigationOrigin}
+          destination={navigationDestination}
           originLabel={isNavigating ? "" : "Origen"}
           destinationLabel={isNavigating ? navigationTargetLabel : "Destino"}
           showOriginMarker={!isNavigating}
@@ -648,175 +723,296 @@ export default function DriverConducir() {
           driverPos={driverPos}
           interactive={true}
           followDriver={isNavigating}
-          navigationZoom={navMode === "gps" ? 17 : 15}
+          navigationZoom={navMode === "gps" ? 18 : 15}
           onRouteInfo={setRouteInfo}
-          tilt={navMode === "gps" && isNavigating ? 55 : 0}
+          rotateHeading={navMode === "gps" && isNavigating}
           heading={navMode === "gps" && isNavigating ? navHeading : 0}
+          tilt={0}
+          mapTheme={driverSolarMode ? "light" : "dark"}
           className="absolute inset-0"
         />
 
+        {/* Turn-by-turn navigation HUD (top) */}
         {isNavigating && (
           <>
             {navMode === "gps" && (
               <TurnByTurnNav
                 routeInfo={routeInfo}
-                phaseLabel={navigatingToPickup ? "Ir a buscar al pasajero" : "En viaje al destino"}
+                phaseLabel={navigatingToPickup ? "Hacia el pasajero" : "Rumbo al destino"}
                 targetAddress={navigationAddress}
                 remainingTime={routeInfo?.durationText}
                 remainingDistance={routeInfo?.distanceText}
               />
             )}
-            <button
-              onClick={() => setNavMode(navMode === "gps" ? "normal" : "gps")}
-              className="absolute right-3 top-[calc(env(safe-area-inset-top)+8.5rem)] z-20 flex items-center gap-2 rounded-full bg-[#181E2F]/95 px-3 py-2 text-xs font-semibold text-white shadow-lg border border-white/10 active:scale-95 transition"
-            >
-              {navMode === "gps" ? <MapIcon className="w-4 h-4 text-accent" /> : <Navigation className="w-4 h-4 text-accent" />}
-              {navMode === "gps" ? "Vista normal" : "Modo GPS"}
-            </button>
+            <div className="absolute right-3 top-[calc(env(safe-area-inset-top)+8.5rem)] z-20 flex flex-col items-end gap-2">
+              <button
+                onClick={() => {
+                  Haptics.light();
+                  setNavMode(navMode === "gps" ? "normal" : "gps");
+                }}
+                className="flex items-center gap-1.5 rounded-full bg-[#0e1320]/90 backdrop-blur-md px-3 py-2 text-xs font-semibold text-white shadow-xl border border-white/10 active:scale-95 transition"
+              >
+                {navMode === "gps" ? <MapIcon className="w-4 h-4 text-accent" /> : <Navigation className="w-4 h-4 text-accent" />}
+                {navMode === "gps" ? "Norte arriba" : "Seguir rumbo"}
+              </button>
+
+              <button
+                onClick={() => {
+                  Haptics.light();
+                  const next = !driverSolarMode;
+                  setDriverSolarMode(next);
+                  try {
+                    localStorage.setItem("bear_driver_solar", String(next));
+                  } catch {}
+                }}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold shadow-xl border active:scale-95 transition ${
+                  driverSolarMode
+                    ? "bg-[#E9B74E] text-[#181E2F] border-[#E9B74E] font-bold"
+                    : "bg-[#0e1320]/90 backdrop-blur-md text-white border-white/10"
+                }`}
+                title={driverSolarMode ? "Modo Deep Navy / Noche" : "Modo Sol / Alto contraste exterior"}
+              >
+                {driverSolarMode ? <Sun className="w-4 h-4 fill-current text-[#181E2F]" /> : <Moon className="w-4 h-4 text-accent" />}
+                {driverSolarMode ? "Modo Sol" : "Modo Noche"}
+              </button>
+            </div>
           </>
         )}
 
-        {cardMinimized && isNavigating && (
-          <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
-            <button
-              onClick={() => setCardMinimized(false)}
-              className="max-w-md mx-auto flex items-center gap-2 px-3 py-2 rounded-full bg-[#0e1320]/90 border border-white/10 text-white shadow-lg backdrop-blur-md"
-            >
-              <BearAvatar size={24} />
-              <span className="font-medium text-xs truncate flex-1 text-left">{activeRide.passenger_name || "Pasajero"}</span>
-              <span className="text-xs font-bold text-accent shrink-0">{formatPrice(activeRide.quoted_fare)}</span>
-              <ChevronUp className="w-3.5 h-3.5 text-white/40 shrink-0" />
-            </button>
-          </div>
-        )}
-        {!cardMinimized && (
-        <div className="absolute inset-x-0 bottom-0 z-10 p-3">
-          <Card className="rounded-2xl p-4 max-w-md mx-auto">
-            {isNavigating && (
-              <button onClick={() => setCardMinimized(true)} className="w-full flex items-center justify-center gap-1 text-xs text-muted-foreground mb-3">
-                <ChevronDown className="w-4 h-4" /> Minimizar
-              </button>
-            )}
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent capitalize">
-                {status.replace(/_/g, " ")}
-              </span>
-              <span className="font-bold text-lg text-accent">{formatPrice(activeRide.quoted_fare)}</span>
-            </div>
+        {/* NATIVE DRIVER HUD BOTTOM BAR (when navigating to pickup or destination) */}
+        {isNavigating && (
+          <div className="absolute inset-x-0 bottom-0 z-20 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pointer-events-none">
+            <div className="max-w-md mx-auto rounded-3xl bg-[#0e1320]/95 backdrop-blur-md border border-accent/30 p-4 shadow-2xl space-y-3 pointer-events-auto">
+              {/* Top row: ETA + Remaining time & distance + Quick actions */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-baseline gap-2">
+                  {etaString && (
+                    <span className="text-2xl font-black text-accent tracking-tight">
+                      {etaString}
+                    </span>
+                  )}
+                  <span className="text-xs font-bold text-white/90">
+                    {routeInfo?.durationText || `${activeRide.duration_min} min`}
+                  </span>
+                  <span className="text-white/30 text-xs">•</span>
+                  <span className="text-xs font-semibold text-white/60">
+                    {routeInfo?.distanceText || `${activeRide.distance_km} km`}
+                  </span>
+                </div>
 
-            <div className="flex items-center gap-3 mb-3 pb-3 border-b border-border">
-              <BearAvatar size={40} />
-              <div>
-                <p className="font-medium text-sm">{activeRide.passenger_name || "Pasajero"}</p>
-                <p className="text-xs text-muted-foreground">Pasajero</p>
-              </div>
-            </div>
-
-            <div className="space-y-2 text-sm mb-4">
-              <p className="text-muted-foreground truncate">
-                <MapPin className="w-3.5 h-3.5 inline mr-1 shrink-0" />
-                {displayAddress(activeRide.origin_address)}
-              </p>
-              <p className="text-muted-foreground truncate">
-                <Navigation className="w-3.5 h-3.5 inline mr-1 shrink-0" />
-                {displayAddress(activeRide.destination_address)}
-              </p>
-              <div className="flex gap-3 text-xs text-muted-foreground pt-1">
-                <span><Clock className="w-3 h-3 inline mr-1" />{activeRide.duration_min} min</span>
-                <span><MapPin className="w-3 h-3 inline mr-1" />{activeRide.distance_km} km</span>
-                <span className="capitalize flex items-center gap-1">
-                  {activeRide.payment_method === "card" && <CreditCard className="w-3 h-3" />}
-                  {activeRide.payment_method === "cash" && <Banknote className="w-3 h-3" />}
-                  {activeRide.payment_method === "qr" && <QrCode className="w-3 h-3" />}
-                  {activeRide.payment_method === "card"
-                    ? "Tarjeta"
-                    : activeRide.payment_method === "cash"
-                      ? "Efectivo"
-                      : "QR"}
-                </span>
-              </div>
-            </div>
-
-            {PICKUP_STATUSES.includes(status) && (
-              <div>
-                <p className="text-sm text-center text-muted-foreground mb-3">
-                  Seguí la guía hasta el punto de encuentro. La llegada se detecta automáticamente.
-                </p>
-                <Button onClick={handleArrived} variant="outline" className="w-full">
-                  Marcar “Llegué” manualmente
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCancelDialog(true)}
-                  className="w-full mt-2 text-destructive text-sm"
-                >
-                  Cancelar viaje
-                </Button>
-              </div>
-            )}
-
-            {status === "DRIVER_ARRIVED" && (
-              <div>
-                <p className="text-sm text-center text-muted-foreground mb-3">
-                  Estás en el punto de encuentro. Pedile al pasajero el PIN de inicio:
-                </p>
-                <div className="flex gap-2">
-                  <Input
-                    value={pinInput}
-                    onChange={(event) => setPinInput(event.target.value.replace(/\D/g, ""))}
-                    inputMode="numeric"
-                    placeholder="PIN de 4 dígitos"
-                    maxLength={4}
-                    className="text-center text-lg tracking-widest"
-                  />
-                  <Button
-                    onClick={handleValidatePin}
-                    disabled={pinInput.length !== 4}
-                    className="bear-gold-gradient text-foreground border-0"
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowChat(true)}
+                    className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white relative active:scale-95 transition"
+                    aria-label="Chat con pasajero"
                   >
-                    <KeyRound className="w-4 h-4" />
-                  </Button>
+                    <MessageCircle className="w-4 h-4 text-accent" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCardMinimized(!cardMinimized)}
+                    className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 active:scale-95 transition"
+                    aria-label="Detalles del viaje"
+                  >
+                    {cardMinimized ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
-            )}
 
-            {status === "IN_PROGRESS" && (
-              <div>
-                <p className="text-sm text-center text-muted-foreground mb-3">
-                  Seguí la guía hasta el destino. BearDrive detectará la llegada automáticamente.
+              {/* Target address pill */}
+              <div className="flex items-center gap-2 px-1">
+                <div className="w-2.5 h-2.5 rounded-full bg-accent shrink-0 animate-pulse" />
+                <p className="text-xs font-medium text-white/90 truncate flex-1">
+                  <span className="text-white/50">{navigatingToPickup ? "Recogida: " : "Destino: "}</span>
+                  {navigationAddress}
                 </p>
-                <Button onClick={handleDestinationArrived} variant="outline" className="w-full">
-                  Marcar llegada manualmente
-                </Button>
               </div>
-            )}
 
-            {status === "ARRIVED" && (
-              <div className="text-center">
-                <Navigation className="w-8 h-8 text-accent mx-auto mb-2" />
-                <p className="text-sm font-medium mb-1">Llegaste al destino</p>
-                <p className="text-xs text-muted-foreground mb-3">Continuá con el cobro para cerrar el viaje.</p>
-                <Button onClick={handleProceedToPayment} className="w-full bear-gold-gradient text-foreground border-0">
-                  Continuar al cobro
+              {/* Main Driver Action Button (large single-touch target) */}
+              {PICKUP_STATUSES.includes(status) && (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    Haptics.success();
+                    handleArrived();
+                  }}
+                  className="w-full h-12 bear-gold-gradient text-foreground border-0 font-extrabold text-sm shadow-lg active:scale-98 transition flex items-center justify-center gap-2"
+                >
+                  <Check className="w-5 h-5 stroke-[2.5]" />
+                  Marcar “Llegué al punto de encuentro”
                 </Button>
+              )}
+
+              {status === "IN_PROGRESS" && (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    Haptics.success();
+                    handleDestinationArrived();
+                  }}
+                  className="w-full h-12 bear-gold-gradient text-foreground border-0 font-extrabold text-sm shadow-lg active:scale-98 transition flex items-center justify-center gap-2"
+                >
+                  <Check className="w-5 h-5 stroke-[2.5]" />
+                  Marcar “Llegué al destino”
+                </Button>
+              )}
+
+              {/* Expanded details drawer (visible when expanded) */}
+              {!cardMinimized && (
+                <div className="pt-2.5 border-t border-white/10 space-y-2 text-xs animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between text-white/70">
+                    <span>Pasajero: <strong className="text-white">{activeRide.passenger_name || "Pasajero"}</strong></span>
+                    <span className="text-accent font-bold">{formatPrice(activeRide.final_fare || activeRide.quoted_fare)}</span>
+                  </div>
+                  {queuedRide && <p className="text-accent text-sm">Próximo viaje: {queuedRide.origin_address} → {queuedRide.destination_address}</p>}
+                  {activeRide.status === "IN_PROGRESS" && <RideDestinationChange ride={activeRide} onUpdated={setActiveRide} readOnly />}
+                  {activeRide.notes && (
+                    <p className="p-2 rounded-xl bg-white/5 text-white/85 border border-white/10 italic text-[11px]">
+                      {activeRide.notes}
+                    </p>
+                  )}
+                  <div className="flex justify-between items-center pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowCancelDialog(true)}
+                      className="text-red-400 hover:underline text-[11px]"
+                    >
+                      Cancelar viaje
+                    </button>
+                    {navigationTarget && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = `https://www.google.com/maps/dir/?api=1&destination=${navigationTarget.lat},${navigationTarget.lng}&travelmode=driving`;
+                          window.open(url, "_blank");
+                        }}
+                        className="text-white/40 hover:text-white/70 text-[11px] underline"
+                      >
+                        Abrir en app externa
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* FOCUSED ACTION CARDS (when arrived, validating PIN, or payment pending) */}
+        {!isNavigating && (
+          <div className="absolute inset-x-0 bottom-0 z-20 p-3">
+            <div className="max-w-md mx-auto"><MapBottomSheet title={status === "DRIVER_ARRIVED" ? "Encuentro con el pasajero" : status === "PAYMENT_PENDING" ? "Cobro del viaje" : "Llegada al destino"}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent capitalize">
+                  {status === "DRIVER_ARRIVED" ? "Validar PIN" : status === "PAYMENT_PENDING" ? "Pago pendiente" : "Llegaste"}
+                </span>
+                <span className="font-bold text-lg text-accent">{formatPrice(activeRide.final_fare ?? activeRide.quoted_fare)}</span>
               </div>
-            )}
+
+              <div className="flex items-center gap-3 mb-4 pb-3 border-b border-border">
+                <BearAvatar size={40} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{activeRide.passenger_name || "Pasajero"}</p>
+                  <p className="text-xs text-muted-foreground">Pasajero</p>
+                </div>
+                <button
+                  onClick={() => setShowChat(true)}
+                  className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center no-select shrink-0"
+                  aria-label="Chat con pasajero"
+                >
+                  <MessageCircle className="w-5 h-5 text-accent" />
+                </button>
+              </div>
+
+              {status === "DRIVER_ARRIVED" && (
+                <div>
+                  <p className="text-sm text-center text-muted-foreground mb-3">
+                    Estás en el punto de encuentro. Pedile al pasajero el PIN de inicio:
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      value={pinInput}
+                      onChange={(event) => setPinInput(event.target.value.replace(/\D/g, ""))}
+                      aria-label="PIN de inicio del pasajero"
+                      inputMode="numeric"
+                      placeholder="PIN de 4 dígitos"
+                      maxLength={4}
+                      className="text-center text-xl tracking-widest font-mono font-black h-12"
+                    />
+                    <Button
+                      onClick={handleValidatePin}
+                      disabled={pinInput.length !== 4}
+                      className="bear-gold-gradient text-foreground border-0 h-12 px-5 font-bold"
+                    >
+                      <KeyRound className="w-5 h-5 mr-1" />
+                      Iniciar
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {status === "ARRIVED" && (
+                <div className="text-center">
+                  <Navigation className="w-8 h-8 text-accent mx-auto mb-2" />
+                  <p className="text-sm font-medium mb-1">Llegaste al destino</p>
+                  <p className="text-xs text-muted-foreground mb-3">Continuá con el cobro para cerrar el viaje.</p>
+                  <Button onClick={handleProceedToPayment} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-bold">
+                    Continuar al cobro
+                  </Button>
+                </div>
+              )}
 
             {status === "PAYMENT_PENDING" && (
               <div className="text-center">
-                {activeRide.payment_method === "card" ? (
+                {qrCheckoutUrl ? (
+                  <QrPaymentDisplay
+                    checkoutUrl={qrCheckoutUrl}
+                    amount={activeRide.final_fare ?? activeRide.quoted_fare}
+                    rideId={activeRide.id}
+                    onClose={() => setQrCheckoutUrl(null)}
+                  />
+                ) : activeRide.payment_method === "card" ? (
                   <>
-                    <Loader2 className="w-8 h-8 text-accent mx-auto mb-2 animate-spin" />
-                    <p className="text-sm text-muted-foreground mb-1">Esperando pago con tarjeta</p>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      El pasajero está pagando. El viaje se completará automáticamente.
+                    <CreditCard className="w-8 h-8 text-accent mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Cobro automático a la tarjeta del pasajero
                     </p>
+                    <Button
+                      onClick={handleComplete}
+                      disabled={completing}
+                      className="w-full bear-gold-gradient text-foreground border-0"
+                    >
+                      {completing ? (
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cobrando...</>
+                      ) : (
+                        "Confirmar cobro automático"
+                      )}
+                    </Button>
+                  </>
+                ) : activeRide.payment_method === "qr" ? (
+                  <>
+                    <QrCode className="w-8 h-8 text-accent mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Generá el QR para que el pasajero pague
+                    </p>
+                    <Button
+                      onClick={handleComplete}
+                      disabled={completing}
+                      className="w-full bear-gold-gradient text-foreground border-0"
+                    >
+                      {completing ? (
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generando...</>
+                      ) : (
+                        "Generar QR de pago"
+                      )}
+                    </Button>
                   </>
                 ) : (
                   <>
                     <Wallet className="w-8 h-8 text-accent mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground mb-3 capitalize">
-                      {activeRide.payment_method === "cash" ? "Cobrá en efectivo" : "Generá el QR de pago"}
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Cobrá en efectivo
                     </p>
                     <Button
                       onClick={handleComplete}
@@ -826,14 +1022,14 @@ export default function DriverConducir() {
                       {completing ? (
                         <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Confirmando...</>
                       ) : (
-                        "Confirmar pago"
+                        "Confirmar pago recibido"
                       )}
                     </Button>
                   </>
                 )}
               </div>
             )}
-          </Card>
+          </MapBottomSheet></div>
         </div>
         )}
 
@@ -843,6 +1039,14 @@ export default function DriverConducir() {
           onConfirm={handleCancel}
           isDriver={true}
         />
+        {showChat && (
+          <RideChat
+            rideId={activeRide.id}
+            userId={user.id}
+            peerName={activeRide.passenger_name}
+            onClose={() => setShowChat(false)}
+          />
+        )}
       </div>
     );
   }
@@ -854,27 +1058,29 @@ export default function DriverConducir() {
         <MapView
           driverPos={driverPos}
           recenter={driverPos}
+          recenterTrigger={mapRecenterTrigger}
           interactive={true}
+          mapTheme={driverSolarMode ? "light" : "dark"}
           className="absolute inset-0"
         />
 
-        <div className="absolute inset-x-0 top-0 z-10 p-3 safe-top">
+        <div className="absolute inset-x-0 top-0 z-10 p-3">
           <div className="flex items-center justify-between max-w-md mx-auto">
             <div className="flex items-center gap-2 px-4 py-2 rounded-full glass-navy">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-sm font-semibold text-white">Online</span>
+              <span className="text-sm font-semibold text-white">Conectado</span>
             </div>
             <Button
               onClick={handleGoOffline}
               size="sm"
-              className="rounded-full glass-navy border-0 text-white hover:text-white"
+              className="min-h-12 rounded-full glass-navy border-0 text-white hover:text-white"
             >
               Desconectarme
             </Button>
           </div>
         </div>
 
-        {!notifAsked && (
+        {!notifAsked && !incomingRide && (
           <div className="absolute inset-x-0 top-16 z-10 p-3">
             <Card className="p-4 max-w-md mx-auto">
               <div className="flex items-start gap-3">
@@ -900,17 +1106,88 @@ export default function DriverConducir() {
           </div>
         )}
 
+        {/* Radar concéntrico animado de 15 km sobre el mapa */}
         {!incomingRide && (
-          <div className="absolute inset-x-0 bottom-0 z-10 p-3">
-            <Card className="rounded-2xl p-4 max-w-md mx-auto text-center">
-              <Loader2 className="w-6 h-6 animate-spin text-accent mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">Esperando solicitudes de viaje...</p>
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-[5]">
+            <div className="relative w-72 h-72 flex items-center justify-center">
+              <span
+                className="absolute w-80 h-80 rounded-full border-2 border-accent/20 animate-ping opacity-60"
+                style={{ animationDuration: "3.2s" }}
+              />
+              <span
+                className="absolute w-56 h-56 rounded-full border border-accent/30 animate-pulse"
+                style={{ animationDuration: "2s" }}
+              />
+              <span className="absolute w-36 h-36 rounded-full border border-accent/40 bg-accent/5 animate-pulse" />
+              <div className="w-12 h-12 rounded-full bg-accent/20 border border-accent/60 flex items-center justify-center shadow-lg shadow-accent/20">
+                <Radio className="w-5 h-5 text-accent animate-pulse" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Botón flotante para recentrar mapa en ubicación del conductor */}
+        {driverPos && !incomingRide && (
+          <button
+            type="button"
+            onClick={() => {
+              Haptics.light();
+              setMapRecenterTrigger((prev) => prev + 1);
+            }}
+            className="absolute right-3.5 bottom-40 z-20 flex items-center gap-2 rounded-full bg-[#181E2F]/95 backdrop-blur-md px-3.5 py-2.5 text-xs font-semibold text-white shadow-2xl border border-white/10 active:scale-95 transition"
+            aria-label="Recentrar mi ubicación"
+          >
+            <Navigation className="w-4 h-4 text-accent fill-accent/20" />
+            <span>Mi ubicación</span>
+          </button>
+        )}
+
+        {/* HUD de Espera Activa con Radar 15km y WakeLock */}
+        {!incomingRide && (
+          <div className="absolute inset-x-0 bottom-0 z-10 p-3 pb-5">
+            <Card className="rounded-3xl p-4 max-w-md mx-auto border border-accent/20 bg-card/90 backdrop-blur-xl shadow-2xl">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-full bg-accent/15 flex items-center justify-center border border-accent/40 shrink-0">
+                    <Radio className="w-4 h-4 text-accent animate-spin" style={{ animationDuration: "6s" }} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                      Esperando solicitudes
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground font-medium">
+                      Te avisaremos cuando haya un viaje disponible
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary/80 border border-border text-[11px] font-semibold text-foreground shrink-0">
+                  <Zap className={`w-3.5 h-3.5 ${isScreenAwake ? "text-accent fill-accent" : "text-muted-foreground"}`} />
+                  <span>{isScreenAwake ? "Pantalla activa" : "Modo auto"}</span>
+                </div>
+              </div>
+
+              {selectedVehicle && (
+                <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-secondary/40 border border-border/40 text-xs">
+                  <div className="flex items-center gap-2">
+                    <Car className="w-3.5 h-3.5 text-accent" />
+                    <span className="font-semibold text-foreground">
+                      {selectedVehicle.brand} {selectedVehicle.model}
+                    </span>
+                  </div>
+                  <span className="font-mono text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
+                    {selectedVehicle.plate}
+                  </span>
+                </div>
+              )}
             </Card>
           </div>
         )}
 
         {incomingRide && (
           <RideRequestModal
+            key={incomingRide.id}
             ride={incomingRide}
             driverPos={driverPos}
             onAccept={() => handleAcceptRide(incomingRide)}
@@ -934,17 +1211,21 @@ export default function DriverConducir() {
       {vehicles.length > 0 && (
         <Card className="p-4 mb-4">
           <p className="text-xs text-muted-foreground mb-2">Vehículo</p>
-          <select
+          <Select
             value={selectedVehicle?.id || ""}
-            onChange={(event) => setSelectedVehicle(vehicles.find((vehicle) => vehicle.id === event.target.value))}
-            className="w-full bg-transparent text-sm font-medium outline-none"
+            onValueChange={(val) => setSelectedVehicle(vehicles.find((v) => v.id === val))}
           >
-            {vehicles.map((vehicle) => (
-              <option key={vehicle.id} value={vehicle.id}>
-                {vehicle.make} {vehicle.model} · {vehicle.plate}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full h-11 text-sm font-medium border-0 bg-transparent focus:ring-0">
+              <SelectValue placeholder="Seleccionar vehículo" />
+            </SelectTrigger>
+            <SelectContent>
+              {vehicles.map((vehicle) => (
+                <SelectItem key={vehicle.id} value={vehicle.id}>
+                  {vehicle.make} {vehicle.model} · {vehicle.plate}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Card>
       )}
 

@@ -63,6 +63,18 @@ Two physical Android devices must be able to complete repeatedly, without manual
 
 ## Immediate technical work
 
+### Progress — 2026-09-12
+
+- Android debug build compiled; user confirmed installation and operation on a physical device. Full two-device ride/payment validation remains pending.
+- Native Base44 client uses the configured hosted URL instead of the WebView localhost origin.
+- Passenger foreground location now updates independently of the agreed pickup; both map markers use cancellable interpolation.
+- Android GPS requests an explicit update interval; the plugin's timeout is no longer implicitly the desired GPS interval.
+- Cross-device location still uses Base44 persistence/subscriptions. Supabase Broadcast, private channel authorization and identity integration are pending.
+- Supabase public DEV variables are documented in `.env.example` but are not consumed yet. Never bundle server secrets.
+- Type checking has outstanding errors; successful bundling does not establish type safety or payment correctness.
+
+### Remaining / original checklist
+
 - Synchronize the local Capacitor/Android state into this branch.
 - Add and use Capacitor Geolocation for Android permission/runtime GPS.
 - Declare Android coarse/fine location permissions.

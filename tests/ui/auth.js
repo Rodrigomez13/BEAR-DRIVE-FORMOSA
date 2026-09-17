@@ -1,0 +1,1 @@
+export const useAuth=()=>({user:{id:'passenger',role:'user',full_name:'Cuenta de prueba local',email:'prueba@example.test',driver_capability:'APPROVED_ELIGIBLE',bearpoints_balance:120,total_rides:12,rating_avg:4.8},logout:()=>{},checkUserAuth:async()=>{}});

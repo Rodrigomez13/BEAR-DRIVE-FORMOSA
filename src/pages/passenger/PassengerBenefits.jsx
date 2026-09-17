@@ -5,31 +5,32 @@ import { Card } from "@/components/ui/card";
 import EmptyState from "@/components/bear/EmptyState";
 import { SkeletonList } from "@/components/bear/SkeletonCard";
 import { Gift, Star } from "lucide-react";
+import PullToRefresh from "@/components/bear/PullToRefresh";
 
 export default function PassengerBenefits() {
   const { user } = useAuth();
   const [benefits, setBenefits] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await base44.entities.Benefit.filter({ enabled: true, audience: "passenger" });
-        const allData = await base44.entities.Benefit.filter({ enabled: true, audience: "all" });
-        setBenefits([...data, ...allData]);
-      } catch (err) {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
+  const load = async () => {
+    try {
+      const data = await base44.entities.Benefit.filter({ enabled: true, audience: "passenger" });
+      const allData = await base44.entities.Benefit.filter({ enabled: true, audience: "all" });
+      setBenefits([...data, ...allData]);
+    } catch (err) {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
 
   return (
-    <div className="max-w-md mx-auto px-4 pt-6 pb-8 animate-fade-in h-full overflow-y-auto scrollbar-hide">
+    <PullToRefresh onRefresh={load}>
+    <div className="max-w-md mx-auto px-4 pt-6 pb-8">
       <h1 className="text-2xl font-bold mb-2">Beneficios</h1>
-      <p className="text-sm text-muted-foreground mb-6">Acumulá BearPoints y canjealos por descuentos</p>
+      <p className="text-sm text-muted-foreground mb-6">Consultá tus BearPoints y los beneficios disponibles</p>
 
       <Card className="p-5 mb-6 bear-gold-gradient text-foreground">
         <div className="flex items-center justify-between">
@@ -74,5 +75,6 @@ export default function PassengerBenefits() {
         </div>
       )}
     </div>
+    </PullToRefresh>
   );
 }

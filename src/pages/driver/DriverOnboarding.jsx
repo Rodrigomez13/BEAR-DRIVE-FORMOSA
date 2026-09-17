@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-import { Upload, Car, FileText, CheckCircle2, Loader2, ArrowLeft, ArrowRight, User, Shield, X, AlertTriangle, Clock } from "lucide-react";
+import { Upload, Car, CheckCircle2, Loader2, ArrowLeft, ArrowRight, Shield, X, AlertTriangle, Clock } from "lucide-react";
 import { sanitizeString, sanitizePhone, sanitizeDNI, sanitizePlate, sanitizeInt } from "@/lib/sanitize";
 import { validateFile, optimizeForWeb } from "@/lib/imageUtils";
 import { businessDaysUntil } from "@/lib/businessDays";
+import LoadingScreen from "@/components/bear/LoadingScreen";
 
 const STEPS = [
   { key: "intro", label: "Introducción" },
@@ -21,6 +22,11 @@ const STEPS = [
   { key: "review", label: "Revisión" },
 ];
 
+async function saveSubmission(entity, data, id) {
+  const res = await base44.functions.invoke("saveDriverSubmission", { entity, data, id });
+  return res.data.record;
+}
+
 export default function DriverOnboarding() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -30,6 +36,11 @@ export default function DriverOnboarding() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [autoReviewing, setAutoReviewing] = useState(false);
+
+  const handleBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/passenger");
+  };
 
   // Form data
   const [personal, setPersonal] = useState({
@@ -117,9 +128,9 @@ export default function DriverOnboarding() {
         ...cleanPersonal,
       };
       if (appId) {
-        await base44.entities.DriverApplication.update(appId, appData);
+        await saveSubmission("DriverApplication", appData, appId);
       } else {
-        const created = await base44.entities.DriverApplication.create(appData);
+        const created = await saveSubmission("DriverApplication", appData);
         appId = created.id;
         setApplication(created);
       }
@@ -127,9 +138,9 @@ export default function DriverOnboarding() {
       // Update or create vehicle (avoid duplicates on resubmission)
       const existingVehicles = await base44.entities.Vehicle.filter({ driver_id: user.id });
       if (existingVehicles.length > 0) {
-        await base44.entities.Vehicle.update(existingVehicles[0].id, { ...cleanVehicle, status: "pending" });
+        await saveSubmission("Vehicle", cleanVehicle, existingVehicles[0].id);
       } else {
-        await base44.entities.Vehicle.create({ driver_id: user.id, ...cleanVehicle, status: "pending", category: "basic" });
+        await saveSubmission("Vehicle", cleanVehicle);
       }
 
       // Delete old documents for this application (in case of resubmission)
@@ -141,7 +152,7 @@ export default function DriverOnboarding() {
       for (const req of requirements) {
         const doc = documents[req.code];
         if (doc && doc.file_url) {
-          await base44.entities.DriverDocument.create({
+          await saveSubmission("DriverDocument", {
             driver_id: user.id,
             application_id: appId,
             subject: req.subject,
@@ -187,7 +198,7 @@ export default function DriverOnboarding() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center h-[100dvh]"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
+    return <LoadingScreen className="h-[100dvh]" label="Cargando..." />;
   }
 
   // Auto-review processing
@@ -274,13 +285,16 @@ export default function DriverOnboarding() {
 
   return (
     <div className="max-w-md mx-auto px-5 pt-8 pb-10">
+      <button onClick={handleBack} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
+        <ArrowLeft className="w-4 h-4" />Volver
+      </button>
       {/* Progress */}
       <div className="flex items-center gap-1 mb-6">
         {STEPS.map((s, i) => (
           <div key={s.key} className={`flex-1 h-1.5 rounded-full ${i <= step ? "bg-accent" : "bg-secondary"}`} />
         ))}
       </div>
-      <p className="text-xs text-muted-foreground mb-4 text-center">Paso {step + 1} de {STEPS.length}: {STEPS[step].label}</p>
+      <p className="text-[14px] text-muted-foreground mb-4 text-center">Paso {step + 1} de {STEPS.length}: {STEPS[step].label}</p>
 
       {step === 0 && (
         <div className="text-center py-6">
@@ -399,12 +413,12 @@ function DocUploadStep({ title, requirements, documents, onUpload, onUpdate, onB
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-semibold text-sm">{req.label}</p>
-                {req.required && <span className="text-xs text-destructive">Obligatorio</span>}
+                {req.required && <span className="text-[14px] text-destructive">Obligatorio</span>}
               </div>
               {doc.file_url && <CheckCircle2 className="w-5 h-5 text-green-500" />}
             </div>
             {doc.file_url ? (
-              <p className="text-xs text-green-600">Documento cargado ✓</p>
+              <p className="text-[14px] text-green-600">Documento cargado ✓</p>
             ) : (
               <label className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-accent transition-colors">
                 <Upload className="w-4 h-4 text-muted-foreground" />
@@ -414,12 +428,12 @@ function DocUploadStep({ title, requirements, documents, onUpload, onUpdate, onB
             )}
             {req.requires_expiration && (
               <div className="space-y-1.5">
-                <Label className="text-xs">Vencimiento</Label>
+                <Label className="text-[14px]">Vencimiento</Label>
                 <Input type="date" value={doc.expires_at || ""} onChange={e => onUpdate(req.code, "expires_at", e.target.value)} className="h-9" />
               </div>
             )}
             <div className="space-y-1.5">
-              <Label className="text-xs">Número (opcional)</Label>
+              <Label className="text-[14px]">Número (opcional)</Label>
               <Input value={doc.document_number || ""} onChange={e => onUpdate(req.code, "document_number", e.target.value)} className="h-9" placeholder="N° de documento" />
             </div>
           </Card>

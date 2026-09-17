@@ -1,100 +1,22 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { todayBusinessDay } from '../../shared/pricing.ts';
-
-export default async function(req) {
-  try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-
-    const body = await req.json();
-    const { ride_id, final_fare, payment_method } = body;
-
-    if (!ride_id) return Response.json({ error: "ride_id es obligatorio" }, { status: 400 });
-
-    // Use service role for cross-user ride access (driver completes a ride owned by passenger)
-    const ride = await base44.asServiceRole.entities.Ride.get(ride_id);
-    if (!ride) return Response.json({ error: "Viaje no encontrado" }, { status: 404 });
-
-    if (!["IN_PROGRESS", "ARRIVED", "PAYMENT_PENDING"].includes(ride.status)) {
-      return Response.json({ error: "El viaje no está en un estado que permita finalizar" }, { status: 400 });
-    }
-
-    // Only the assigned driver or the passenger can complete
-    if (ride.driver_id !== user.id && ride.passenger_id !== user.id) {
-      return Response.json({ error: "No autorizado para este viaje" }, { status: 403 });
-    }
-
-    const fare = typeof final_fare === "number" ? final_fare : ride.quoted_fare;
-    const completedDate = new Date().toISOString();
-
-    // 1. Mark ride COMPLETED
-    const updated = await base44.asServiceRole.entities.Ride.update(ride_id, {
-      status: "COMPLETED",
-      final_fare: fare,
-      payment_method: payment_method || ride.payment_method,
-      completed_date: completedDate
-    });
-
-    // 2. Award BearPoints to passenger (10 points per completed ride)
-    const pointsAward = 10;
-    const passengerLedger = await base44.asServiceRole.entities.BearPointsLedger.create({
-      user_id: ride.passenger_id,
-      points: pointsAward,
-      reason: "ride_completed",
-      ride_id: ride_id,
-      balance_after: (ride.passenger_id === user.id ? user.bearpoints_balance || 0 : 0) + pointsAward
-    });
-    // Update passenger balance
-    const passenger = await base44.asServiceRole.entities.User.get(ride.passenger_id);
-    if (passenger) {
-      await base44.asServiceRole.entities.User.update(ride.passenger_id, {
-        bearpoints_balance: (passenger.bearpoints_balance || 0) + pointsAward,
-        total_rides: (passenger.total_rides || 0) + 1
-      });
-    }
-
-    // 4. Notify passenger of pending digital payment
-    const pm = payment_method || ride.payment_method;
-    if ((pm === "card" || pm === "qr") && passenger?.email) {
-      try {
-        await base44.asServiceRole.integrations.Core.SendEmail({
-          to: passenger.email,
-          subject: "BearDrive — Pago pendiente de tu viaje",
-          body: `Hola,\n\nTu viaje ha finalizado pero tenés un pago pendiente con ${pm === "card" ? "tarjeta" : "QR"}.\n\nMonto: $${fare.toLocaleString("es-AR")}\n\nIngresá a la app para completar el pago desde tu viaje activo.\n\nGracias,\nEquipo BearDrive`
-        });
-      } catch (emailErr) {
-        console.error("Error sending payment notification:", emailErr);
-      }
-    }
-
-    // 3. Driver daily charge — only on first completed ride of the business day
-    const businessDay = todayBusinessDay(completedDate);
-    const existingCharges = await base44.asServiceRole.entities.DriverDailyCharge.filter({
-      driver_id: ride.driver_id,
-      business_day: businessDay
-    });
-    if (existingCharges.length === 0 && ride.driver_id) {
-      const chargeConfigs = await base44.asServiceRole.entities.DailyChargeConfig.filter({ active: true });
-      const chargeConfig = chargeConfigs[0] || { amount: 1500, currency: "ARS" };
-      await base44.asServiceRole.entities.DriverDailyCharge.create({
-        driver_id: ride.driver_id,
-        driver_name: ride.driver_name || "",
-        business_day: businessDay,
-        amount: chargeConfig.amount,
-        currency: chargeConfig.currency || "ARS",
-        status: "pending",
-        total_due: chargeConfig.amount,
-        trigger_ride_id: ride_id
-      });
-    }
-
-    return Response.json({
-      ride: updated,
-      bearpoints_awarded: pointsAward,
-      daily_charge_created: existingCharges.length === 0
-    });
-  } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+import { api, participant, fail, withLock, cas, publicRide } from '../../shared/domain.ts';
+import { sellerAccount, checkout } from '../../shared/payments.ts';
+import { finalizeRideCompletion } from '../../shared/rideCompletion.ts';
+export default req=>api(req,createClientFromRequest,async(client,user,body)=>{
+ const e=client.asServiceRole.entities;
+ await participant(client,user,body.ride_id);
+ return withLock(e.Ride,body.ride_id,async()=>{
+  const ride=await participant(client,user,body.ride_id);
+  if(ride.driver_id!==user.id) fail('Solo el conductor puede confirmar el cobro',403);
+  if(['COMPLETED','RATED'].includes(ride.status)) {await finalizeRideCompletion(client,ride.id,ride.completed_date);return {ride:publicRide(ride,user.id),payment_status:'completed'};}
+  if(ride.status!=='PAYMENT_PENDING') fail('El viaje no está listo para cobrar');
+  if(ride.payment_method==='cash') {
+   const date=new Date().toISOString();
+   await cas(e.Ride,{id:ride.id,status:'PAYMENT_PENDING'},{status:'COMPLETED',payment_status:'paid',completed_date:date,final_fare:ride.final_fare||ride.quoted_fare});
+   await finalizeRideCompletion(client,ride.id,date);
+   return {ride:publicRide(await e.Ride.get(ride.id),user.id),payment_status:'completed'};
   }
-}
+  if(ride.payment_method!=='qr') fail('Pago anterior requiere conciliación por soporte');
+  return checkout(client,'Ride',ride,await sellerAccount(client,ride.driver_id),'ride');
+ });
+});

@@ -1,0 +1,68 @@
+{
+  "name": "RideQuote",
+  "type": "object",
+  "properties": {
+    "passenger_id": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string"
+    },
+    "price": {
+      "type": "number"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "distance_km": {
+      "type": "number"
+    },
+    "duration_min": {
+      "type": "number"
+    },
+    "origin_lat": {
+      "type": "number"
+    },
+    "origin_lng": {
+      "type": "number"
+    },
+    "destination_lat": {
+      "type": "number"
+    },
+    "destination_lng": {
+      "type": "number"
+    },
+    "origin_address": {
+      "type": "string"
+    },
+    "destination_address": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "string"
+    },
+    "consumed": {
+      "type": "boolean"
+    },
+    "search_radius_km": {
+      "type": "number"
+    },
+    "retry_count": {
+      "type": "number"
+    },
+    "retry_of": {
+      "type": "string"
+    }
+  },
+  "rls": {
+    "create": false,
+    "read": {
+      "data.passenger_id": "{{user.id}}"
+    },
+    "update": false,
+    "delete": false
+  }
+}

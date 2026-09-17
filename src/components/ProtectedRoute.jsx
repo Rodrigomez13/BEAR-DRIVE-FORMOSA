@@ -1,3 +1,4 @@
+import AccountDebtNotice from '@/components/bear/AccountDebtNotice';
 import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
@@ -33,5 +34,5 @@ export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthe
     return unauthenticatedElement;
   }
 
-  return <Outlet />;
+  return <AccountDebtNotice><Outlet /></AccountDebtNotice>;
 }

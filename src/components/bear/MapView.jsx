@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { loadMapsSDK, getAuthFailure, resetSdkPromise } from "@/lib/mapsConfig";
+import { getCachedRoute, setCachedRoute } from "@/lib/routeCache";
 import { AlertTriangle, Navigation } from "lucide-react";
+import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
+import { useTheme } from "@/lib/ThemeContext";
 
-const DARK_MAP_STYLES = [
+export const DARK_MAP_STYLES = [
   { elementType: "geometry", stylers: [{ color: "#0e1320" }] },
   { elementType: "labels.text.stroke", stylers: [{ color: "#0e1320" }] },
   { elementType: "labels.text.fill", stylers: [{ color: "#8b93a8" }] },
@@ -10,7 +13,7 @@ const DARK_MAP_STYLES = [
   { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#e0b85e" }] },
   { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#8a92a6" }] },
   { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#9aa2b5" }] },
-  { featureType: "poi", elementType: "labels.icon", stylers: [{ visibility: "on" }] },
+  { featureType: "poi", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
   { featureType: "poi.business", elementType: "labels.text.fill", stylers: [{ color: "#b8a46e" }] },
   { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#101820" }] },
   { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6a8a6a" }] },
@@ -30,15 +33,53 @@ const DARK_MAP_STYLES = [
   { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#121828" }] },
 ];
 
-function originIcon(g) {
+export const LIGHT_MAP_STYLES = [
+  { elementType: "geometry", stylers: [{ color: "#f4f6f9" }] },
+  { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#1e293b" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 3.5 }] },
+  { featureType: "administrative", elementType: "labels.text.fill", stylers: [{ color: "#0f172a" }] },
+  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#0f172a" }, { weight: "bold" }] },
+  { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#334155" }] },
+  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#475569" }] },
+  { featureType: "poi.business", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#dcfce7" }] },
+  { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#15803d" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#cbd5e1" }, { weight: 1.2 }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#0f172a" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#fed7aa" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#f97316" }, { weight: 1.5 }] },
+  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#7c2d12" }] },
+  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road.arterial", elementType: "geometry.stroke", stylers: [{ color: "#94a3b8" }, { weight: 1.2 }] },
+  { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road.local", elementType: "geometry.stroke", stylers: [{ color: "#e2e8f0" }, { weight: 1 }] },
+  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#bae6fd" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#0369a1" }] },
+  { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#f8fafc" }] },
+  { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#f1f5f9" }] },
+];
+
+function originPinBackground(g) {
+  const size = 44;
+  const svg =
+    "<svg xmlns='http://www.w3.org/2000/svg' width='" + size + "' height='" + size + "' viewBox='0 0 " + size + " " + size + "'>" +
+    "<circle cx='22' cy='22' r='20' fill='#181E2F' stroke='#E9B74E' stroke-width='3'/>" +
+    "</svg>";
   return {
-    path: g.maps.SymbolPath.CIRCLE,
-    scale: 11,
-    fillColor: "#181E2F",
-    fillOpacity: 1,
-    strokeColor: "#E9B74E",
-    strokeWeight: 3,
-    labelOrigin: new g.maps.Point(0, -16),
+    url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
+    scaledSize: new g.maps.Size(size, size),
+    anchor: new g.maps.Point(22, 22),
+  };
+}
+
+function originPinLogo(g) {
+  return {
+    url: BEAR_LOGO_SVG,
+    scaledSize: new g.maps.Size(30, 30),
+    anchor: new g.maps.Point(15, 15),
   };
 }
 
@@ -66,11 +107,37 @@ function carIcon(g) {
   };
 }
 
+function navCarIcon(g, heading) {
+  return {
+    path: g.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+    scale: 7,
+    fillColor: "#E9B74E",
+    fillOpacity: 1,
+    strokeColor: "#181E2F",
+    strokeWeight: 2,
+    rotation: Number.isFinite(heading) ? heading : 0,
+  };
+}
+
 function stripHtml(value = "") {
   if (!value) return "";
   const node = document.createElement("div");
   node.innerHTML = value;
   return node.textContent || node.innerText || "";
+}
+
+function nearestPointIndex(path, pos) {
+  if (!path || path.length === 0 || !pos) return 0;
+  let minDist = Infinity;
+  let minIdx = 0;
+  for (let i = 0; i < path.length; i++) {
+    const d = (path[i].lat - pos.lat) ** 2 + (path[i].lng - pos.lng) ** 2;
+    if (d < minDist) {
+      minDist = d;
+      minIdx = i;
+    }
+  }
+  return minIdx;
 }
 
 function haversineMeters(a, b) {
@@ -85,9 +152,9 @@ function haversineMeters(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-function offsetCenter(pos, tilt, heading) {
-  if (!tilt) return pos;
-  const offsetDist = 0.004;
+function offsetCenter(pos, isRotating, heading) {
+  if (!isRotating) return pos;
+  const offsetDist = 0.0022;
   const headingRad = ((heading || 0) * Math.PI) / 180;
   return {
     lat: pos.lat + offsetDist * Math.cos(headingRad),
@@ -98,29 +165,40 @@ function offsetCenter(pos, tilt, heading) {
 export default function MapView({
   center = { lat: -26.1849, lng: -58.1731 },
   zoom = 15,
-  origin,
-  destination,
+  origin = undefined,
+  destination = undefined,
   originLabel = "Origen",
   destinationLabel = "Destino",
   showOriginMarker = true,
   showDestinationMarker = true,
-  driverPos,
-  userPos,
-  path,
-  onMapClick,
+  driverPos = undefined,
+  userPos = undefined,
+  path = undefined,
+  onMapClick = undefined,
   className = "",
-  recenter,
+  recenter = undefined,
+  recenterTrigger = undefined,
+  recenterZoom = 16,
   interactive = true,
   followDriver = false,
   navigationZoom = 17,
-  onRouteInfo,
+  onRouteInfo = undefined,
+  rotateHeading = false,
   tilt = 0,
   heading = 0,
   markerAnimationDuration = 900,
+  mapTheme = undefined,
 }) {
+  const themeContext = useTheme();
+  const effectiveTheme = mapTheme || themeContext?.theme || "dark";
+  const isDark = effectiveTheme === "dark";
+
+  const isRotating = rotateHeading || (tilt > 0);
+  const isRotatingRef = useRef(isRotating);
+
   const containerRef = useRef(null);
   const mapRef = useRef(null);
-  const markersRef = useRef({});
+  const markersRef = useRef(/** @type {Partial<Record<'origin'|'originBg'|'destination'|'driver'|'user', google.maps.Marker>>} */ ({}));
   const polylineRef = useRef(null);
   const dirRendererRef = useRef(null);
   const dirServiceRef = useRef(null);
@@ -133,6 +211,12 @@ export default function MapView({
   const routeInfoRef = useRef(null);
   const routeStepsRef = useRef([]);
   const currentStepRef = useRef(0);
+  const fullRoutePathRef = useRef([]);
+  const driverPosRef = useRef(null);
+  const routePolylineRef = useRef([]);
+  const lastRecalcRef = useRef(0);
+  const recalculatingRef = useRef(false);
+  const [deviatedOrigin, setDeviatedOrigin] = useState(null);
 
   const [status, setStatus] = useState("loading");
   const [errorMsg, setErrorMsg] = useState("");
@@ -156,9 +240,27 @@ export default function MapView({
   }, [onRouteInfo]);
 
   useEffect(() => {
+    isRotatingRef.current = isRotating;
     tiltRef.current = tilt;
     headingRef.current = heading;
-  }, [tilt, heading]);
+  }, [isRotating, tilt, heading]);
+
+  useEffect(() => {
+    driverPosRef.current = driverPos;
+  }, [driverPos]);
+
+  // Update map visual style when day/night theme changes
+  useEffect(() => {
+    if (!mapRef.current || status !== "ready") return;
+    const styles = isDark ? DARK_MAP_STYLES : LIGHT_MAP_STYLES;
+    const backgroundColor = isDark ? "#0e1320" : "#f4f6f9";
+    mapRef.current.setOptions({ styles, backgroundColor });
+    if (polylineRef.current) {
+      polylineRef.current.setOptions({
+        strokeColor: isDark ? "#E9B74E" : "#d97706",
+      });
+    }
+  }, [isDark, status]);
 
   // Initialize map.
   useEffect(() => {
@@ -170,22 +272,33 @@ export default function MapView({
       if (cancelled || !containerRef.current) return;
       setDebugInfo("SDK cargado, creando instancia del mapa...");
 
+      const initialStyles = isDark ? DARK_MAP_STYLES : LIGHT_MAP_STYLES;
+      const initialBg = isDark ? "#0e1320" : "#f4f6f9";
+
       const map = new g.maps.Map(containerRef.current, {
         center,
         zoom,
-        styles: DARK_MAP_STYLES,
-        backgroundColor: "#0e1320",
+        styles: initialStyles,
+        backgroundColor: initialBg,
         gestureHandling: interactive ? "greedy" : "none",
         disableDefaultUI: true,
         clickableIcons: false,
       });
 
       mapRef.current = map;
+      markersRef.current.originBg = new g.maps.Marker({
+        map,
+        icon: originPinBackground(g),
+        visible: false,
+        clickable: false,
+        zIndex: 500,
+      });
       markersRef.current.origin = new g.maps.Marker({
         map,
-        icon: originIcon(g),
-        label: { text: originLabel, color: "#E9B74E", fontSize: "11px", fontWeight: "bold" },
+        icon: originPinLogo(g),
         visible: false,
+        clickable: false,
+        zIndex: 501,
       });
       markersRef.current.destination = new g.maps.Marker({
         map,
@@ -304,14 +417,18 @@ export default function MapView({
     const markers = markersRef.current;
     if (!markers.origin || status !== "ready") return;
 
-    markers.origin.setLabel({ text: originLabel, color: "#E9B74E", fontSize: "11px", fontWeight: "bold" });
     markers.destination.setLabel({ text: destinationLabel, color: "#E9B74E", fontSize: "11px", fontWeight: "bold" });
 
     if (origin && showOriginMarker) {
       markers.origin.setPosition(origin);
       markers.origin.setVisible(true);
+      if (markers.originBg) {
+        markers.originBg.setPosition(origin);
+        markers.originBg.setVisible(true);
+      }
     } else {
       markers.origin.setVisible(false);
+      if (markers.originBg) markers.originBg.setVisible(false);
     }
 
     if (destination && showDestinationMarker) {
@@ -321,7 +438,7 @@ export default function MapView({
       markers.destination.setVisible(false);
     }
 
-    if (userPos && markers.user) {
+    if (userPos && markers.user && !(origin && showOriginMarker)) {
       markers.user.setPosition(userPos);
       markers.user.setVisible(true);
     } else if (markers.user) {
@@ -333,6 +450,13 @@ export default function MapView({
   useEffect(() => {
     const marker = markersRef.current.driver;
     if (!marker || status !== "ready") return;
+
+    // Rotate the car icon to point in the travel direction during GPS navigation.
+    const g = window.google;
+    if (g?.maps) {
+      marker.setIcon(isRotating ? navCarIcon(g, heading) : (Number.isFinite(heading) && heading > 0 ? navCarIcon(g, heading) : carIcon(g)));
+    }
+
     if (!driverPos) {
       marker.setVisible(false);
       return;
@@ -367,11 +491,22 @@ export default function MapView({
     }
 
     if (followDriver && !followSuspended && mapRef.current) {
-      mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, tilt, heading));
+      mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, isRotating, heading));
       const currentZoom = mapRef.current.getZoom() || 0;
       if (currentZoom < navigationZoom - 1 || currentZoom > navigationZoom + 2) {
         mapRef.current.setZoom(navigationZoom);
       }
+    }
+
+    // Trim the route polyline so it shrinks as the driver advances.
+    const fullPath = fullRoutePathRef.current;
+    if (fullPath && fullPath.length > 1 && polylineRef.current) {
+      const trimIndex = nearestPointIndex(fullPath, driverPos);
+      const trimmed =
+        trimIndex > 0
+          ? [{ lat: driverPos.lat, lng: driverPos.lng }, ...fullPath.slice(trimIndex)]
+          : fullPath;
+      polylineRef.current.setPath(trimmed);
     }
 
     const routeInfo = routeInfoRef.current;
@@ -386,6 +521,18 @@ export default function MapView({
       }
 
       currentStepRef.current = stepIndex;
+
+      // Calcular dinámicamente distancia y tiempo restantes hasta el destino
+      let remainingMeters = Math.max(0, Math.round(distanceToManeuver));
+      for (let i = stepIndex + 1; i < steps.length; i++) {
+        remainingMeters += steps[i].distanceMeters || 0;
+      }
+      const remainingDistanceText = remainingMeters < 1000
+        ? `${remainingMeters} m`
+        : `${(remainingMeters / 1000).toFixed(1).replace(".", ",")} km`;
+      const remainingMinutes = Math.max(1, Math.round(remainingMeters / 450));
+      const remainingDurationText = `${remainingMinutes} min`;
+
       onRouteInfoRef.current?.({
         ...routeInfo,
         currentStepIndex: stepIndex,
@@ -394,34 +541,94 @@ export default function MapView({
         nextManeuverDistanceMeters: Math.round(distanceToManeuver),
         afterNextInstruction: steps[stepIndex + 1]?.instruction || "",
         afterNextManeuver: steps[stepIndex + 1]?.maneuver || "",
+        distanceText: remainingDistanceText,
+        durationText: remainingDurationText,
+        distanceMeters: remainingMeters,
       });
     }
-  }, [driverPos?.lat, driverPos?.lng, driverPos?.heading, followDriver, followSuspended, navigationZoom, tilt, heading, status, markerAnimationDuration]);
+
+    // Event-driven route recalculation: only when the driver deviates >50m from
+    // the route polyline (Gemini recommendation: no timer-based recalculation).
+    if (followDriver && routePolylineRef.current.length > 2 && !recalculatingRef.current) {
+      const minDist = routePolylineRef.current.reduce(
+        (min, p) => Math.min(min, haversineMeters(driverPos, p)),
+        Infinity
+      );
+      if (minDist > 50 && Date.now() - lastRecalcRef.current > 10000) {
+        lastRecalcRef.current = Date.now();
+        recalculatingRef.current = true;
+        setDeviatedOrigin({ lat: driverPos.lat, lng: driverPos.lng });
+      }
+    }
+  }, [driverPos?.lat, driverPos?.lng, driverPos?.heading, followDriver, followSuspended, navigationZoom, isRotating, heading, status, markerAnimationDuration]);
 
   // Update route only when endpoints/path actually change. Driver GPS updates do not trigger route API calls.
   useEffect(() => {
     const g = window.google?.maps;
     if (!g || !mapRef.current || !dirServiceRef.current || status !== "ready") return;
 
+    const effectiveOrigin = deviatedOrigin || origin;
+
     if (path && path.length >= 2) {
       dirRendererRef.current.set("directions", null);
-      polylineRef.current.setPath(path.map((point) => ({ lat: point.lat, lng: point.lng })));
+      const fullPath = path.map((point) => ({ lat: point.lat, lng: point.lng }));
+      fullRoutePathRef.current = fullPath;
+      polylineRef.current.setPath(fullPath);
       polylineRef.current.setVisible(true);
       routeInfoRef.current = null;
       routeStepsRef.current = [];
+      routePolylineRef.current = [];
       onRouteInfoRef.current?.(null);
       return;
     }
 
-    if (origin && destination) {
+    if (effectiveOrigin && destination) {
       polylineRef.current.setVisible(false);
       dirRendererRef.current.setOptions({ preserveViewport: followDriverRef.current });
+
+      // Apply extracted route data (from cache or API) to refs + polyline + camera.
+      const applyRouteData = (fullPath, steps, routePolylinePoints, info) => {
+        fullRoutePathRef.current = fullPath;
+        const currentDriverPos = driverPosRef.current;
+        const trimIndex = currentDriverPos ? nearestPointIndex(fullPath, currentDriverPos) : 0;
+        const trimmed =
+          trimIndex > 0 && currentDriverPos
+            ? [{ lat: currentDriverPos.lat, lng: currentDriverPos.lng }, ...fullPath.slice(trimIndex)]
+            : fullPath;
+        polylineRef.current.setPath(trimmed);
+        polylineRef.current.setVisible(true);
+        routePolylineRef.current = routePolylinePoints;
+        recalculatingRef.current = false;
+        routeStepsRef.current = steps;
+        currentStepRef.current = 0;
+        routeInfoRef.current = info;
+        onRouteInfoRef.current?.(info);
+        if (followDriverRef.current && driverPos && mapRef.current) {
+          mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, isRotatingRef.current, headingRef.current));
+          mapRef.current.setZoom(navigationZoom);
+        }
+      };
+
+      // 1. Check local cache before hitting the Directions API.
+      const cached = getCachedRoute(effectiveOrigin, destination);
+      if (cached) {
+        dirRendererRef.current.set("directions", null);
+        applyRouteData(cached.fullPath, cached.steps, cached.routePolyline, cached.routeInfo);
+        return;
+      }
+
+      // 2. Cache miss — call Google Directions API and store the result.
       dirServiceRef.current.route(
-        { origin, destination, travelMode: g.TravelMode.DRIVING },
+        { origin: effectiveOrigin, destination, travelMode: g.TravelMode.DRIVING },
         (result, routeStatus) => {
           if (routeStatus === "OK" && result) {
-            dirRendererRef.current.setDirections(result);
+            dirRendererRef.current.set("directions", null);
             const leg = result.routes?.[0]?.legs?.[0];
+            const overviewPath = result.routes?.[0]?.overview_path;
+            const fullPath =
+              overviewPath && overviewPath.length > 0
+                ? overviewPath.map((p) => ({ lat: p.lat(), lng: p.lng() }))
+                : [effectiveOrigin, destination];
             const steps = (leg?.steps || []).map((step) => ({
               instruction: stripHtml(step.instructions) || "Seguí la ruta",
               maneuver: step.maneuver || "",
@@ -431,9 +638,16 @@ export default function MapView({
                 : destination,
             }));
 
-            routeStepsRef.current = steps;
-            currentStepRef.current = 0;
-            routeInfoRef.current = {
+            const overviewPolyline = result.routes?.[0]?.overview_polyline;
+            let routePolylinePoints;
+            if (overviewPolyline && g.geometry?.encoding) {
+              routePolylinePoints = g.geometry.encoding
+                .decodePath(overviewPolyline)
+                .map((p) => ({ lat: p.lat(), lng: p.lng() }));
+            } else {
+              routePolylinePoints = steps.map((s) => s.end);
+            }
+            const info = {
               distanceMeters: leg?.distance?.value || null,
               distanceText: leg?.distance?.text || "",
               durationSeconds: leg?.duration?.value || null,
@@ -445,15 +659,22 @@ export default function MapView({
               afterNextInstruction: steps[1]?.instruction || "",
               afterNextManeuver: steps[1]?.maneuver || "",
             };
-            onRouteInfoRef.current?.(routeInfoRef.current);
-
-            if (followDriverRef.current && driverPos && mapRef.current) {
-              mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, tiltRef.current, headingRef.current));
-              mapRef.current.setZoom(navigationZoom);
+            applyRouteData(fullPath, steps, routePolylinePoints, info);
+            // Only cache original OD pairs — deviated recalculation positions are
+            // arbitrary and would pollute the cache with low-value entries.
+            if (!deviatedOrigin) {
+              setCachedRoute(effectiveOrigin, destination, {
+                fullPath,
+                steps,
+                routePolyline: routePolylinePoints,
+                routeInfo: info,
+              });
             }
           } else {
+            recalculatingRef.current = false;
             dirRendererRef.current.set("directions", null);
-            polylineRef.current.setPath([origin, destination]);
+            fullRoutePathRef.current = [effectiveOrigin, destination];
+            polylineRef.current.setPath([effectiveOrigin, destination]);
             polylineRef.current.setVisible(true);
             routeInfoRef.current = null;
             routeStepsRef.current = [];
@@ -466,17 +687,38 @@ export default function MapView({
 
     polylineRef.current.setVisible(false);
     dirRendererRef.current.set("directions", null);
+    fullRoutePathRef.current = [];
     routeInfoRef.current = null;
     routeStepsRef.current = [];
+    routePolylineRef.current = [];
     onRouteInfoRef.current?.(null);
-  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, pathKey, status, navigationZoom]);
+  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, deviatedOrigin?.lat, deviatedOrigin?.lng, pathKey, status, navigationZoom]);
 
-  // Explicit recenter for non-navigation maps.
+  // Reset deviation tracking when endpoints change (new phase or new route).
+  useEffect(() => {
+    setDeviatedOrigin(null);
+    recalculatingRef.current = false;
+  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng]);
+
+  // Explicit recenter for non-navigation maps or when recenterTrigger changes.
   useEffect(() => {
     if (mapRef.current && recenter && status === "ready" && !followDriver) {
-      mapRef.current.panTo(recenter);
+      mapRef.current.panTo({ lat: recenter.lat, lng: recenter.lng });
+      if (recenterZoom) {
+        mapRef.current.setZoom(recenterZoom);
+      }
     }
-  }, [recenter?.lat, recenter?.lng, status, followDriver]);
+  }, [recenter?.lat, recenter?.lng, recenterTrigger, recenterZoom, status, followDriver]);
+
+  // Ensure map canvas adapts when rotating navigation mode is toggled.
+  useEffect(() => {
+    if (mapRef.current && window.google?.maps) {
+      window.google.maps.event.trigger(mapRef.current, "resize");
+      if (driverPos) {
+        mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, isRotating, heading));
+      }
+    }
+  }, [isRotating]);
 
   // Detect gm_authFailure that fires after map load.
   useEffect(() => {
@@ -504,23 +746,41 @@ export default function MapView({
   const resumeFollow = () => {
     setFollowSuspended(false);
     if (driverPos && mapRef.current) {
-      mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, tilt, heading));
+      mapRef.current.panTo(offsetCenter({ lat: driverPos.lat, lng: driverPos.lng }, isRotating, heading));
       mapRef.current.setZoom(navigationZoom);
     }
   };
 
+  const currentBg = isDark ? "#0e1320" : "#f4f6f9";
+  const safeHeading = Number.isFinite(heading) ? heading : 0;
+
   return (
-    <div className={className} style={{ background: "#0e1320" }}>
+    <div className={`relative overflow-hidden ${className}`} style={{ background: currentBg }}>
       <div
         ref={containerRef}
-        className="absolute inset-0"
-        style={{
-          background: "#0e1320",
-          transform: tilt > 0 ? `perspective(1200px) rotateX(${tilt}deg) rotateZ(${-heading}deg) scale(1.25)` : "none",
-          transformOrigin: "center center",
-          transition: "transform 0.4s ease-out",
-          backfaceVisibility: "hidden",
-        }}
+        style={
+          isRotating
+            ? {
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                width: "180vmax",
+                height: "180vmax",
+                transform: `translate(-50%, -50%) rotate(${-safeHeading}deg)`,
+                transformOrigin: "center center",
+                transition: "transform 0.25s linear",
+                willChange: "transform",
+                background: currentBg,
+              }
+            : {
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                transform: "none",
+                background: currentBg,
+              }
+        }
       />
 
       {followDriver && followSuspended && status === "ready" && (

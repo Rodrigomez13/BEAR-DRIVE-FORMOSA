@@ -1,0 +1,48 @@
+{
+  "name": "RideMessage",
+  "type": "object",
+  "properties": {
+    "ride_id": {
+      "type": "string",
+      "description": "Ride this message belongs to"
+    },
+    "sender_id": {
+      "type": "string",
+      "description": "User sending the message"
+    },
+    "sender_role": {
+      "type": "string",
+      "enum": [
+        "passenger",
+        "driver"
+      ]
+    },
+    "text": {
+      "type": "string",
+      "description": "Message content (max 500 chars)",
+      "maxLength": 500
+    }
+  },
+  "required": [
+    "ride_id",
+    "sender_id",
+    "sender_role",
+    "text"
+  ],
+  "rls": {
+    "create": {
+      "data.sender_id": "{{user.id}}"
+    },
+    "read": null,
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

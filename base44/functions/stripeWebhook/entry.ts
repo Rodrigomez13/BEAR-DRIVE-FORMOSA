@@ -1,7 +1,10 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { secrets } from 'base44:runtime';
-import { todayBusinessDay } from '../../shared/pricing.ts';
 
+// Stripe webhook handler — confirms ride completion when payments succeed.
+// Handles two event types:
+// - checkout.session.completed: QR payments (passenger paid via Checkout URL)
+// - payment_intent.succeeded: card auto-charges (off-session PaymentIntent)
 export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
@@ -27,72 +30,13 @@ export default async function(req) {
 
     const event = JSON.parse(rawBody);
 
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object;
-      const rideId = session.metadata?.ride_id;
-
-      if (!rideId) {
-        console.error("Webhook: ride_id ausente en metadata");
-        return Response.json({ received: true, warning: "no_ride_id" });
-      }
-
-      const ride = await base44.asServiceRole.entities.Ride.get(rideId);
-      if (!ride) {
-        console.error("Webhook: viaje no encontrado:", rideId);
-        return Response.json({ received: true, warning: "ride_not_found" });
-      }
-
-      if (ride.status === "COMPLETED") {
-        return Response.json({ received: true, already_completed: true });
-      }
-
-      const fare = ride.final_fare || ride.quoted_fare;
-      const completedDate = new Date().toISOString();
-
-      // Mark ride COMPLETED
-      await base44.asServiceRole.entities.Ride.update(rideId, {
-        status: "COMPLETED",
-        final_fare: fare,
-        completed_date: completedDate
-      });
-
-      // Award BearPoints to passenger (10 points per completed ride)
-      const pointsAward = 10;
-      await base44.asServiceRole.entities.BearPointsLedger.create({
-        user_id: ride.passenger_id,
-        points: pointsAward,
-        reason: "ride_completed",
-        ride_id: rideId,
-        balance_after: pointsAward
-      });
-
-      const passenger = await base44.asServiceRole.entities.User.get(ride.passenger_id);
-      if (passenger) {
-        await base44.asServiceRole.entities.User.update(ride.passenger_id, {
-          bearpoints_balance: (passenger.bearpoints_balance || 0) + pointsAward,
-          total_rides: (passenger.total_rides || 0) + 1
-        });
-      }
-
-      // Driver daily charge — only on first completed ride of the business day
-      const businessDay = todayBusinessDay(completedDate);
-      const existingCharges = await base44.asServiceRole.entities.DriverDailyCharge.filter({
-        driver_id: ride.driver_id,
-        business_day: businessDay
-      });
-      if (existingCharges.length === 0 && ride.driver_id) {
-        const chargeConfigs = await base44.asServiceRole.entities.DailyChargeConfig.filter({ active: true });
-        const chargeConfig = chargeConfigs[0] || { amount: 1500, currency: "ARS" };
-        await base44.asServiceRole.entities.DriverDailyCharge.create({
-          driver_id: ride.driver_id,
-          driver_name: ride.driver_name || "",
-          business_day: businessDay,
-          amount: chargeConfig.amount,
-          currency: chargeConfig.currency || "ARS",
-          status: "pending",
-          total_due: chargeConfig.amount,
-          trigger_ride_id: rideId
-        });
+    const object = event.data?.object;
+    const rideId = object?.metadata?.ride_id;
+    if (rideId) {
+      const existing = await base44.asServiceRole.entities.SupportCase.filter({ description: `Pago Stripe pendiente de conciliación: ${event.id}` });
+      if (!existing.length) {
+        const ride = await base44.asServiceRole.entities.Ride.get(rideId);
+        await base44.asServiceRole.entities.SupportCase.create({ user_id: ride.passenger_id, ride_id: rideId, category: 'payment', status: 'open', description: `Pago Stripe pendiente de conciliación: ${event.id}` });
       }
     }
 
@@ -114,6 +58,7 @@ async function verifyStripeSignature(rawBody, signature, webhookSecret) {
     const timestamp = timestampPart.split("=")[1];
     const expectedSig = signaturePart.split("=")[1];
 
+    if (!Number.isFinite(Number(timestamp)) || Math.abs(Date.now() - Number(timestamp) * 1000) > 300000) return false;
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       "raw",

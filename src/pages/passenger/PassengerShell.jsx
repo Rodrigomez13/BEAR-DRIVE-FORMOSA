@@ -1,21 +1,13 @@
 import React from "react";
-import { Outlet } from "react-router-dom";
-import BottomNav from "@/components/bear/BottomNav";
-import { Navigation, Activity, Gift, User } from "lucide-react";
+import MobileAppShell from "@/components/layout/MobileAppShell";
+import { Navigation, Activity, Wallet, User } from "lucide-react";
 
 export default function PassengerShell() {
   const items = [
     { path: "", label: "Viajar", icon: Navigation },
-    { path: "activity", label: "Actividad", icon: Activity },
-    { path: "benefits", label: "Beneficios", icon: Gift },
-    { path: "profile", label: "Perfil", icon: User },
+    { path: "rides", label: "Viajes", icon: Activity },
+    { path: "wallet", label: "Billetera", icon: Wallet },
+    { path: "account", label: "Cuenta", icon: User },
   ];
-  return (
-    <div className="app-screen h-[100dvh] overflow-hidden flex flex-col bg-background">
-      <main className="flex-1 min-h-0 overflow-hidden relative">
-        <Outlet />
-      </main>
-      <BottomNav items={items} basePath="/passenger" />
-    </div>
-  );
+  return <MobileAppShell items={items} basePath="/passenger" />;
 }

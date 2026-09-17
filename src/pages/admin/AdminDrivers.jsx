@@ -7,12 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import StarRating from "@/components/bear/StarRating";
-import { CheckCircle2, XCircle, Loader2, FileText, Car, User, Clock, MoreHorizontal } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, FileText, Car, User, Clock, MoreHorizontal, Search, Pause, Play } from "lucide-react";
 import { businessDaysUntil } from "@/lib/businessDays";
+import LoadingScreen from "@/components/bear/LoadingScreen";
 
 const STATUS_LABELS = {
   DRAFT: "Borrador", SUBMITTED: "Enviada", UNDER_REVIEW: "En revisión",
-  APPROVED: "Aprobada", REJECTED: "Rechazada", MORE_INFO_REQUIRED: "Más info",
+  APPROVED: "Activa", REJECTED: "Rechazada", MORE_INFO_REQUIRED: "Más info", SUSPENDED: "Suspendida",
 };
 
 export default function AdminDrivers() {
@@ -24,6 +25,8 @@ export default function AdminDrivers() {
   const [vehicles, setVehicles] = useState([]);
   const [reason, setReason] = useState("");
   const [acting, setActing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     const load = async () => {
@@ -68,10 +71,56 @@ export default function AdminDrivers() {
     }
   };
 
-  const pendingApps = applications.filter(a => a.status === "SUBMITTED" || a.status === "UNDER_REVIEW");
-  const reviewedApps = applications.filter(a => ["APPROVED", "REJECTED", "MORE_INFO_REQUIRED"].includes(a.status));
+  // Quick approve/reject directly from the list without opening the detail view
+  const handleQuickAction = async (app, action) => {
+    let reasonText = "";
+    if (action === "reject") {
+      reasonText = window.prompt("Motivo del rechazo (obligatorio):") || "";
+      if (!reasonText.trim()) return;
+    }
+    try {
+      await base44.functions.invoke("reviewDriverApplication", {
+        application_id: app.id, action, reason: reasonText,
+      });
+      toast({ title: action === "approve" ? "Conductor aprobado" : "Solicitud rechazada" });
+      const data = await base44.entities.DriverApplication.filter({}, "-created_date", 100);
+      setApplications(data);
+    } catch (err) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
 
-  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
+  // One-click suspend / reactivate from the list
+  const handleStatusToggle = async (app, action) => {
+    try {
+      await base44.functions.invoke("reviewDriverApplication", {
+        application_id: app.id, action,
+      });
+      toast({ title: action === "suspend" ? "Conductor suspendido" : "Conductor reactivado" });
+      const data = await base44.entities.DriverApplication.filter({}, "-created_date", 100);
+      setApplications(data);
+    } catch (err) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const matchesSearch = (a) => !searchQuery ||
+    `${a.first_name} ${a.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (a.applicant_email || "").toLowerCase().includes(searchQuery.toLowerCase());
+
+  const pendingApps = applications.filter(a => (a.status === "SUBMITTED" || a.status === "UNDER_REVIEW") && matchesSearch(a));
+
+  const filteredApps = applications.filter(a => {
+    if (!matchesSearch(a)) return false;
+    if (statusFilter === "all") return true;
+    if (statusFilter === "pending") return ["SUBMITTED", "UNDER_REVIEW"].includes(a.status);
+    if (statusFilter === "active") return a.status === "APPROVED";
+    if (statusFilter === "suspended") return a.status === "SUSPENDED";
+    if (statusFilter === "rejected") return a.status === "REJECTED";
+    return true;
+  });
+
+  if (loading) return <LoadingScreen className="h-64" label="Cargando..." />;
 
   if (selected) {
     return (
@@ -109,11 +158,11 @@ export default function AdminDrivers() {
               <div key={d.id} className="flex items-center justify-between p-2 rounded-lg bg-secondary/30">
                 <div>
                   <p className="text-sm font-medium">{d.label}</p>
-                  {d.expires_at && <p className="text-xs text-muted-foreground">Vence: {d.expires_at}</p>}
+                  {d.expires_at && <p className="text-[14px] text-muted-foreground">Vence: {d.expires_at}</p>}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${d.status === "APPROVED" ? "bg-green-100 text-green-700" : d.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-accent/10 text-accent"}`}>{d.status}</span>
-                  {d.file_url && <a href={d.file_url} target="_blank" rel="noreferrer" className="text-xs text-accent hover:underline">Ver archivo</a>}
+                  <span className={`text-[14px] px-2 py-0.5 rounded-full ${d.status === "APPROVED" ? "bg-green-100 text-green-700" : d.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-accent/10 text-accent"}`}>{d.status}</span>
+                  {d.file_url && <a href={d.file_url} target="_blank" rel="noreferrer" className="text-[14px] text-accent hover:underline">Ver archivo</a>}
                 </div>
               </div>
             ))}
@@ -129,14 +178,14 @@ export default function AdminDrivers() {
                 <div>
                   <p className="font-semibold text-sm">Cuenta regresiva de revisión</p>
                   <p className="text-2xl font-bold text-accent">{businessDaysUntil(selected.review_deadline)} días hábiles restantes</p>
-                  <p className="text-xs text-white/60">Vence: {new Date(selected.review_deadline).toLocaleDateString("es-AR")}</p>
+                  <p className="text-[14px] text-white/60">Vence: {new Date(selected.review_deadline).toLocaleDateString("es-AR")}</p>
                 </div>
               </div>
             </Card>
           )}
           {selected.auto_review_notes && (
             <Card className="p-4 mb-4 bg-accent/5">
-              <p className="text-xs font-semibold text-muted-foreground mb-1">Verificación automática</p>
+              <p className="text-[14px] font-semibold text-muted-foreground mb-1">Verificación automática</p>
               <p className="text-sm">{selected.auto_review_notes}</p>
             </Card>
           )}
@@ -144,7 +193,7 @@ export default function AdminDrivers() {
             <p className="font-semibold text-sm mb-3">Acciones</p>
             <div className="space-y-3">
               <div>
-                <Label className="text-xs">Motivo (obligatorio para rechazar / solicitar info)</Label>
+                <Label className="text-[14px]">Motivo (obligatorio para rechazar / solicitar info)</Label>
                 <Input value={reason} onChange={e => setReason(e.target.value)} placeholder="Ej: Documento ilegible, falta información..." className="mt-1" />
               </div>
               <div className="flex gap-2">
@@ -174,7 +223,38 @@ export default function AdminDrivers() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Conductores</h1>
+      <h1 className="text-2xl font-bold mb-4">Conductores</h1>
+
+      <div className="mb-6 space-y-3">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre o email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { key: "all", label: "Todos" },
+            { key: "pending", label: "Pendientes" },
+            { key: "active", label: "Activos" },
+            { key: "suspended", label: "Suspendidos" },
+            { key: "rejected", label: "Rechazados" },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setStatusFilter(tab.key)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors no-select ${
+                statusFilter === tab.key ? "bear-gold-gradient text-foreground" : "bg-secondary text-muted-foreground hover:bg-secondary/80"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {pendingApps.length > 0 && (
         <>
@@ -185,14 +265,20 @@ export default function AdminDrivers() {
                 <div>
                   <p className="font-semibold">{app.first_name} {app.last_name}</p>
                   <p className="text-sm text-muted-foreground">{app.applicant_email}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Enviada: {new Date(app.submitted_date || app.created_date).toLocaleDateString("es-AR")}</p>
+                  <p className="text-[14px] text-muted-foreground mt-1">Enviada: {new Date(app.submitted_date || app.created_date).toLocaleDateString("es-AR")}</p>
                   {app.status === "UNDER_REVIEW" && app.review_deadline && (
-                    <p className="text-xs text-accent mt-1 flex items-center gap-1"><Clock className="w-3 h-3" />{businessDaysUntil(app.review_deadline)} días hábiles restantes</p>
+                    <p className="text-[14px] text-accent mt-1 flex items-center gap-1"><Clock className="w-3 h-3" />{businessDaysUntil(app.review_deadline)} días hábiles restantes</p>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent">{STATUS_LABELS[app.status]}</span>
-                  <Button size="sm" className="bear-gold-gradient text-foreground border-0">Revisar</Button>
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <span className="text-[14px] font-semibold px-2 py-1 rounded-full bg-accent/10 text-accent">{STATUS_LABELS[app.status]}</span>
+                  <button onClick={() => handleQuickAction(app, "approve")} className="w-9 h-9 rounded-full bg-green-600 text-white flex items-center justify-center hover:bg-green-700 shrink-0 no-select" title="Aprobar rápido">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleQuickAction(app, "reject")} className="w-9 h-9 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/90 shrink-0 no-select" title="Rechazar rápido">
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                  <Button size="sm" variant="outline" onClick={() => loadDetail(app)} className="shrink-0">Revisar</Button>
                 </div>
               </Card>
             ))}
@@ -200,20 +286,32 @@ export default function AdminDrivers() {
         </>
       )}
 
-      <h2 className="font-semibold text-sm mb-3">Todas las solicitudes</h2>
-      {applications.length === 0 ? (
-        <Card className="p-8 text-center"><p className="text-sm text-muted-foreground">No hay solicitudes de conductores</p></Card>
+      <h2 className="font-semibold text-sm mb-3">Todas las solicitudes ({filteredApps.length})</h2>
+      {filteredApps.length === 0 ? (
+        <Card className="p-8 text-center"><p className="text-sm text-muted-foreground">{searchQuery ? "Sin resultados para tu búsqueda" : "No hay solicitudes de conductores"}</p></Card>
       ) : (
         <div className="space-y-2">
-          {applications.map(app => (
+          {filteredApps.map(app => (
             <Card key={app.id} className="p-3 flex items-center justify-between cursor-pointer hover:border-accent" onClick={() => loadDetail(app)}>
               <div>
                 <p className="text-sm font-medium">{app.first_name} {app.last_name}</p>
-                <p className="text-xs text-muted-foreground">{app.applicant_email}</p>
+                <p className="text-[14px] text-muted-foreground">{app.applicant_email}</p>
               </div>
-              <span className={`text-xs font-semibold px-2 py-1 rounded-full ${app.status === "APPROVED" ? "bg-green-100 text-green-700" : app.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-secondary text-muted-foreground"}`}>
-                {STATUS_LABELS[app.status] || app.status}
-              </span>
+              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                <span className={`text-[14px] font-semibold px-2 py-1 rounded-full ${app.status === "APPROVED" ? "bg-green-100 text-green-700" : app.status === "SUSPENDED" ? "bg-orange-100 text-orange-700" : app.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-secondary text-muted-foreground"}`}>
+                  {STATUS_LABELS[app.status] || app.status}
+                </span>
+                {app.status === "APPROVED" && (
+                  <button onClick={() => handleStatusToggle(app, "suspend")} className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600 shrink-0 no-select" title="Suspender">
+                    <Pause className="w-4 h-4" />
+                  </button>
+                )}
+                {app.status === "SUSPENDED" && (
+                  <button onClick={() => handleStatusToggle(app, "reactivate")} className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center hover:bg-green-700 shrink-0 no-select" title="Reactivar">
+                    <Play className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </Card>
           ))}
         </div>

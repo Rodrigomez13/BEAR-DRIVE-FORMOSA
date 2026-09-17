@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -145,6 +143,11 @@
   .scrollbar-hide::-webkit-scrollbar { display: none; }
   .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
+  .no-select {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
   /* Insets for gesture navigation, notches and rounded display cut-outs. */
   .safe-top { padding-top: var(--safe-top); }
   .safe-bottom { padding-bottom: var(--safe-bottom); }
@@ -172,8 +175,28 @@
   }
 
   .tap-target {
-    min-width: 44px;
-    min-height: 44px;
+    min-width: 48px;
+    min-height: 48px;
+    touch-action: manipulation;
+  }
+
+  .mobile-app-shell {
+    width: 100%;
+    min-width: 0;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-top: var(--safe-top);
+    padding-left: var(--safe-left);
+    padding-right: var(--safe-right);
+  }
+  .mobile-app-main {
+    flex: 1 1 0%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .animate-fade-in { animation: fade-in 0.25s ease-out; }
@@ -202,4 +225,16 @@
   .mobile-content {
     width: min(100%, 38rem);
   }
+}
+
+/* Keep map controls and the app navigation outside the request panel scroll. */
+.map-sheet-content {
+  max-height: min(58vh, 36rem);
+  max-height: min(58dvh, 36rem);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-padding-block: 1rem;
+}
+@media (max-height: 550px) {
+  .map-sheet-content { max-height: 42dvh; }
 }

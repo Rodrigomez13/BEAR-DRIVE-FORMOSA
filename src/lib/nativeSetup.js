@@ -5,16 +5,49 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 
 const StatusBar = registerPlugin("StatusBar");
 const SplashScreen = registerPlugin("SplashScreen");
+const App = registerPlugin("App");
+
+let initialized = false;
+
+function resolveInitialTheme() {
+  const stored = localStorage.getItem("bear_theme");
+  if (stored) return stored;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+// Updates the native status bar style to match the active theme.
+// Called by ThemeContext on every theme change; safe to call on web (no-op).
+export async function updateStatusBarStyle(theme) {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    const isDark = theme === "dark";
+    await StatusBar.setStyle({ style: isDark ? "DARK" : "LIGHT" });
+    await StatusBar.setBackgroundColor({ color: isDark ? "#0A0D14" : "#181E2F" });
+  } catch (e) {
+    console.warn("[nativeSetup] StatusBar no disponible:", e);
+  }
+}
 
 export async function initNative() {
-  if (!Capacitor.isNativePlatform()) return;
+  if (!Capacitor.isNativePlatform() || initialized) return;
+  initialized = true;
+
+  try {
+    await App.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) {
+        window.dispatchEvent(new Event("bear-app-resume"));
+        window.dispatchEvent(new Event("bear-payment-return"));
+      }
+    });
+  } catch (error) {
+    console.warn("[nativeSetup] No se pudo registrar el regreso a la app", error);
+  }
 
   try {
     // El WebView queda debajo de las barras del sistema para evitar que contenido,
     // botones o mapas queden ocultos bajo la barra de estado en distintos equipos.
     await StatusBar.setOverlaysWebView({ overlay: false });
-    await StatusBar.setStyle({ style: "LIGHT" });
-    await StatusBar.setBackgroundColor({ color: "#181E2F" });
+    await updateStatusBarStyle(resolveInitialTheme());
   } catch (e) {
     console.warn("[nativeSetup] StatusBar no disponible:", e);
   }

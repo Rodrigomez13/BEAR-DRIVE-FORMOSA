@@ -35,8 +35,37 @@ function formatAddressFromResult(result) {
   return result.formatted_address || "";
 }
 
+export const FORMOSA_POIS = [
+  { name: "Plaza San Martín", address: "Av. 25 de Mayo y Fontana", lat: -26.1849, lng: -58.1731, category: "Plaza Central" },
+  { name: "Costanera Vuelta Fermosa", address: "Av. Costanera y San Martín", lat: -26.1772, lng: -58.1635, category: "Paseo Costero" },
+  { name: "Terminal de Ómnibus", address: "Av. Gutnisky 4200", lat: -26.1965, lng: -58.1990, category: "Transporte" },
+  { name: "Aeropuerto El Pucú (FMA)", address: "Ruta Nacional 11 Km 1167", lat: -26.2132, lng: -58.2284, category: "Aeropuerto" },
+  { name: "UNaF (Universidad Nacional)", address: "Av. Gutnisky 3200", lat: -26.1910, lng: -58.2050, category: "Educación" },
+  { name: "Hospital Central de Formosa", address: "Mitre y Salta", lat: -26.1812, lng: -58.1802, category: "Salud" },
+  { name: "Peatonal Rivadavia", address: "Rivadavia 450", lat: -26.1833, lng: -58.1710, category: "Centro Comercial" },
+  { name: "Estadio Cincuentenario", address: "Av. Néstor Kirchner y Colombia", lat: -26.1730, lng: -58.1890, category: "Deportes y Eventos" },
+  { name: "La Cruz del Norte", address: "Acceso Sur y Ruta 11", lat: -26.2215, lng: -58.2130, category: "Monumento / Acceso" },
+];
+
 export async function searchPlaces(query) {
-  if (!query || query.trim().length < 3) return [];
+  if (!query || query.trim().length < 2) return [];
+  const qNorm = query.trim().toLowerCase();
+
+  // Local POIs match first for instant Formosa reference
+  const matchingPois = FORMOSA_POIS.filter(
+    (p) =>
+      p.name.toLowerCase().includes(qNorm) ||
+      p.address.toLowerCase().includes(qNorm) ||
+      p.category.toLowerCase().includes(qNorm)
+  ).map((p) => ({
+    place_id: `poi_${p.name.replace(/\s+/g, "_")}`,
+    label: `${p.name} (${p.address})`,
+    main_text: p.name,
+    secondary_text: `${p.category} · ${p.address}, Formosa`,
+    location: { lat: p.lat, lng: p.lng, label: `${p.name}, ${p.address}` },
+    is_poi: true,
+  }));
+
   try {
     const g = await onMapsSDKReady();
     const autoService = new g.maps.places.AutocompleteService();
@@ -56,18 +85,29 @@ export async function searchPlaces(query) {
         }
       );
     });
-    return predictions.slice(0, 5).map((p) => ({
+    const googleResults = predictions.slice(0, 5).map((p) => ({
       place_id: p.place_id,
       label: p.description,
       main_text: p.structured_formatting?.main_text || (p.description || "").split(",")[0],
       secondary_text: p.structured_formatting?.secondary_text || "",
     }));
+
+    return [...matchingPois, ...googleResults];
   } catch {
-    return [];
+    return matchingPois;
   }
 }
 
-export async function geocodePlace(placeId) {
+export async function geocodePlace(placeId, directLocation = null) {
+  if (directLocation && directLocation.lat && directLocation.lng) {
+    return directLocation;
+  }
+  if (placeId && placeId.startsWith("poi_")) {
+    const poi = FORMOSA_POIS.find((p) => `poi_${p.name.replace(/\s+/g, "_")}` === placeId);
+    if (poi) {
+      return { lat: poi.lat, lng: poi.lng, label: `${poi.name} (${poi.address})` };
+    }
+  }
   try {
     const g = await onMapsSDKReady();
     const placesService = new g.maps.places.PlacesService(document.createElement("div"));

@@ -1,3 +1,4 @@
+import { premiumEligible } from '../../shared/domain.ts';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
 export default async function(req) {
@@ -14,13 +15,22 @@ export default async function(req) {
     const { application_id, action, reason } = body;
 
     if (!application_id) return Response.json({ error: "application_id es obligatorio" }, { status: 400 });
-    if (!["approve", "reject", "more_info"].includes(action)) {
+    if (!["approve", "reject", "more_info", "suspend", "reactivate"].includes(action)) {
       return Response.json({ error: "Acción inválida" }, { status: 400 });
     }
 
     const application = await base44.asServiceRole.entities.DriverApplication.get(application_id);
     if (!application) return Response.json({ error: "Solicitud no encontrada" }, { status: 404 });
 
+    if (action === "approve" || action === "reactivate") {
+      const [requirements, documents] = await Promise.all([
+        base44.asServiceRole.entities.DocumentRequirement.filter({ enabled: true, required: true }),
+        base44.asServiceRole.entities.DriverDocument.filter({ application_id }),
+      ]);
+      if (!requirements.length || requirements.some(r => !documents.some(d => d.code === r.code && d.file_url && (!r.requires_expiration || (d.expires_at && d.expires_at >= new Date().toISOString().slice(0,10)))))) {
+        return Response.json({ error: "Faltan documentos obligatorios vigentes" }, { status: 400 });
+      }
+    }
     const now = new Date().toISOString();
     let newStatus, driverStatus, capability, logAction;
 
@@ -34,6 +44,16 @@ export default async function(req) {
       driverStatus = "REJECTED";
       capability = "NO_DRIVER";
       logAction = "driver_rejected";
+    } else if (action === "suspend") {
+      newStatus = "SUSPENDED";
+      driverStatus = "SUSPENDED";
+      capability = "SUSPENDED";
+      logAction = "driver_suspended";
+    } else if (action === "reactivate") {
+      newStatus = "APPROVED";
+      driverStatus = "APPROVED";
+      capability = "APPROVED_ELIGIBLE";
+      logAction = "driver_reactivated";
     } else {
       newStatus = "MORE_INFO_REQUIRED";
       driverStatus = "MORE_INFO_REQUIRED";
@@ -47,7 +67,8 @@ export default async function(req) {
       reviewed_by: user.id,
       review_date: now,
       rejection_reason: action === "reject" ? reason : null,
-      more_info_reason: action === "more_info" ? reason : null
+      more_info_reason: action === "more_info" ? reason : null,
+      suspend_reason: action === "suspend" ? (reason || "Suspensión administrativa") : null
     });
 
     // Update user driver status + capability
@@ -71,7 +92,7 @@ export default async function(req) {
       // Approve pending vehicles
       const vehicles = await base44.asServiceRole.entities.Vehicle.filter({ driver_id: application.user_id, status: "pending" });
       for (const v of vehicles) {
-        await base44.asServiceRole.entities.Vehicle.update(v.id, { status: "approved" });
+        await base44.asServiceRole.entities.Vehicle.update(v.id, { status: "approved", premium_eligible: premiumEligible(v), premium_approved_by: user.id });
       }
     }
 

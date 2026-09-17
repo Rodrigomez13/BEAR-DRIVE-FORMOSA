@@ -7,6 +7,8 @@ export const base44 = createClient({
   appId,
   token,
   functionsVersion,
-  serverUrl: '',
-  appBaseUrl
+  appBaseUrl,
+  ...(import.meta.env.DEV
+    ? { serverUrl: 'http://localhost:4400' }
+    : {})
 });

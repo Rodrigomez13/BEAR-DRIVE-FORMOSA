@@ -2,6 +2,8 @@
   "name": "DriverApplication",
   "type": "object",
   "properties": {
+    "operation_lock": { "type": "string" },
+    "operation_started_at": { "type": "string" },
     "user_id": {
       "type": "string",
       "description": "Applicant user id"
@@ -21,7 +23,8 @@
         "UNDER_REVIEW",
         "APPROVED",
         "REJECTED",
-        "MORE_INFO_REQUIRED"
+        "MORE_INFO_REQUIRED",
+        "SUSPENDED"
       ],
       "default": "DRAFT"
     },
@@ -55,7 +58,14 @@
       "format": "date-time"
     },
     "reviewed_by": {
-      "type": "string"
+      "type": "string",
+      "rls": {
+        "write": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      }
     },
     "review_date": {
       "type": "string",
@@ -76,6 +86,10 @@
     "more_info_reason": {
       "type": "string"
     },
+    "suspend_reason": {
+      "type": "string",
+      "description": "Reason for admin suspension"
+    },
     "idempotency_key": {
       "type": "string"
     }
@@ -85,18 +99,7 @@
     "status"
   ],
   "rls": {
-    "create": {
-      "$or": [
-        {
-          "data.user_id": "{{user.id}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
+    "create": false,
     "read": {
       "$or": [
         {
@@ -109,18 +112,7 @@
         }
       ]
     },
-    "update": {
-      "$or": [
-        {
-          "data.user_id": "{{user.id}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
+    "update": false,
     "delete": {
       "$or": [
         {

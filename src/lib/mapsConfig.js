@@ -90,7 +90,7 @@ export function loadMapsSDK() {
       };
 
       const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&language=es&region=AR&v=weekly&callback=${callbackName}`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places,geometry&language=es&region=AR&v=weekly&callback=${callbackName}`;
       script.async = true;
       script.defer = true;
       script.onerror = () => {
