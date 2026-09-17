@@ -392,33 +392,39 @@ export default function PassengerViajar() {
     setActiveRide(tempRide);
     setQuote(null);
     try {
-<<<<<<< HEAD
-      const response = await beardrive.rides.request({
-        quote_id: quote.id,
-        payment_method: paymentMethod === "cash" ? "cash" : "qr",
-        notes: notes.join(" · "),
-=======
-      const ride = await base44.entities.Ride.create({
-        passenger_id: user.id,
-        passenger_name: sanitizeString(user.full_name || user.email, 100),
-        status: "SEARCHING",
-        origin_address: sanitizeString(originAddress, 300) || "Ubicación seleccionada",
-        origin_lat: origin.lat,
-        origin_lng: origin.lng,
-        destination_address: sanitizeString(destinationAddress, 300) || "Ubicación seleccionada",
-        destination_lat: destination.lat,
-        destination_lng: destination.lng,
-        category,
-        payment_method: paymentMethod,
-        quoted_fare: finalFare,
-        distance_km: quote.distance_km,
-        duration_min: quote.duration_min,
-        start_pin: pin,
-        notes: finalNotes,
-        quote_data: JSON.stringify(quote),
->>>>>>> 0d3a9a0eb5ae3325a2ad4b14ceafa159667e7f8b
-      });
+      const quoteId = quote.id || quote.quote_id;
+      let ride;
+      if (quoteId) {
+        const response = await beardrive.rides.request({
+          quote_id: quoteId,
+          payment_method: paymentMethod === "cash" ? "cash" : "qr",
+          notes: finalNotes,
+        });
+        if (!response.data?.ride?.id) throw new Error("No se pudo confirmar la solicitud");
+        ride = response.data.ride;
+      } else {
+        ride = await base44.entities.Ride.create({
+          passenger_id: user.id,
+          passenger_name: sanitizeString(user.full_name || user.email, 100),
+          status: "SEARCHING",
+          origin_address: sanitizeString(originAddress, 300) || "Ubicación seleccionada",
+          origin_lat: origin.lat,
+          origin_lng: origin.lng,
+          destination_address: sanitizeString(destinationAddress, 300) || "Ubicación seleccionada",
+          destination_lat: destination.lat,
+          destination_lng: destination.lng,
+          category,
+          payment_method: paymentMethod,
+          quoted_fare: finalFare,
+          distance_km: quote.distance_km,
+          duration_min: quote.duration_min,
+          start_pin: pin,
+          notes: finalNotes,
+          quote_data: JSON.stringify(quote),
+        });
+      }
       setActiveRide(ride);
+      Haptics.success();
       toast({ title: "Viaje solicitado", description: "Buscando conductores cercanos..." });
     } catch (err) {
       setActiveRide(null);
@@ -519,12 +525,12 @@ export default function PassengerViajar() {
     }
     setPaying(true);
     try {
-<<<<<<< HEAD
-      await openPayment(async () => (await beardrive.payments.rideCheckout({ ride_id: activeRide.id })).data.checkout_url);
-=======
-      const res = await base44.functions.invoke("getRidePaymentUrl", { ride_id: activeRide.id });
-      if (res.data?.checkout_url) window.location.href = res.data.checkout_url;
->>>>>>> 0d3a9a0eb5ae3325a2ad4b14ceafa159667e7f8b
+      const res = await beardrive.payments.rideCheckout({ ride_id: activeRide.id });
+      if (res.data?.checkout_url) {
+        window.location.href = res.data.checkout_url;
+      } else {
+        toast({ title: "No se pudo obtener el link de pago", variant: "destructive" });
+      }
     } catch (err) {
       toast({ title: "Error al obtener link de pago", description: err.message, variant: "destructive" });
     } finally {
@@ -542,16 +548,12 @@ export default function PassengerViajar() {
     }
     setPaying(true);
     try {
-<<<<<<< HEAD
-      await openPayment(async () => (await beardrive.payments.createRidePayment({ ride_id: activeRide.id })).data.checkout_url);
-=======
-      const res = await base44.functions.invoke("createRidePayment", { ride_id: activeRide.id });
+      const res = await beardrive.payments.createRidePayment({ ride_id: activeRide.id });
       if (res.data?.checkout_url) {
         window.location.href = res.data.checkout_url;
       } else {
         toast({ title: "No se pudo iniciar el pago", variant: "destructive" });
       }
->>>>>>> 0d3a9a0eb5ae3325a2ad4b14ceafa159667e7f8b
     } catch (err) {
       toast({ title: "Error al iniciar el pago", description: err.message, variant: "destructive" });
     } finally {
