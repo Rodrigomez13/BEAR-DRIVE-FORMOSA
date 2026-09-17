@@ -130,9 +130,12 @@ export default function DriverConducir() {
   const lastLocationPersistRef = useRef(0);
   const silencedRides = useRef(new Set());
   const prevPosRef = useRef(null);
+  const driverPosRef = useRef(null);
   const arrivalHitsRef = useRef({ pickup: 0, destination: 0 });
   const transitionInFlightRef = useRef(false);
   const phaseRef = useRef(null);
+
+  driverPosRef.current = driverPos;
 
   const eligible = user?.driver_capability === "APPROVED_ELIGIBLE";
 
