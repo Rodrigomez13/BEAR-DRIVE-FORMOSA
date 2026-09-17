@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { addBusinessDays } from '../../shared/businessDays.ts';
 
-export default async function(req) {
+export default async function(req: Request): Promise<Response> {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
@@ -60,13 +60,25 @@ export default async function(req) {
         review_deadline: deadline.toISOString(),
         auto_review_notes: "Verificación automática completada. Documentos legibles y válidos."
       });
-      // Notify driver that documentation passed to review
+
+      // Notify driver that documentation passed to review.
+      // Crucial: Use verified account email (not user-supplied applicant_email) and sanitize recipient name.
       try {
-        await base44.asServiceRole.integrations.Core.SendEmail({
-          to: application.applicant_email,
-          subject: "BearDrive - Tu documentación pasó a revisión",
-          text: `Hola ${application.applicant_name || ""},\n\nTu documentación fue verificada automáticamente y pasó a la etapa de revisión administrativa. Tenés 3 días hábiles para que nuestro equipo confirme tu solicitud.\n\nGracias por postularte a BearDrive.`,
-        });
+        const applicantUser = application.user_id === user.id
+          ? user
+          : await base44.asServiceRole.entities.User.get(application.user_id);
+
+        const verifiedEmail = applicantUser?.email;
+        if (verifiedEmail) {
+          const rawName = (applicantUser?.full_name || application.applicant_name || "").replace(/[\r\n\t]/g, " ").trim();
+          const safeName = rawName.slice(0, 50);
+
+          await base44.asServiceRole.integrations.Core.SendEmail({
+            to: verifiedEmail,
+            subject: "BearDrive - Tu documentación pasó a revisión",
+            text: `Hola${safeName ? ` ${safeName}` : ""},\n\nTu documentación fue verificada automáticamente y pasó a la etapa de revisión administrativa. Tenés 3 días hábiles para que nuestro equipo confirme tu solicitud.\n\nGracias por postularte a BearDrive.`,
+          });
+        }
       } catch (e) {
         // Email failure shouldn't block the flow
       }
@@ -85,7 +97,7 @@ export default async function(req) {
       });
       return Response.json({ ok: true, status: "MORE_INFO_REQUIRED", issues });
     }
-  } catch (error) {
+  } catch (error: any) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 }

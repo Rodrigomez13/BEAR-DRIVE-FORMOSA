@@ -1,32 +1,26 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
-// In-memory rate limiter to slow down DNI enumeration.
-// Best-effort: persists across warm invocations only.
+// In-memory rate limiter per authenticated user to prevent DNI enumeration.
+// Uses user.id as key so rotating HTTP headers (like X-Forwarded-For) cannot bypass it.
 const attempts = new Map<string, { count: number; resetAt: number }>();
-const MAX_ATTEMPTS = 15;
+const MAX_ATTEMPTS = 10;
 const WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
-function getClientIp(req: Request): string {
-  const fwd = req.headers?.get?.("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim();
-  return "unknown";
-}
-
-function isBlocked(key: string): boolean {
-  const entry = attempts.get(key);
+function isBlocked(userId: string): boolean {
+  const entry = attempts.get(userId);
   if (!entry) return false;
   if (Date.now() > entry.resetAt) {
-    attempts.delete(key);
+    attempts.delete(userId);
     return false;
   }
   return entry.count >= MAX_ATTEMPTS;
 }
 
-function recordAttempt(key: string) {
+function recordAttempt(userId: string) {
   const now = Date.now();
-  const entry = attempts.get(key);
+  const entry = attempts.get(userId);
   if (!entry || now > entry.resetAt) {
-    attempts.set(key, { count: 1, resetAt: now + WINDOW_MS });
+    attempts.set(userId, { count: 1, resetAt: now + WINDOW_MS });
     return;
   }
   entry.count++;
@@ -40,8 +34,7 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const rateKey = `${user.id}_${getClientIp(req)}`;
-    if (isBlocked(rateKey)) {
+    if (isBlocked(user.id)) {
       return Response.json({ available: false, message: "Demasiadas consultas. Intentá nuevamente en unos minutos." }, { status: 429 });
     }
 
@@ -55,7 +48,7 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ available: false, message: "El DNI debe tener 7 u 8 dígitos" }, { status: 400 });
     }
 
-    recordAttempt(rateKey);
+    recordAttempt(user.id);
 
     const existing = await base44.asServiceRole.entities.User.filter({ dni: cleanDni }, undefined, 1);
     if (existing.length > 0 && existing[0].id !== user.id) {
