@@ -16,6 +16,11 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
     const { ride_id, round } = body;
     if (!ride_id) return Response.json({ error: "ride_id es obligatorio" }, { status: 400 });
@@ -29,8 +34,17 @@ export default async function(req) {
     } catch {
       return Response.json({ skipped: true, reason: "ride_not_found" });
     }
+
+    if (!ride) {
+      return Response.json({ skipped: true, reason: "ride_not_found" });
+    }
+
+    if (user.role !== 'admin' && ride.passenger_id !== user.id) {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     // Skip if a driver already accepted — later rounds are no-ops.
-    if (!ride || ride.status !== "SEARCHING") {
+    if (ride.status !== "SEARCHING") {
       return Response.json({ skipped: true, reason: "not_searching" });
     }
     if (ride.origin_lat == null || ride.origin_lng == null) {

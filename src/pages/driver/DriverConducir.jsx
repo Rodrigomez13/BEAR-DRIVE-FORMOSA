@@ -79,7 +79,7 @@ function navigationPhase(status) {
   return null;
 }
 
-function formatManeuverDistance(meters) {
+function _formatManeuverDistance(meters) {
   if (!Number.isFinite(meters)) return "";
   if (meters < 1000) return `${Math.max(10, Math.round(meters / 10) * 10)} m`;
   return `${(meters / 1000).toFixed(1).replace(".", ",")} km`;
@@ -129,9 +129,12 @@ export default function DriverConducir() {
   const lastLocationPersistRef = useRef(0);
   const silencedRides = useRef(new Set());
   const prevPosRef = useRef(null);
+  const driverPosRef = useRef(null);
   const arrivalHitsRef = useRef({ pickup: 0, destination: 0 });
   const transitionInFlightRef = useRef(false);
   const phaseRef = useRef(null);
+
+  driverPosRef.current = driverPos;
 
   const eligible = user?.driver_capability === "APPROVED_ELIGIBLE";
 
