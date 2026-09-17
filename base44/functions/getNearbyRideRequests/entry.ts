@@ -1,8 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { api, all, eligibleVehicle, premiumEligible, ACTIVE } from '../../shared/domain.ts';
+import { api, all, eligibleVehicle, premiumEligible, requireNoDebt, ACTIVE } from '../../shared/domain.ts';
 import { haversineKm } from '../../shared/pricing.ts';
 export default req => api(req,createClientFromRequest,async (client,user) => {
  const e=client.asServiceRole.entities;
+ await requireNoDebt(client,user.id);
  const locations=await e.DriverLocation.filter({driver_id:user.id,online:true});
  const location=locations[0];
  if (!location || Date.now()-Date.parse(location.updated_date || location.created_date)>90000) return {rides:[]};

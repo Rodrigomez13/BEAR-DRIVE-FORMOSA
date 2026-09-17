@@ -16,8 +16,8 @@ export default function SecurityPrivacy() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-full bg-background">
-      <div className="responsive-content mx-auto px-5 pt-8 pb-10">
+    <div className="h-[100dvh] overflow-y-auto bg-background">
+      <div className="max-w-md mx-auto px-5 pt-8 pb-10">
         <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-sm text-muted-foreground mb-4">
           <ChevronLeft className="w-4 h-4" />Volver
         </button>

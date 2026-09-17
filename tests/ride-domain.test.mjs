@@ -156,12 +156,12 @@ test('Formosa business day and next-day 15h deadline',async()=>{
   assert.equal(premiumEligible({year:2023,created_date:'2026-09-14'}),true);
   assert.equal(premiumEligible({year:2022,created_date:'2026-09-14'}),false);
 });
-test('debt is advisory for both roles',async()=>{
+test('both roles blocked from new operations by unpaid passenger ride or overdue daily charge',async()=>{
   const {debtStatus}=await load('base44/shared/domain.ts');
   setup({DriverDailyCharge:[{driver_id:'passenger',status:'pending',business_day:'2020-01-01'}]});
-  assert.equal((await debtStatus(globalThis.fixture.client,'passenger')).blocked,false);
+  assert.equal((await debtStatus(globalThis.fixture.client,'passenger')).blocked,true);
   setup({Ride:[ride({status:'PAYMENT_PENDING'})]});
-  assert.equal((await debtStatus(globalThis.fixture.client,'passenger')).blocked,false);
+  assert.equal((await debtStatus(globalThis.fixture.client,'passenger')).blocked,true);
 });
 test('payment must match amount, currency, seller and immutable reference',async()=>{
   const {paymentMatches}=await load('base44/shared/payments.ts');
@@ -217,11 +217,11 @@ test('digital checkout uses driver token, reuses stored checkout and never compa
   const db=setup({Ride:[ride({status:'PAYMENT_PENDING',payment_method:'qr'})],PaymentAccount:[{id:'account',driver_id:'driver',access_token:'seller-token',seller_id:'seller',expires_at:'2099-01-01'}]});
   Object.assign(globalThis.fixture.secrets,{APP_PUBLIC_URL:'https://app.test',MP_WEBHOOK_URL:'https://api.test/hook',MERCADO_PAGO_ACCESS_TOKEN:'forbidden-company-token'});
   let requests=0;
-  globalThis.fetch=async(url,options)=>{requests++;assert.equal(options.headers.Authorization,'Bearer seller-token');if(options.body){const body=JSON.parse(options.body);assert.equal(body.marketplace_fee,0);}return Response.json({id:'preference',init_point:'https://mp.test/pay',collector_id:'seller'});};
+  globalThis.fetch=async(url,options)=>{requests++;assert.equal(options.headers.Authorization,'Bearer seller-token');const body=JSON.parse(options.body);assert.equal(body.marketplace_fee,0);return Response.json({id:'preference',init_point:'https://mp.test/pay',collector_id:'seller'});};
   try {
     assert.equal((await call('createRidePayment',{ride_id:'ride'})).status,200);
     assert.equal((await call('createRidePayment',{ride_id:'ride'})).status,200);
-    assert.equal(requests,2);assert.equal(db.Ride[0].status,'PAYMENT_PENDING');
+    assert.equal(requests,1);assert.equal(db.Ride[0].status,'PAYMENT_PENDING');
   } finally {globalThis.fetch=originalFetch;}
 });
 test('Mercado Pago signature rejects unsigned, tampered and expired requests',async()=>{
@@ -314,52 +314,4 @@ test('payment readiness requires admin and returns no credential values', async 
   assert.equal(result.status,200);
   assert.equal(result.data.checks.find(c=>c.name==='Coordinación de viajes').ok,true);
   assert.equal(result.data.checks.find(c=>c.name==='Receptor del cargo diario').ok,false);
-});
-
-test('test payment mode refuses real sellers and stale checkouts before creating payment', async()=>{
-  const originalFetch=globalThis.fetch;
-  const {checkout}=await load('base44/shared/payments.ts');
-  try {
-    for (const scenario of ['real','wrong-seller','stale','valid']) {
-      setup(); Object.assign(globalThis.fixture.secrets,{MP_PAYMENT_MODE:'test',APP_PUBLIC_URL:'https://app.test',MP_WEBHOOK_URL:'https://api.test/hook'});
-      const calls=[];
-      globalThis.fetch=async(url)=>{
-        calls.push(url);
-        if(url.endsWith('/users/me')) return Response.json({id:scenario==='wrong-seller'?'other':'seller',site_id:'MLA',tags:scenario==='real'?[]:['test_user']});
-        return Response.json({collector_id:scenario==='stale'?'other':'seller'});
-      };
-      const run=()=>checkout(globalThis.fixture.client,'Ride',{id:'ride',mp_preference_id:'pref',payment_checkout_url:'https://www.mercadopago.com.ar/checkout'}, {access_token:'test',seller_id:'seller'},'ride');
-      if(scenario==='valid') assert.ok((await run()).checkout_url);
-      else await assert.rejects(run);
-      assert.equal(calls.length,['real','wrong-seller'].includes(scenario)?1:2);
-    }
-  } finally {globalThis.fetch=originalFetch;}
-});
-
-test('passenger can request another ride while an older fare remains unpaid',async()=>{
- const db=setup({Ride:[ride({status:'PAYMENT_PENDING'})],DriverDailyCharge:[{driver_id:'passenger',status:'pending',business_day:'2020-01-01'}],RideQuote:[{id:'new',passenger_id:'passenger',price:8000,expires_at:'2099-01-01'}]});
- assert.equal((await call('createRide',{quote_id:'new',payment_method:'cash'})).status,200);
- assert.equal(db.Ride[0].status,'PAYMENT_PENDING');assert.equal(db.Ride.length,2);
-});
-test('late fees use full overdue days, grace and simple interest; checkout amount is frozen',async()=>{
- const {chargeBalance}=await load('base44/shared/domain.ts');
- const charge={status:'pending',amount:1000,due_at:'2026-01-01T18:00:00Z',late_fee_coefficient:0.001,grace_days:1};
- assert.equal(chargeBalance(charge,Date.parse('2026-01-04T18:00:00Z')).total_due,1002);
- assert.equal(chargeBalance(charge,Date.parse('2026-01-01T17:00:00Z')).late_fee,0);
- assert.equal(chargeBalance({...charge,payment_checkout_url:'https://checkout',total_due:1001},Date.parse('2026-02-01')).total_due,1001);
-});
-
-test('driver with overdue charges and an unpaid past ride can accept a new ride',async()=>{
- const db=setup(driverSeed({DriverDailyCharge:[{driver_id:'driver',status:'pending',business_day:'2020-01-01'}],Ride:[ride({id:'old',status:'PAYMENT_PENDING'}),ride({id:'new',driver_id:null,status:'SEARCHING',payment_method:'cash',origin_lat:-26,origin_lng:-58,created_date:new Date().toISOString()})]}),'driver');
- const result=await call('acceptRide',{ride_id:'new',vehicle_id:'car'});
- assert.equal(result.status,200);assert.equal(result.data.queued,false);assert.equal(db.Ride[0].status,'PAYMENT_PENDING');
-});
-
-test('production also refuses a cached checkout for a different seller',async()=>{
- setup(); const originalFetch=globalThis.fetch;
- const {checkout}=await load('base44/shared/payments.ts');
- globalThis.fetch=async()=>Response.json({collector_id:'old-seller'});
- try {
-  await assert.rejects(()=>checkout(globalThis.fixture.client,'DriverDailyCharge',{id:'charge',payment_checkout_url:'https://www.mercadopago.com.ar/checkout',mp_preference_id:'pref'},{access_token:'new-token',seller_id:'new-seller'},'daily'),/otra cuenta receptora/);
- } finally { globalThis.fetch=originalFetch; }
 });

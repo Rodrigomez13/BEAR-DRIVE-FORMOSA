@@ -208,7 +208,7 @@
 
 /* Small Android devices (320–359 px wide). */
 @media (max-width: 359px) {
-
+  html { font-size: 13px; }
   .mobile-content { width: 100%; }
 }
 
@@ -237,17 +237,4 @@
 }
 @media (max-height: 550px) {
   .map-sheet-content { max-height: 42dvh; }
-}
-
-/* Preserve the phone layout; give account screens room on larger displays. */
-.responsive-content { width: 100%; max-width: 28rem; min-width: 0; }
-@media (min-width: 768px) {
-  .responsive-content { max-width: 40rem; }
-}
-/* Avoid iOS focus zoom without shrinking text on narrow phones. */
-@media (pointer: coarse) {
-  input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
-}
-@media (max-height: 550px) {
-  .map-sheet-content { max-height: min(42dvh, calc(100dvh - 180px)); }
 }

@@ -55,5 +55,3 @@ skills-lock.json
 .env.base44.local
 .env.seed.local
 ```
-artifacts/
-android/keystore.properties

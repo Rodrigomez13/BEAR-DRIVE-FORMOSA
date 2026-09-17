@@ -30,9 +30,6 @@ async function resolveDailyChargeConfig(entities, completedDate) {
 
   return {
     amount,
-    late_fee_enabled: config.late_fee_enabled === true,
-    late_fee_coefficient: Math.max(0, Number(config.late_fee_coefficient) || 0),
-    grace_days: Math.max(0, Math.floor(Number(config.grace_days) || 0)),
     currency: String(config.currency || 'ARS'),
   };
 }
@@ -105,8 +102,6 @@ export async function finalizeRideCompletion(client, rideId, completedDate) {
             driver_name: ride.driver_name || '',
             business_day: day,
             amount: chargeConfig.amount,
-            late_fee_coefficient: chargeConfig.late_fee_enabled ? chargeConfig.late_fee_coefficient : 0,
-            grace_days: chargeConfig.grace_days || 0,
             total_due: chargeConfig.amount,
             currency: chargeConfig.currency,
             status: 'pending',

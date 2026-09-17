@@ -1,6 +1,6 @@
-import { openPayment } from "@/lib/payment-navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
+import { base44 } from "@/api/base44Client";
 import { beardrive } from "@/services/beardrive";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ import { useRideSubscription } from "@/hooks/useRideSubscription";
 import { sanitizeString } from "@/lib/sanitize";
 import Haptics from "@/lib/haptics";
 import BearAvatar from "@/components/bear/BearAvatar";
-import { MapPin, Search, Crosshair, Loader2, Star, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown, Share2, MessageCircle } from "lucide-react";
+import { MapPin, Search, Crosshair, Loader2, Star, Shield, X, CheckCircle2, Wallet, QrCode, Banknote, CreditCard, ChevronUp, ChevronDown, Share2, MessageCircle, Sparkles } from "lucide-react";
 import { Image } from "@/components/ui/image";
 import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
 import LoadingScreen from "@/components/bear/LoadingScreen";
@@ -33,7 +33,7 @@ const CATEGORIES = [
   { code: "premium", name: "BearPremium", eta: "5 min", desc: "Confort premium", badge: "Confort" },
 ];
 
-const ACTIVE_STATUSES = ["SEARCHING", "ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING", "PIN_VALIDATION", "IN_PROGRESS", "ARRIVED"];
+const ACTIVE_STATUSES = ["SEARCHING", "ASSIGNED", "DRIVER_APPROACHING", "DRIVER_ARRIVED", "WAITING", "PIN_VALIDATION", "IN_PROGRESS", "ARRIVED", "PAYMENT_PENDING"];
 
 export default function PassengerViajar() {
   const { user } = useAuth();
@@ -60,6 +60,8 @@ export default function PassengerViajar() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showSosDialog, setShowSosDialog] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [savedCard, setSavedCard] = useState(null);
+  const [linkingCard, setLinkingCard] = useState(false);
   const [paying, setPaying] = useState(false);
   const [driverPos, setDriverPos] = useState(null);
   const [userPos, setUserPos] = useState(null);
@@ -72,14 +74,15 @@ export default function PassengerViajar() {
   const [destExpanded, setDestExpanded] = useState(true);
   const [paymentExpanded, setPaymentExpanded] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(true);
+  const [usePoints, setUsePoints] = useState(false);
   const [cashNoteOption, setCashNoteOption] = useState("exact");
   const [pickupReference, setPickupReference] = useState("");
-  // A redirect is not proof of payment; the backend confirms accreditation.
+  // Handle Stripe redirect return + card setup return + fetch saved card
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const paymentStatus = params.get("payment");
     if (paymentStatus === "success") {
-      toast({ title: "Regresaste de Mercado Pago", description: "El pago se confirma al recibir la acreditación." });
+      toast({ title: "Pago procesado", description: "Confirmando con el conductor..." });
     } else if (paymentStatus === "cancelled") {
       toast({ title: "Pago cancelado", description: "Podés reintentar el pago", variant: "destructive" });
     }
@@ -90,6 +93,27 @@ export default function PassengerViajar() {
       window.history.replaceState({}, "", url);
     }
 
+    // Handle card setup return
+    const cardSetup = params.get("card_setup");
+    if (cardSetup === "success") {
+      toast({ title: "Tarjeta vinculada", description: "Ya podés pagar con tarjeta automáticamente" });
+    } else if (cardSetup === "cancelled") {
+      toast({ title: "Vinculación cancelada", variant: "destructive" });
+    }
+    if (cardSetup) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("card_setup");
+      window.history.replaceState({}, "", url);
+    }
+
+    // Fetch saved card info
+    const fetchCard = async () => {
+      try {
+        const res = await base44.functions.invoke("getPassengerPaymentMethod", {});
+        if (res.data?.has_card) setSavedCard(res.data);
+      } catch { /* ignore */ }
+    };
+    fetchCard();
   }, []);
 
   // Recover active ride on mount.
@@ -323,29 +347,87 @@ export default function PassengerViajar() {
     }
   };
 
-  const requestingRide = useRef(false);
-  // Create through the server: quote, fare, PIN and idempotency are authoritative.
+  // Request ride
   const handleRequestRide = async () => {
-    if (!quote?.id || requestingRide.current) return;
-    requestingRide.current = true;
-    const notes = [];
-    if (pickupReference.trim()) notes.push(`Ref: ${sanitizeString(pickupReference.trim(), 100)}`);
-    if (paymentMethod === "cash") notes.push(cashNoteOption === "exact" ? "Pago justo" : cashNoteOption === "change" ? "Necesita cambio" : `Abona con $${cashNoteOption}`);
+    if (!quote) return;
+    if (paymentMethod === "card" && !savedCard) {
+      toast({ title: "Vinculá una tarjeta primero", description: "Tocá \"Vincular tarjeta\" abajo", variant: "destructive" });
+      return;
+    }
+    Haptics.medium();
+    const pin = String(Math.floor(1000 + Math.random() * 9000));
+    const availablePoints = user?.bear_points || 0;
+    const pointsDiscount = (usePoints && availablePoints >= 50)
+      ? Math.min(Math.floor(availablePoints / 10) * 100, Math.floor(quote.price * 0.3))
+      : 0;
+    const finalFare = Math.max(quote.price - pointsDiscount, 500);
+
+    const notesList = [];
+    if (pickupReference.trim()) notesList.push(`Ref: ${sanitizeString(pickupReference.trim(), 100)}`);
+    if (paymentMethod === "cash") {
+      if (cashNoteOption === "exact") notesList.push("Pago justo (sin vuelto)");
+      else if (cashNoteOption === "change") notesList.push("Necesita cambio");
+      else notesList.push(`Abona con billete de $${Number(cashNoteOption).toLocaleString("es-AR")}`);
+    }
+    if (pointsDiscount > 0) notesList.push(`Desc. BearPoints: -$${pointsDiscount}`);
+    const finalNotes = notesList.join(" · ");
+
+    // Optimistic: show searching state immediately, roll back on failure
+    const tempRide = {
+      status: "SEARCHING",
+      origin_address: sanitizeString(originAddress, 300) || "Ubicación seleccionada",
+      origin_lat: origin.lat,
+      origin_lng: origin.lng,
+      destination_address: sanitizeString(destinationAddress, 300) || "Ubicación seleccionada",
+      destination_lat: destination.lat,
+      destination_lng: destination.lng,
+      category,
+      payment_method: paymentMethod,
+      quoted_fare: finalFare,
+      distance_km: quote.distance_km,
+      duration_min: quote.duration_min,
+      start_pin: pin,
+      notes: finalNotes,
+    };
+    setActiveRide(tempRide);
+    setQuote(null);
     try {
+<<<<<<< HEAD
       const response = await beardrive.rides.request({
         quote_id: quote.id,
         payment_method: paymentMethod === "cash" ? "cash" : "qr",
         notes: notes.join(" · "),
+=======
+      const ride = await base44.entities.Ride.create({
+        passenger_id: user.id,
+        passenger_name: sanitizeString(user.full_name || user.email, 100),
+        status: "SEARCHING",
+        origin_address: sanitizeString(originAddress, 300) || "Ubicación seleccionada",
+        origin_lat: origin.lat,
+        origin_lng: origin.lng,
+        destination_address: sanitizeString(destinationAddress, 300) || "Ubicación seleccionada",
+        destination_lat: destination.lat,
+        destination_lng: destination.lng,
+        category,
+        payment_method: paymentMethod,
+        quoted_fare: finalFare,
+        distance_km: quote.distance_km,
+        duration_min: quote.duration_min,
+        start_pin: pin,
+        notes: finalNotes,
+        quote_data: JSON.stringify(quote),
+>>>>>>> 0d3a9a0eb5ae3325a2ad4b14ceafa159667e7f8b
       });
-      if (!response.data?.ride?.id) throw new Error("No se pudo confirmar la solicitud");
-      setActiveRide(response.data.ride);
-      setQuote(null);
-      Haptics.success();
-    } catch (error) {
-      toast({ title: "No se pudo solicitar el viaje", description: error.response?.data?.error || error.message, variant: "destructive" });
-    } finally { requestingRide.current = false; }
+      setActiveRide(ride);
+      toast({ title: "Viaje solicitado", description: "Buscando conductores cercanos..." });
+    } catch (err) {
+      setActiveRide(null);
+      setQuote(quote);
+      toast({ title: "No se pudo solicitar el viaje", description: err.message, variant: "destructive" });
+    }
   };
 
+  // Cancel ride
   const handleCancel = async () => {
     if (!activeRide) return;
     if (!activeRide.id) {
@@ -412,11 +494,37 @@ export default function PassengerViajar() {
     setDriverPos(null);
   };
 
+  // Link a card for automatic payments (Stripe SetupIntent via Checkout)
+  const handleLinkCard = async () => {
+    if (window.self !== window.top) {
+      toast({ title: "No disponible en vista previa", description: "Publicá la app para vincular tarjeta", variant: "destructive" });
+      return;
+    }
+    setLinkingCard(true);
+    try {
+      const res = await base44.functions.invoke("setupPassengerCard", {});
+      if (res.data?.checkout_url) window.location.href = res.data.checkout_url;
+    } catch (err) {
+      toast({ title: "Error al vincular tarjeta", description: err.message, variant: "destructive" });
+    } finally {
+      setLinkingCard(false);
+    }
+  };
+
   // Pay via QR — get the Checkout URL generated by the driver and redirect
   const handleQrPayment = async () => {
+    if (window.self !== window.top) {
+      toast({ title: "No disponible en vista previa", description: "Publicá la app para pagar", variant: "destructive" });
+      return;
+    }
     setPaying(true);
     try {
+<<<<<<< HEAD
       await openPayment(async () => (await beardrive.payments.rideCheckout({ ride_id: activeRide.id })).data.checkout_url);
+=======
+      const res = await base44.functions.invoke("getRidePaymentUrl", { ride_id: activeRide.id });
+      if (res.data?.checkout_url) window.location.href = res.data.checkout_url;
+>>>>>>> 0d3a9a0eb5ae3325a2ad4b14ceafa159667e7f8b
     } catch (err) {
       toast({ title: "Error al obtener link de pago", description: err.message, variant: "destructive" });
     } finally {
@@ -424,12 +532,26 @@ export default function PassengerViajar() {
     }
   };
 
-  // Legacy card rides require reconciliation; new digital rides use Mercado Pago.
+  // Pay with card via Stripe Checkout
   const handleCardPayment = async () => {
     if (!activeRide) return;
+    // Block checkout inside iframe (preview)
+    if (window.self !== window.top) {
+      toast({ title: "Pago no disponible en vista previa", description: "Publicá la app para pagar con tarjeta", variant: "destructive" });
+      return;
+    }
     setPaying(true);
     try {
+<<<<<<< HEAD
       await openPayment(async () => (await beardrive.payments.createRidePayment({ ride_id: activeRide.id })).data.checkout_url);
+=======
+      const res = await base44.functions.invoke("createRidePayment", { ride_id: activeRide.id });
+      if (res.data?.checkout_url) {
+        window.location.href = res.data.checkout_url;
+      } else {
+        toast({ title: "No se pudo iniciar el pago", variant: "destructive" });
+      }
+>>>>>>> 0d3a9a0eb5ae3325a2ad4b14ceafa159667e7f8b
     } catch (err) {
       toast({ title: "Error al iniciar el pago", description: err.message, variant: "destructive" });
     } finally {
@@ -684,18 +806,17 @@ export default function PassengerViajar() {
               <div className="text-center py-2">
                 {status === "ARRIVED" && <><CheckCircle2 className="w-10 h-10 text-accent mx-auto mb-2" /><p className="font-semibold">Llegaste a destino</p></>}
                 {status === "PAYMENT_PENDING" && <>
-                  <button className="min-h-12 underline" onClick={() => setActiveRide(null)}>Pagar después y pedir otro viaje</button>
                   <Wallet className="w-10 h-10 text-accent mx-auto mb-2" />
                   <p className="font-semibold">Pago pendiente</p>
                   {activeRide.payment_method === "card" ? (
                     <div className="flex flex-col items-center gap-2">
-                      <p className="text-sm text-muted-foreground">Este viaje tiene un medio de pago anterior. Si no podés pagarlo, contactá a soporte.</p>
+                      <p className="text-sm text-muted-foreground">Procesando pago automático con tu tarjeta...</p>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         Esperando confirmación
                       </div>
                       <button onClick={handleCardPayment} disabled={paying} className="text-xs text-muted-foreground underline mt-2">
-                        Consultar pago pendiente
+                        ¿Problemas? Pagar manualmente
                       </button>
                     </div>
                   ) : activeRide.payment_method === "qr" ? (
@@ -793,12 +914,21 @@ export default function PassengerViajar() {
             <div>
               <div className="rounded-xl bg-secondary/60 p-3 mb-4 space-y-2 text-sm"><p><span className="text-muted-foreground">Desde: </span>{displayAddress(originAddress, "Origen seleccionado")}</p><p><span className="text-muted-foreground">Hasta: </span>{displayAddress(destinationAddress, "Destino seleccionado")}</p></div>
               {(() => {
+                const ptsDiscount = (usePoints && (user?.bear_points || 0) >= 50)
+                  ? Math.min(Math.floor((user?.bear_points || 0) / 10) * 100, Math.floor(quote.price * 0.3))
+                  : 0;
+                const effectivePrice = Math.max(quote.price - ptsDiscount, 500);
+
                 return (
                   <div className="text-center mb-3">
                     <p className="text-sm text-muted-foreground">Precio del viaje</p>
                     <button onClick={() => setShowBreakdown(!showBreakdown)} className="text-4xl font-extrabold text-accent inline-flex items-center gap-1">
-                      {formatPrice(quote.price)}
-
+                      {formatPrice(effectivePrice)}
+                      {ptsDiscount > 0 && (
+                        <span className="text-xs line-through text-muted-foreground ml-2 font-normal">
+                          {formatPrice(quote.price)}
+                        </span>
+                      )}
                       <ChevronDown className={`w-5 h-5 transition-transform ${showBreakdown ? "rotate-180" : ""}`} />
                     </button>
                     <p className="text-xs text-muted-foreground mt-1">{quote.distance_km} km · {quote.duration_min} min</p>
@@ -849,6 +979,30 @@ export default function PassengerViajar() {
                   </button>
                 ))}
               </div>
+
+              {/* BearPoints Immediate Discount Toggle */}
+              {user?.bear_points > 0 && (
+                <div className="mb-3 p-2.5 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-accent shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-foreground">Usar BearPoints</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Tenés {user.bear_points} pts disponibles (-${Math.min(Math.floor(user.bear_points / 10) * 100, Math.floor(quote.price * 0.3))} OFF)
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={usePoints}
+                    onChange={(e) => {
+                      Haptics.light();
+                      setUsePoints(e.target.checked);
+                    }}
+                    className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                  />
+                </div>
+              )}
 
               {/* Payment Method Selector */}
               <div className="flex gap-2 mb-3">
@@ -937,7 +1091,26 @@ export default function PassengerViajar() {
                   maxLength={100}
                 />
               </div>
-              {paymentMethod !== "cash" && <p className="text-xs text-muted-foreground p-3 mb-3 rounded-xl bg-secondary">Al finalizar, abrís Mercado Pago y elegís saldo o tarjeta. El importe se confirma desde el servidor.</p>}
+              {paymentMethod === "card" && (
+                <div className="mb-4 p-3 rounded-xl bg-secondary/50">
+                  {savedCard ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-5 h-5 text-accent" />
+                        <div>
+                          <p className="text-sm font-medium capitalize">{savedCard.brand} ·· {savedCard.last4}</p>
+                          <p className="text-xs text-muted-foreground">Venc: {String(savedCard.exp_month).padStart(2, "0")}/{String(savedCard.exp_year).slice(-2)}</p>
+                        </div>
+                      </div>
+                      <button onClick={handleLinkCard} className="text-xs text-accent font-medium">Cambiar</button>
+                    </div>
+                  ) : (
+                    <button onClick={handleLinkCard} disabled={linkingCard} className="w-full flex items-center justify-center gap-2 text-sm font-medium text-accent">
+                      {linkingCard ? <><Loader2 className="w-4 h-4 animate-spin" />Vinculando...</> : <><CreditCard className="w-4 h-4" />Vincular tarjeta</>}
+                    </button>
+                  )}
+                </div>
+              )}
               <Button onClick={handleRequestRide} className="w-full h-12 bear-gold-gradient text-foreground border-0 font-semibold">
                 Solicitar viaje
               </Button>
