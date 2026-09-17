@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { base44 } from "@/api/base44Client";
+import { beardrive } from "@/services/beardrive";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
@@ -20,25 +20,33 @@ export default function DriverEarnings() {
 
   const load = async () => {
     try {
-      const r = await base44.entities.Ride.filter({ driver_id: user.id, status: { $in: ["COMPLETED", "RATED"] } }, "-created_date", 100);
+      const r = await beardrive.rides.list({ driver_id: user.id, status: { $in: ["COMPLETED", "RATED"] } }, "-created_date", 100);
       setRides(r);
-      const c = await base44.entities.DriverDailyCharge.filter({ driver_id: user.id }, "-business_day", 50);
-      setCharges(c);
-      const accountResponse = await base44.functions.invoke("getDriverPaymentAccount", {});
-      setPaymentAccount(accountResponse.data.account?.status === "connected" ? accountResponse.data.account : null);
-    } catch (err) { toast({ title: "No se pudo cargar la información", description: err.response?.data?.error || err.message, variant: "destructive" }); } finally { setLoading(false); }
+      const c = await beardrive.payments.charges(user.id);
+      const status = await beardrive.payments.accountStatus().catch(() => ({ data: { charges: [] } }));
+      const balances = new Map((status.data?.charges || []).map(charge => [charge.id, charge]));
+      setCharges(c.map(charge => balances.get(charge.id) || charge));
+      const accountResponse = await beardrive.payments.driverAccount();
+      setPaymentAccount(accountResponse.data?.account?.status === "connected" ? accountResponse.data.account : null);
+    } catch (err) {
+      toast({ title: "No se pudo cargar la información", description: err.response?.data?.error || err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const connectPayments = async () => {
     if (connecting) return;
     setConnecting(true);
     try {
-      const res = await base44.functions.invoke("connectDriverPayments", {});
+      const res = await beardrive.payments.connect();
       if (!res.data?.url) throw new Error("No se recibió el enlace de vinculación");
       window.location.assign(res.data.url);
     } catch (e) {
       toast({ title: e.response?.data?.error || e.message, variant: "destructive" });
-    } finally { setConnecting(false); }
+    } finally {
+      setConnecting(false);
+    }
   };
 
   useEffect(() => { if (user?.id) load(); }, [user?.id]);
@@ -76,10 +84,14 @@ export default function DriverEarnings() {
 
   const handlePayDebt = async (chargeId) => {
     try {
-      const res = await base44.functions.invoke("createDailyChargePayment", { charge_id: chargeId });
-      window.location.assign(res.data.checkout_url);
+      const res = await beardrive.payments.payDailyCharge({ charge_id: chargeId });
+      if (res.data?.checkout_url) {
+        window.location.assign(res.data.checkout_url);
+      } else {
+        throw new Error("No se recibió el enlace de pago");
+      }
     } catch (err) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err.response?.data?.error || err.message, variant: "destructive" });
     }
   };
 

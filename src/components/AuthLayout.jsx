@@ -1,7 +1,7 @@
 import React from "react";
 import ThemeToggle from "@/components/bear/ThemeToggle";
 
-export default function AuthLayout({ icon: Icon, title, subtitle, footer, children }) {
+export default function AuthLayout({ icon: Icon, title, subtitle = undefined, footer = undefined, children = undefined }) {
   return (
     <div className="relative min-h-[100dvh] overflow-y-auto scrollbar-hide flex flex-col items-center justify-center px-4 py-8 bg-gradient-to-b from-background to-secondary/40">
       <div className="absolute top-4 right-4 z-10">

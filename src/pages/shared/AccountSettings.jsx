@@ -69,7 +69,7 @@ export default function AccountSettings() {
     if (!user?.email) return;
     setResettingPassword(true);
     try {
-      await base44.auth.resetPasswordForEmail(user.email);
+      await base44.auth.resetPasswordRequest(user.email);
       toast({
         title: "Correo de restablecimiento enviado",
         description: `Enviamos un enlace seguro a ${user.email} para cambiar tu contraseña.`,

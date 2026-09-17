@@ -5,6 +5,9 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 
 const StatusBar = registerPlugin("StatusBar");
 const SplashScreen = registerPlugin("SplashScreen");
+const App = registerPlugin("App");
+
+let initialized = false;
 
 function resolveInitialTheme() {
   const stored = localStorage.getItem("bear_theme");
@@ -26,7 +29,19 @@ export async function updateStatusBarStyle(theme) {
 }
 
 export async function initNative() {
-  if (!Capacitor.isNativePlatform()) return;
+  if (!Capacitor.isNativePlatform() || initialized) return;
+  initialized = true;
+
+  try {
+    await App.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) {
+        window.dispatchEvent(new Event("bear-app-resume"));
+        window.dispatchEvent(new Event("bear-payment-return"));
+      }
+    });
+  } catch (error) {
+    console.warn("[nativeSetup] No se pudo registrar el regreso a la app", error);
+  }
 
   try {
     // El WebView queda debajo de las barras del sistema para evitar que contenido,

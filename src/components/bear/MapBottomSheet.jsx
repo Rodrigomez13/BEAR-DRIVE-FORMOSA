@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 /** A bounded, non-modal map panel: the map and bottom navigation remain usable. */
-export default function MapBottomSheet({ title, subtitle, expanded = true, onToggle, children }) {
+export default function MapBottomSheet({ title, subtitle = undefined, expanded = true, onToggle = undefined, children }) {
   return <section aria-label={title} className="rounded-3xl border border-border bg-card shadow-xl overflow-hidden">
     <header className="px-4 pt-2 pb-3 border-b border-border/60">
       <div aria-hidden="true" className="w-9 h-1 rounded-full bg-muted-foreground/25 mx-auto mb-2" />
