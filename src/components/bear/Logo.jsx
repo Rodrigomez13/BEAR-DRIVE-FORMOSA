@@ -5,7 +5,7 @@ import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
 // BearDrive logo lockup: transparent SVG icon + wordmark below.
 // Square container with object-contain ensures the icon is never cropped.
 // Supports long-press (>=2.5s) to trigger the hidden admin access.
-export default function Logo({ size = "md", onLongPress, className = "" }) {
+export default function Logo({ size = "md", onLongPress = undefined, className = "" }) {
   const timerRef = useRef(null);
 
   const sizes = {

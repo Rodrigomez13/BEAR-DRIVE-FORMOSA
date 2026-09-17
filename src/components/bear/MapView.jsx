@@ -165,29 +165,29 @@ function offsetCenter(pos, isRotating, heading) {
 export default function MapView({
   center = { lat: -26.1849, lng: -58.1731 },
   zoom = 15,
-  origin,
-  destination,
+  origin = undefined,
+  destination = undefined,
   originLabel = "Origen",
   destinationLabel = "Destino",
   showOriginMarker = true,
   showDestinationMarker = true,
-  driverPos,
-  userPos,
-  path,
-  onMapClick,
+  driverPos = undefined,
+  userPos = undefined,
+  path = undefined,
+  onMapClick = undefined,
   className = "",
-  recenter,
-  recenterTrigger,
+  recenter = undefined,
+  recenterTrigger = undefined,
   recenterZoom = 16,
   interactive = true,
   followDriver = false,
   navigationZoom = 17,
-  onRouteInfo,
+  onRouteInfo = undefined,
   rotateHeading = false,
   tilt = 0,
   heading = 0,
   markerAnimationDuration = 900,
-  mapTheme,
+  mapTheme = undefined,
 }) {
   const themeContext = useTheme();
   const effectiveTheme = mapTheme || themeContext?.theme || "dark";
@@ -198,7 +198,7 @@ export default function MapView({
 
   const containerRef = useRef(null);
   const mapRef = useRef(null);
-  const markersRef = useRef({});
+  const markersRef = useRef(/** @type {Partial<Record<'origin'|'originBg'|'destination'|'driver'|'user', google.maps.Marker>>} */ ({}));
   const polylineRef = useRef(null);
   const dirRendererRef = useRef(null);
   const dirServiceRef = useRef(null);

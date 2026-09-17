@@ -19,10 +19,10 @@ export default function AdminDashboard() {
   const load = async () => {
     try {
       const [applications, rides, drivers, charges] = await Promise.all([
-        base44.entities.DriverApplication.list(100),
-        base44.entities.Ride.list(100),
-        base44.entities.User.list(100),
-        base44.entities.DriverDailyCharge.list(50),
+        base44.entities.DriverApplication.list('-created_date', 100),
+        base44.entities.Ride.list('-created_date', 100),
+        base44.entities.User.list('-created_date', 100),
+        base44.entities.DriverDailyCharge.list('-created_date', 50),
       ]);
 
       const pendingApps = applications.filter(a => a.status === "SUBMITTED" || a.status === "UNDER_REVIEW");

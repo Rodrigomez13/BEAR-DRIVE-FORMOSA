@@ -1,7 +1,7 @@
 import { openPayment } from "@/lib/payment-navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { base44 } from "@/api/base44Client";
+import { beardrive } from "@/services/beardrive";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -99,7 +99,7 @@ export default function PassengerViajar() {
   useEffect(() => {
     const recover = async () => {
       try {
-        const rides = await base44.entities.Ride.filter({ passenger_id: user.id, status: { $in: ACTIVE_STATUSES } }, "-created_date", 1);
+        const rides = await beardrive.rides.list({ passenger_id: user.id, status: { $in: ACTIVE_STATUSES } }, "-created_date", 1);
         if (rides.length > 0) {
           setActiveRide(rides[0]);
           if (rides[0].origin_lat) setOrigin({ lat: rides[0].origin_lat, lng: rides[0].origin_lng });
@@ -143,13 +143,13 @@ export default function PassengerViajar() {
     if (!activeRide?.driver_id) return;
 
     // Initial fetch so the marker appears immediately
-    base44.entities.DriverLocation.filter({ driver_id: activeRide.driver_id })
+    beardrive.drivers.locations(activeRide.driver_id)
       .then((locs) => {
         if (locs.length > 0) setDriverPos({ lat: locs[0].lat, lng: locs[0].lng, heading: locs[0].heading });
       })
       .catch(() => {});
 
-    const unsubscribe = base44.entities.DriverLocation.subscribe((event) => {
+    const unsubscribe = beardrive.drivers.subscribeLocation((event) => {
       if (event.data?.driver_id !== activeRide.driver_id) return;
       if (event.type === "delete") return;
       setDriverPos({ lat: event.data.lat, lng: event.data.lng, heading: event.data.heading });
@@ -287,7 +287,7 @@ export default function PassengerViajar() {
     let cancelled = false;
     const recalculate = async () => {
       try {
-        const res = await base44.functions.invoke("calculateQuote", {
+        const res = await beardrive.rides.quote({
           origin_lat: origin.lat, origin_lng: origin.lng,
           destination_lat: destination.lat, destination_lng: destination.lng,
           category,
@@ -310,7 +310,7 @@ export default function PassengerViajar() {
     }
     setQuoteLoading(true);
     try {
-      const res = await base44.functions.invoke("calculateQuote", {
+      const res = await beardrive.rides.quote({
         origin_lat: origin.lat, origin_lng: origin.lng,
         destination_lat: destination.lat, destination_lng: destination.lng,
         category,
@@ -332,7 +332,7 @@ export default function PassengerViajar() {
     if (pickupReference.trim()) notes.push(`Ref: ${sanitizeString(pickupReference.trim(), 100)}`);
     if (paymentMethod === "cash") notes.push(cashNoteOption === "exact" ? "Pago justo" : cashNoteOption === "change" ? "Necesita cambio" : `Abona con $${cashNoteOption}`);
     try {
-      const response = await base44.functions.invoke("createRide", {
+      const response = await beardrive.rides.request({
         quote_id: quote.id,
         payment_method: paymentMethod === "cash" ? "cash" : "qr",
         notes: notes.join(" · "),
@@ -361,7 +361,7 @@ export default function PassengerViajar() {
       return;
     }
     try {
-      await base44.functions.invoke("passengerCancelRide", { ride_id: activeRide.id });
+      await beardrive.rides.cancelPassenger({ ride_id: activeRide.id });
       setActiveRide(null);
       setOrigin(null);
       setDestination(null);
@@ -380,7 +380,7 @@ export default function PassengerViajar() {
   const handleRate = async () => {
     if (rating === 0) return;
     try {
-      await base44.functions.invoke("rateRide", { ride_id: activeRide.id, score: rating, comment: ratingComment, tags: ratingTags.join(",") });
+      await beardrive.rides.rate({ ride_id: activeRide.id, score: rating, comment: ratingComment, tags: ratingTags.join(",") });
       toast({ title: "¡Gracias por tu calificación!" });
       setShowFavoriteModal(true);
     } catch (err) {
@@ -416,7 +416,7 @@ export default function PassengerViajar() {
   const handleQrPayment = async () => {
     setPaying(true);
     try {
-      await openPayment(async () => (await base44.functions.invoke("getRidePaymentUrl", { ride_id: activeRide.id })).data.checkout_url);
+      await openPayment(async () => (await beardrive.payments.rideCheckout({ ride_id: activeRide.id })).data.checkout_url);
     } catch (err) {
       toast({ title: "Error al obtener link de pago", description: err.message, variant: "destructive" });
     } finally {
@@ -429,7 +429,7 @@ export default function PassengerViajar() {
     if (!activeRide) return;
     setPaying(true);
     try {
-      await openPayment(async () => (await base44.functions.invoke("createRidePayment", { ride_id: activeRide.id })).data.checkout_url);
+      await openPayment(async () => (await beardrive.payments.createRidePayment({ ride_id: activeRide.id })).data.checkout_url);
     } catch (err) {
       toast({ title: "Error al iniciar el pago", description: err.message, variant: "destructive" });
     } finally {

@@ -14,7 +14,8 @@ import {
 const FALLBACK_IMAGE_URL =
   "https://static.wixstatic.com/media/12d367_4f26ccd17f8f4e3a8958306ea08c2332~mv2.png"
 
-const ImageWrapper = React.forwardRef(({ aspectRatio, className, style, children }, ref) => (
+const ImageWrapper = React.forwardRef(/** @param {React.ComponentPropsWithoutRef<'span'> & {aspectRatio?: string}} props */
+  ({ aspectRatio, className, style, children }, ref) => (
   <span
     ref={ref}
     className={cn("inline-block relative", className)}
@@ -26,6 +27,7 @@ const ImageWrapper = React.forwardRef(({ aspectRatio, className, style, children
 ImageWrapper.displayName = "ImageWrapper"
 
 const ResponsiveImage = React.forwardRef(
+  /** @param {React.ComponentPropsWithoutRef<'img'> & {parsed: ReturnType<typeof parseWixMediaUrl>, fittingType: 'fill'|'fit', focalPoint?: {x:number,y:number}, quality?: number, aspectRatio?: string}} props */
   ({ parsed, fittingType, focalPoint, quality, className, style, aspectRatio, onLoad, ...props }, parentRef) => {
     const wrapperRef = React.useRef(null)
     const imgRef = React.useRef(null)
@@ -116,6 +118,7 @@ ResponsiveImage.displayName = "ResponsiveImage"
  * original swaps to the generic fallback image.
  */
 const Image = React.forwardRef(
+  /** @param {React.ComponentPropsWithoutRef<'img'> & {fittingType?: 'fill'|'fit', originWidth?: number, originHeight?: number, focalPointX?: number, focalPointY?: number, quality?: number}} props */
   (
     {
       src,

@@ -32,7 +32,10 @@ export async function initNative() {
   initialized = true;
   try {
     await App.addListener("appStateChange", ({ isActive }) => {
-      if (isActive) window.dispatchEvent(new Event("bear-payment-return"));
+      if (isActive) {
+        window.dispatchEvent(new Event("bear-app-resume"));
+        window.dispatchEvent(new Event("bear-payment-return"));
+      }
     });
   } catch (error) { console.warn("[nativeSetup] No se pudo registrar el regreso a la app", error); }
 

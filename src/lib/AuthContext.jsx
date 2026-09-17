@@ -1,8 +1,8 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { beardrive } from '@/services/beardrive';
 import { appParams } from '@/lib/app-params';
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
       setAuthError(null);
       
       try {
-        const publicSettings = await base44.app.getPublicSettings();
+        const publicSettings = await beardrive.auth.publicSettings();
         setAppPublicSettings(publicSettings);
         
         // If we got the app public settings successfully, check if user is authenticated
@@ -81,7 +81,7 @@ export const AuthProvider = ({ children }) => {
     try {
       // Now check if the user is authenticated
       setIsLoadingAuth(true);
-      const currentUser = await base44.auth.me();
+      const currentUser = await beardrive.auth.currentUser();
       setUser(currentUser);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
@@ -108,16 +108,16 @@ export const AuthProvider = ({ children }) => {
     
     if (shouldRedirect) {
       // Use the SDK's logout method which handles token cleanup and redirect
-      base44.auth.logout(window.location.href);
+      beardrive.auth.logout(window.location.href);
     } else {
       // Just remove the token without redirect
-      base44.auth.logout();
+      beardrive.auth.logout();
     }
   };
 
   const navigateToLogin = () => {
     // Use the SDK's redirectToLogin method
-    base44.auth.redirectToLogin(window.location.href);
+    beardrive.auth.login(window.location.href);
   };
 
   return (

@@ -3,7 +3,7 @@ import RideDestinationChange from "@/components/bear/RideDestinationChange";
 import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { beardrive } from "@/services/beardrive";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -143,11 +143,11 @@ export default function DriverConducir() {
 
     const load = async () => {
       try {
-        const vehiclesResult = await base44.entities.Vehicle.filter({ driver_id: user.id, status: "approved" });
+        const vehiclesResult = await beardrive.drivers.approvedVehicles(user.id);
         setVehicles(vehiclesResult);
         if (vehiclesResult.length > 0) setSelectedVehicle(vehiclesResult[0]);
 
-        const active = await base44.entities.Ride.filter(
+        const active = await beardrive.rides.list(
           { driver_id: user.id, status: { $in: ACTIVE_RIDE_STATUSES } },
           "-created_date",
           3
@@ -155,7 +155,7 @@ export default function DriverConducir() {
         setActiveRide(active.find(r => r.status !== "ASSIGNED") || null);
         setQueuedRide(active.find(r => r.status === "ASSIGNED") || null);
 
-        const locations = await base44.entities.DriverLocation.filter({ driver_id: user.id });
+        const locations = await beardrive.drivers.locations(user.id);
         if (locations.length > 0) {
           setDriverLocationId(locations[0].id);
           if (locations[0].online) setOnline(true);
@@ -179,7 +179,7 @@ export default function DriverConducir() {
     async () => {
       if (!driverPos) return;
       try {
-        const res = await base44.functions.invoke("getNearbyRideRequests", {
+        const res = await beardrive.rides.offers({
           lat: driverPos.lat,
           lng: driverPos.lng,
           radius_km: 15,
@@ -210,7 +210,7 @@ export default function DriverConducir() {
   });
   useEffect(() => {
     if (activeRide || !queuedRide) return;
-    base44.functions.invoke("activateQueuedRide", { ride_id: queuedRide.id })
+    beardrive.rides.activateQueued({ ride_id: queuedRide.id })
       .then(res => { setActiveRide(res.data.ride); setQueuedRide(null); }).catch(() => {});
   }, [activeRide, queuedRide?.id]);
   useActiveRideGuard(!!activeRide || !!queuedRide);
@@ -287,7 +287,7 @@ export default function DriverConducir() {
       lastLocationPersistRef.current = now;
 
       try {
-        await base44.functions.invoke("updateDriverLocation", {
+        await beardrive.drivers.updateLocation({
           lat: position.lat,
           lng: position.lng,
           online: true,
@@ -317,7 +317,7 @@ export default function DriverConducir() {
         if (arrivalHitsRef.current.pickup >= 2) {
           transitionInFlightRef.current = true;
           try {
-            await base44.functions.invoke("transitionRideStatus", {
+            await beardrive.rides.transition({
               ride_id: activeRide.id, target_status: "DRIVER_ARRIVED",
             });
             navVoice.announceArrival(true);
@@ -347,7 +347,7 @@ export default function DriverConducir() {
         if (arrivalHitsRef.current.destination >= 2) {
           transitionInFlightRef.current = true;
           try {
-            await base44.functions.invoke("transitionRideStatus", {
+            await beardrive.rides.transition({
               ride_id: activeRide.id, target_status: "ARRIVED",
             });
             navVoice.announceArrival(false);
@@ -438,7 +438,7 @@ export default function DriverConducir() {
       const position = await getCurrentPosition({ enableHighAccuracy: true, maximumAge: 1000 });
       setDriverPos(position);
 
-      const res = await base44.functions.invoke("driverGoOnline", {
+      const res = await beardrive.drivers.goOnline({
         lat: position.lat,
         lng: position.lng,
         vehicle_id: selectedVehicle.id,
@@ -462,7 +462,7 @@ export default function DriverConducir() {
   const handleGoOffline = async () => {
     try {
       if (driverLocationId) {
-        await base44.entities.DriverLocation.update(driverLocationId, { online: false });
+        await beardrive.drivers.goOffline();
       }
       setOnline(false);
       setAvailableRides([]);
@@ -504,7 +504,7 @@ export default function DriverConducir() {
       setNavigationStart({ lat: position.lat, lng: position.lng });
       setRouteInfo(null);
 
-      const res = await base44.functions.invoke("acceptRide", {
+      const res = await beardrive.rides.acceptOffer({
         ride_id: ride.id,
         vehicle_id: selectedVehicle.id,
         vehicle_plate: selectedVehicle.plate,
@@ -528,7 +528,7 @@ export default function DriverConducir() {
   const handleArrived = async () => {
     if (!activeRide) return;
     try {
-      const res = await base44.functions.invoke("transitionRideStatus", {
+      const res = await beardrive.rides.transition({
         ride_id: activeRide.id, target_status: "DRIVER_ARRIVED",
       });
       setActiveRide(res.data.ride);
@@ -540,7 +540,7 @@ export default function DriverConducir() {
 
   const handleValidatePin = async () => {
     try {
-      const res = await base44.functions.invoke("validateRidePin", {
+      const res = await beardrive.rides.validatePin({
         ride_id: activeRide.id, pin: pinInput,
       });
       const startCoord = driverPos
@@ -564,7 +564,7 @@ export default function DriverConducir() {
   const handleDestinationArrived = async () => {
     if (!activeRide) return;
     try {
-      const res = await base44.functions.invoke("transitionRideStatus", {
+      const res = await beardrive.rides.transition({
         ride_id: activeRide.id, target_status: "ARRIVED",
       });
       setActiveRide(res.data.ride);
@@ -577,7 +577,7 @@ export default function DriverConducir() {
   const handleProceedToPayment = async () => {
     if (!activeRide) return;
     try {
-      const res = await base44.functions.invoke("transitionRideStatus", {
+      const res = await beardrive.rides.transition({
         ride_id: activeRide.id, target_status: "PAYMENT_PENDING",
       });
       setActiveRide(res.data.ride);
@@ -589,7 +589,7 @@ export default function DriverConducir() {
   const handleComplete = async () => {
     setCompleting(true);
     try {
-      const res = await base44.functions.invoke("completeRide", {
+      const res = await beardrive.rides.complete({
         ride_id: activeRide.id,
       });
 
@@ -631,7 +631,7 @@ export default function DriverConducir() {
   const handleCancel = async () => {
     if (!activeRide) return;
     try {
-      const res = await base44.functions.invoke("driverCancelRide", { ride_id: activeRide.id });
+      const res = await beardrive.rides.cancelDriver({ ride_id: activeRide.id });
       if (res.data?.re_searched) {
         toast({ title: "Viaje reasignado", description: "Buscando otro conductor para el pasajero" });
       } else {
