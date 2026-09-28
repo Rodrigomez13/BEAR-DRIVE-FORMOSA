@@ -48,10 +48,7 @@ android/**/build/
 .agents/
 skills-lock.json
 
-```gitignore
 # BearDrive private test artifacts
-
 .private/
 .env.base44.local
 .env.seed.local
-```
