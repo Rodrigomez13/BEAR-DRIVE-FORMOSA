@@ -2,10 +2,10 @@
 // En web (navegador) los plugins no hacen nada (no-op), así que esto es seguro
 // tanto en el preview web como dentro del APK Android.
 import { Capacitor, registerPlugin } from "@capacitor/core";
+import { App } from "@capacitor/app";
 
 const StatusBar = registerPlugin("StatusBar");
 const SplashScreen = registerPlugin("SplashScreen");
-const App = registerPlugin("App");
 
 let initialized = false;
 
@@ -31,6 +31,16 @@ export async function updateStatusBarStyle(theme) {
 export async function initNative() {
   if (!Capacitor.isNativePlatform() || initialized) return;
   initialized = true;
+
+  document.documentElement.classList.add("native-app");
+  document.querySelector('meta[name="viewport"]')?.setAttribute(
+    "content", "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+  );
+
+  await App.addListener("backButton", ({ canGoBack }) => {
+    if (canGoBack) window.history.back();
+    else App.minimizeApp();
+  });
 
   try {
     await App.addListener("appStateChange", ({ isActive }) => {
