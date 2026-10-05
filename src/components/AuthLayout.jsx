@@ -14,7 +14,7 @@ export default function AuthLayout({ icon: Icon, title, subtitle = undefined, fo
           <div className="relative mb-3">
             <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-accent/30 to-amber-500/10 p-1 shadow-lg shadow-accent/10 flex items-center justify-center border border-accent/40">
               <img
-                src="/assets/mascot/frame_01.png"
+                src="/assets/brand/bear-wave.webp"
                 alt="Mascota BearDrive"
                 className="w-full h-full object-contain filter drop-shadow-md"
               />

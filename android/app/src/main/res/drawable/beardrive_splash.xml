@@ -5,5 +5,5 @@
         android:width="144dp"
         android:height="144dp"
         android:gravity="center"
-        android:drawable="@drawable/beardrive_app_mark" />
+        android:drawable="@drawable/beardrive_app_icon" />
 </layer-list>

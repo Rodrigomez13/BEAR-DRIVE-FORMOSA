@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 export default function LoadingScreen({
   label = "Cargando...",
   className = "",
-  mascotImage = "/assets/mascot/bear_costanera_wave_hd.jpg",
+  mascotImage = "/assets/brand/bear-wave.webp",
   showPinBadge = true,
 }) {
   return (
@@ -33,9 +33,10 @@ export default function LoadingScreen({
             <img
               src={mascotImage}
               alt="BearDrive"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
               onError={(e) => {
-                e.currentTarget.src = "/beardrive-login-pin.png";
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "/assets/brand/app-icon.png";
               }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
@@ -45,11 +46,12 @@ export default function LoadingScreen({
           {showPinBadge && (
             <div className="absolute -bottom-2 -right-2 w-12 h-12 rounded-2xl bg-[#0f1422] border-2 border-[#E9B74E] shadow-xl p-1 flex items-center justify-center overflow-hidden">
               <img
-                src="/assets/mascot/bear_pin_emblem.png"
+                src="/assets/brand/app-icon.png"
                 alt="Bear Pin"
                 className="w-full h-full object-contain"
                 onError={(e) => {
-                  e.currentTarget.src = "/beardrive-login-pin.png";
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/assets/brand/app-icon.png";
                 }}
               />
             </div>
