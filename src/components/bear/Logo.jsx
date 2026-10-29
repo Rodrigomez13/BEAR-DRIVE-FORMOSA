@@ -1,6 +1,5 @@
 import React, { useRef, useCallback } from "react";
 import { Image } from "@/components/ui/image";
-import { BEAR_LOGO_SVG } from "@/lib/brandAssets";
 
 // BearDrive logo lockup: transparent SVG icon + wordmark below.
 // Square container with object-contain ensures the icon is never cropped.
@@ -42,7 +41,7 @@ export default function Logo({ size = "md", onLongPress = undefined, className =
     >
       <div className="flex flex-col items-center gap-2">
         <div className={`${s.box} flex items-center justify-center`}>
-          <Image src={BEAR_LOGO_SVG} alt="BearDrive" className="w-full h-full object-contain" />
+          <Image src="/assets/brand/app-icon.png" alt="BearDrive" className="w-full h-full object-contain" />
         </div>
         <span className={`${s.text} font-extrabold tracking-tight text-foreground leading-none`}>
           Bear<span className="text-accent">Drive</span>

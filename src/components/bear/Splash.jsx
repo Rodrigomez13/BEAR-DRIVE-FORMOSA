@@ -60,11 +60,12 @@ export default function Splash() {
           <div className="relative w-56 h-56 sm:w-64 sm:h-64 rounded-3xl p-1.5 bg-gradient-to-tr from-[#E9B74E] via-[#ffdf88] to-[#996f1e] shadow-[0_0_45px_rgba(233,183,78,0.4)]">
             <div className="w-full h-full rounded-[20px] bg-[#0f1422] overflow-hidden relative flex items-center justify-center">
               <img
-                src="/assets/mascot/bear_costanera_wave_hd.jpg"
+                src="/assets/brand/bear-wave.webp"
                 alt="BearDrive en Formosa"
-                className="w-full h-full object-cover transform scale-105 hover:scale-110 transition-transform duration-700"
+                className="w-full h-full object-contain transition-transform duration-700"
                 onError={(e) => {
-                  e.currentTarget.src = "/beardrive-login-pin.png";
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/assets/brand/app-icon.png";
                 }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
@@ -78,11 +79,12 @@ export default function Splash() {
               className="absolute -bottom-2.5 -right-2.5 w-14 h-14 rounded-2xl bg-[#0f1422] border-2 border-[#E9B74E] shadow-2xl p-1.5 flex items-center justify-center overflow-hidden"
             >
               <img
-                src="/assets/mascot/bear_pin_emblem.png"
+                src="/assets/brand/app-icon.png"
                 alt="Bear Pin"
                 className="w-full h-full object-contain"
                 onError={(e) => {
-                  e.currentTarget.src = "/beardrive-login-pin.png";
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/assets/brand/app-icon.png";
                 }}
               />
             </motion.div>

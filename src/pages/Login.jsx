@@ -149,7 +149,7 @@ export default function Login() {
             <div className="relative w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
               <div className="absolute inset-0 rounded-full bg-accent/20 blur-xl opacity-70 group-hover:opacity-100 transition-opacity" />
               <img
-                src="/assets/mascot/bear_pin_emblem.png"
+                src="/assets/brand/app-icon.png"
                 alt="Logo BearDrive Formosa"
                 onError={(e) => { e.currentTarget.src = "/assets/beardrive-login-pin.png"; }}
                 className="relative w-full h-full object-contain filter z-10 drop-shadow-[0_8px_16px_rgba(233,183,78,0.25)] opacity-100" />
@@ -164,6 +164,7 @@ export default function Login() {
             className="h-11 w-auto object-contain drop-shadow" />
           
 
+          <img src="/assets/brand/formosa-welcome.webp" alt="Mascota BearDrive en Formosa" className="mt-4 w-full max-w-sm aspect-[16/9] rounded-2xl object-contain" />
           <p className="mt-2 text-xs text-muted-foreground font-medium text-center">
             Movilidad urbana y segura en Formosa
           </p>

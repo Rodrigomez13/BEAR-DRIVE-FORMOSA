@@ -13,12 +13,15 @@
     "cap:sync": "vite build && cap sync android",
     "cap:open": "cap open android",
     "cap:run": "vite build && cap run android",
-    "android": "vite build && cap sync android && cap open android"
+    "android": "vite build && cap sync android && cap open android",
+    "android:apk": "node scripts/build-android.mjs",
+    "android:sync": "node scripts/build-android.mjs --sync-only"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.57",
     "@base44/vite-plugin": "^1.0.48",
     "@capacitor/android": "^8.5.1",
+    "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.1",
     "@capacitor/geolocation": "^8.2.2",
     "@capacitor/splash-screen": "^8.0.2",
