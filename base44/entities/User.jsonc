@@ -63,6 +63,32 @@
       ],
       "default": "passenger"
     },
+    "is_test_account": {
+      "type": "boolean",
+      "default": false,
+      "description": "Marks accounts provisioned exclusively for controlled BearDrive testing",
+      "rls": {
+        "write": false
+      }
+    },
+    "test_persona": {
+      "type": "string",
+      "enum": [
+        "passenger",
+        "driver"
+      ],
+      "description": "Controlled test persona. Never used as an authorization source.",
+      "rls": {
+        "write": false
+      }
+    },
+    "mercadopago_test_user_id": {
+      "type": "string",
+      "description": "Optional Mercado Pago test-user reference. No tokens or passwords are stored here.",
+      "rls": {
+        "write": false
+      }
+    },
     "rating_avg": {
       "type": "number",
       "default": 0,
